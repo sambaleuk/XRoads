@@ -345,7 +345,7 @@
       "title": "LogEntry Streaming",
       "description": "En tant qu'utilisateur, je veux voir les logs apparaître en temps réel depuis le MCP.",
       "priority": "medium",
-      "status": "pending",
+      "status": "complete",
       "depends_on": ["US-007", "US-011", "US-013"],
       "acceptance_criteria": [
         "MCPClient émet les logs via AsyncStream<LogEntry>",
@@ -357,7 +357,7 @@
         "Le streaming fonctionne et les logs s'affichent en temps réel"
       ],
       "technical_notes": "Utiliser AsyncStream pour le streaming. Task avec while loop pour polling. Attention à la cancellation avec Task.isCancelled.",
-      "completed_at": null
+      "completed_at": "2026-02-02T04:00:00.000Z"
     },
     {
       "id": "US-018",

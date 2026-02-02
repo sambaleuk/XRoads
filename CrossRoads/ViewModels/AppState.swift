@@ -35,6 +35,17 @@ final class AppState {
     /// Current error message to display
     var error: AppError?
 
+    /// MCP connection status
+    var mcpConnectionStatus: MCPConnectionStatus = .disconnected
+
+    /// Indicates if log streaming is active
+    var isStreamingLogs: Bool = false
+
+    // MARK: - Private Properties
+
+    /// Task for log streaming
+    private var logStreamTask: Task<Void, Never>?
+
     // MARK: - Services
 
     /// Service container providing access to all services
@@ -177,6 +188,89 @@ final class AppState {
     /// Clears the current error
     func clearError() {
         self.error = nil
+    }
+
+    // MARK: - MCP Log Streaming
+
+    /// Starts the MCP server and begins streaming logs
+    /// Logs are automatically added to the logs array as they arrive
+    func startLogStreaming() async {
+        guard !isStreamingLogs else { return }
+
+        isStreamingLogs = true
+        addLog(LogEntry(level: .info, source: "system", worktree: "", message: "Starting MCP connection..."))
+
+        let mcpClient = services.mcpClient
+
+        // Start MCP server if not running
+        do {
+            let isRunning = await mcpClient.serverIsRunning
+            if !isRunning {
+                try await mcpClient.start()
+            }
+
+            // Update connection status
+            mcpConnectionStatus = await mcpClient.status
+            addLog(LogEntry(level: .info, source: "mcp", worktree: "", message: "MCP server connected"))
+
+        } catch {
+            mcpConnectionStatus = .error(error.localizedDescription)
+            isStreamingLogs = false
+            addLog(LogEntry(level: .error, source: "mcp", worktree: "", message: "Failed to start MCP: \(error.localizedDescription)"))
+            return
+        }
+
+        // Start consuming the log stream
+        logStreamTask = Task { [weak self] in
+            guard let self = self else { return }
+
+            let stream = await mcpClient.logStream()
+
+            for await logEntry in stream {
+                // Check for cancellation
+                guard !Task.isCancelled else { break }
+
+                // Add log on main actor
+                await MainActor.run {
+                    self.addLog(logEntry)
+                }
+            }
+
+            // Stream ended
+            await MainActor.run {
+                self.isStreamingLogs = false
+            }
+        }
+    }
+
+    /// Stops log streaming and disconnects from MCP
+    func stopLogStreaming() async {
+        guard isStreamingLogs else { return }
+
+        addLog(LogEntry(level: .info, source: "system", worktree: "", message: "Stopping MCP connection..."))
+
+        let mcpClient = services.mcpClient
+
+        // Cancel the stream task
+        logStreamTask?.cancel()
+        logStreamTask = nil
+
+        // Stop the MCP log stream
+        await mcpClient.stopLogStream()
+
+        // Stop the MCP server
+        await mcpClient.stop()
+
+        // Update state
+        mcpConnectionStatus = .disconnected
+        isStreamingLogs = false
+
+        addLog(LogEntry(level: .info, source: "mcp", worktree: "", message: "MCP server disconnected"))
+    }
+
+    /// Refreshes the MCP connection status
+    func refreshMCPStatus() async {
+        mcpConnectionStatus = await services.mcpClient.status
     }
 }
 

@@ -251,6 +251,21 @@ extension MCPLogEntry {
     }
 }
 
+// MARK: - MCP Connection Status
+
+/// Represents the current connection status of the MCP client
+enum MCPConnectionStatus: Sendable, Equatable {
+    case disconnected
+    case connecting
+    case connected
+    case error(String)
+
+    var isConnected: Bool {
+        if case .connected = self { return true }
+        return false
+    }
+}
+
 // MARK: - MCP Client Actor
 
 /// Thread-safe MCP client for communicating with crossroads-mcp server
@@ -266,6 +281,21 @@ actor MCPClient {
     private var pendingResponses: [Int: CheckedContinuation<JSONRPCResponse, Error>] = [:]
     private var responseBuffer: String = ""
     private var isRunning: Bool = false
+
+    /// Current connection status
+    private var connectionStatus: MCPConnectionStatus = .disconnected
+
+    /// Log streaming task
+    private var logStreamTask: Task<Void, Never>?
+
+    /// Continuation for the log stream
+    private var logStreamContinuation: AsyncStream<LogEntry>.Continuation?
+
+    /// Track last seen log IDs to avoid duplicates
+    private var lastSeenLogIds: Set<String> = []
+
+    /// Polling interval for log streaming (in nanoseconds)
+    private let pollingInterval: UInt64 = 500_000_000 // 500ms
 
     /// Path to the MCP server directory
     private let mcpServerPath: String
@@ -300,14 +330,18 @@ actor MCPClient {
             throw MCPError.serverAlreadyRunning
         }
 
+        connectionStatus = .connecting
+
         // Verify node exists
         guard FileManager.default.fileExists(atPath: nodePath) else {
+            connectionStatus = .error("Node.js not found")
             throw MCPError.serverNotFound(path: nodePath)
         }
 
         // Verify MCP server directory exists
         let serverScript = (mcpServerPath as NSString).appendingPathComponent("dist/index.js")
         guard FileManager.default.fileExists(atPath: serverScript) else {
+            connectionStatus = .error("MCP server script not found")
             throw MCPError.serverNotFound(path: serverScript)
         }
 
@@ -351,6 +385,7 @@ actor MCPClient {
         do {
             try process.run()
         } catch {
+            connectionStatus = .error("Failed to launch: \(error.localizedDescription)")
             throw MCPError.serverLaunchFailed(reason: error.localizedDescription)
         }
 
@@ -361,12 +396,21 @@ actor MCPClient {
         self.isRunning = true
 
         // Initialize the MCP connection
-        try await initialize()
+        do {
+            try await initialize()
+            connectionStatus = .connected
+        } catch {
+            connectionStatus = .error("Initialization failed: \(error.localizedDescription)")
+            throw error
+        }
     }
 
     /// Stops the MCP server process
     func stop() {
         guard isRunning, let process = process else { return }
+
+        // Stop log streaming first
+        stopPollingLoop()
 
         // Close stdin to signal EOF
         stdinPipe?.fileHandleForWriting.closeFile()
@@ -385,6 +429,7 @@ actor MCPClient {
         self.stdoutPipe = nil
         self.stderrPipe = nil
         self.isRunning = false
+        self.connectionStatus = .disconnected
 
         // Cancel pending requests
         for (_, continuation) in pendingResponses {
@@ -396,6 +441,124 @@ actor MCPClient {
     /// Check if the server is running
     var serverIsRunning: Bool {
         return isRunning
+    }
+
+    /// Get the current connection status
+    var status: MCPConnectionStatus {
+        return connectionStatus
+    }
+
+    // MARK: - Log Streaming
+
+    /// Creates an AsyncStream that emits LogEntry items from the MCP server
+    /// The stream polls getState() at the specified interval and yields new logs
+    /// - Returns: AsyncStream of LogEntry that yields new logs as they arrive
+    func logStream() -> AsyncStream<LogEntry> {
+        // Cancel any existing stream task
+        logStreamContinuation?.finish()
+        logStreamTask?.cancel()
+
+        return AsyncStream { [weak self] continuation in
+            Task { [weak self] in
+                await self?.setLogStreamContinuation(continuation)
+
+                // Start polling loop
+                await self?.startPollingLoop()
+            }
+
+            // Handle stream termination
+            continuation.onTermination = { [weak self] _ in
+                Task { [weak self] in
+                    await self?.stopPollingLoop()
+                }
+            }
+        }
+    }
+
+    /// Sets the log stream continuation
+    private func setLogStreamContinuation(_ continuation: AsyncStream<LogEntry>.Continuation) {
+        self.logStreamContinuation = continuation
+    }
+
+    /// Starts the polling loop for log streaming
+    private func startPollingLoop() {
+        // Clear seen logs when starting fresh
+        lastSeenLogIds.removeAll()
+
+        logStreamTask = Task { [weak self] in
+            while !Task.isCancelled {
+                guard let self = self else { break }
+
+                // Get polling interval once per iteration
+                let interval = await self.pollingInterval
+
+                // Only poll if server is running
+                guard await self.serverIsRunning else {
+                    // Server not running, wait and retry
+                    try? await Task.sleep(nanoseconds: interval)
+                    continue
+                }
+
+                do {
+                    let state = try await self.getState()
+
+                    // Find new logs that we haven't seen before
+                    for mcpLog in state.logs {
+                        let shouldYield = await self.shouldYieldLog(mcpLog)
+                        if shouldYield {
+                            let logEntry = mcpLog.toLogEntry()
+                            await self.yieldLog(logEntry)
+                            await self.markLogSeen(mcpLog.id)
+                        }
+                    }
+                } catch {
+                    // Log error but continue polling
+                    // Don't flood with errors - just skip this iteration
+                    if !(error is CancellationError) {
+                        // Could emit error log here if needed
+                    }
+                }
+
+                // Wait before next poll
+                try? await Task.sleep(nanoseconds: interval)
+            }
+        }
+    }
+
+    /// Stops the polling loop
+    private func stopPollingLoop() {
+        logStreamTask?.cancel()
+        logStreamTask = nil
+        logStreamContinuation?.finish()
+        logStreamContinuation = nil
+    }
+
+    /// Check if a log should be yielded (not seen before)
+    private func shouldYieldLog(_ mcpLog: MCPLogEntry) -> Bool {
+        return !lastSeenLogIds.contains(mcpLog.id)
+    }
+
+    /// Mark a log ID as seen
+    private func markLogSeen(_ logId: String) {
+        lastSeenLogIds.insert(logId)
+        // Limit the set size to prevent unbounded growth
+        if lastSeenLogIds.count > 2000 {
+            // Remove oldest half (approximate - sets don't maintain order)
+            let toRemove = Array(lastSeenLogIds.prefix(1000))
+            for id in toRemove {
+                lastSeenLogIds.remove(id)
+            }
+        }
+    }
+
+    /// Yields a log entry to the stream
+    private func yieldLog(_ logEntry: LogEntry) {
+        logStreamContinuation?.yield(logEntry)
+    }
+
+    /// Stops log streaming explicitly
+    func stopLogStream() {
+        stopPollingLoop()
     }
 
     // MARK: - MCP Tool Methods
@@ -626,6 +789,10 @@ actor MCPClient {
     /// Handle server termination
     private func handleTermination(exitCode: Int32) {
         isRunning = false
+        connectionStatus = .error("Server terminated (exit code: \(exitCode))")
+
+        // Stop log streaming
+        stopPollingLoop()
 
         // Cancel all pending requests
         for (_, continuation) in pendingResponses {

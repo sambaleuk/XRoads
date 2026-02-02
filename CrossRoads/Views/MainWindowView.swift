@@ -119,6 +119,9 @@ private struct InspectorColumn: View {
 
                 Spacer()
 
+                // MCP Connection Status Indicator
+                MCPStatusBadge(status: appState.mcpConnectionStatus, isStreaming: appState.isStreamingLogs)
+
                 Button {
                     appState.clearLogs()
                 } label: {
@@ -139,6 +142,75 @@ private struct InspectorColumn: View {
             LogsListView(logs: appState.filteredLogs)
         }
         .background(Color.bgCanvas)
+        .task {
+            // Auto-start log streaming when view appears
+            await appState.startLogStreaming()
+        }
+    }
+}
+
+// MARK: - MCP Status Badge
+
+/// Badge showing MCP connection status
+private struct MCPStatusBadge: View {
+    let status: MCPConnectionStatus
+    let isStreaming: Bool
+
+    @State private var isPulsing: Bool = false
+
+    var body: some View {
+        HStack(spacing: 4) {
+            // Status dot
+            Circle()
+                .fill(statusColor)
+                .frame(width: 8, height: 8)
+                .scaleEffect(isPulsing && isStreaming ? 1.2 : 1.0)
+                .animation(
+                    isStreaming ? .easeInOut(duration: 0.8).repeatForever(autoreverses: true) : .default,
+                    value: isPulsing
+                )
+
+            // Status text
+            Text(statusText)
+                .font(.xs)
+                .foregroundStyle(Color.textTertiary)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color.bgElevated.opacity(0.5))
+        .cornerRadius(Theme.Radius.sm)
+        .onAppear {
+            isPulsing = true
+        }
+        .onChange(of: isStreaming) { _, newValue in
+            isPulsing = newValue
+        }
+    }
+
+    private var statusColor: Color {
+        switch status {
+        case .disconnected:
+            return Color.textTertiary
+        case .connecting:
+            return Color.statusWarning
+        case .connected:
+            return Color.statusSuccess
+        case .error:
+            return Color.statusError
+        }
+    }
+
+    private var statusText: String {
+        switch status {
+        case .disconnected:
+            return "Disconnected"
+        case .connecting:
+            return "Connecting..."
+        case .connected:
+            return isStreaming ? "Streaming" : "Connected"
+        case .error(let message):
+            return "Error: \(message.prefix(20))"
+        }
     }
 }
 
