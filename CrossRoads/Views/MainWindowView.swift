@@ -77,6 +77,9 @@ struct MainWindowView: View {
         }
         .background(Color.bgApp)
         .preferredColorScheme(.dark)
+        .sheet(isPresented: $showNewWorktreeSheet) {
+            WorktreeCreateSheet()
+        }
     }
 }
 

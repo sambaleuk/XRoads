@@ -324,7 +324,7 @@
       "title": "WorktreeCreateSheet",
       "description": "En tant qu'utilisateur, je veux un formulaire pour créer un nouveau worktree avec choix de l'agent.",
       "priority": "medium",
-      "status": "pending",
+      "status": "complete",
       "depends_on": ["US-009", "US-013"],
       "acceptance_criteria": [
         "Sheet modale avec Form",
@@ -338,7 +338,7 @@
         "Le projet compile et le sheet fonctionne"
       ],
       "technical_notes": "Utiliser .sheet(isPresented:). NSOpenPanel pour sélection dossier. Validation avec @State et computed property isValid.",
-      "completed_at": null
+      "completed_at": "2026-02-02T03:00:00.000Z"
     },
     {
       "id": "US-017",
