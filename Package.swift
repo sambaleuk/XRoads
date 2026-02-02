@@ -30,7 +30,9 @@ let package = Package(
                 "Models/Session.swift",
                 "Services/GitService.swift",
                 "Services/ProcessRunner.swift",
-                "Services/MCPClient.swift"
+                "Services/MCPClient.swift",
+                "Services/ServiceContainer.swift",
+                "ViewModels/AppState.swift"
             ]
         )
     ]
