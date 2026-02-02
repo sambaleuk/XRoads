@@ -36,7 +36,8 @@ let package = Package(
                 "Services/ProcessRunner.swift",
                 "Services/MCPClient.swift",
                 "Services/ServiceContainer.swift",
-                "ViewModels/AppState.swift"
+                "ViewModels/AppState.swift",
+                "ViewModels/SessionViewModel.swift"
             ]
         )
     ]

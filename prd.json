@@ -263,7 +263,7 @@
       "title": "SessionViewModel @MainActor",
       "description": "En tant que développeur, je veux un ViewModel MVVM pour gérer la logique des sessions et worktrees.",
       "priority": "high",
-      "status": "pending",
+      "status": "complete",
       "depends_on": ["US-008"],
       "acceptance_criteria": [
         "Classe SessionViewModel avec @MainActor",
@@ -277,7 +277,7 @@
         "Le projet compile sans erreur"
       ],
       "technical_notes": "Pattern MVVM avec @MainActor pour thread-safety UI. Utiliser defer { isLoading = false } pour cleanup.",
-      "completed_at": null
+      "completed_at": "2026-02-02T01:30:00.000Z"
     },
     {
       "id": "US-014",
