@@ -20,7 +20,14 @@ let package = Package(
             sources: [
                 "App/CrossRoadsApp.swift",
                 "Views/ContentView.swift",
-                "Resources/Theme.swift"
+                "Resources/Theme.swift",
+                "Models/AgentType.swift",
+                "Models/AgentStatus.swift",
+                "Models/LogLevel.swift",
+                "Models/Agent.swift",
+                "Models/Worktree.swift",
+                "Models/LogEntry.swift",
+                "Models/Session.swift"
             ]
         )
     ]

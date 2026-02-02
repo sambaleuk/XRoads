@@ -58,7 +58,7 @@
       "title": "Modèles de données Codable",
       "description": "En tant que développeur, je veux des modèles de données Swift bien typés pour représenter les agents, worktrees, logs et sessions.",
       "priority": "critical",
-      "status": "pending",
+      "status": "complete",
       "depends_on": ["US-001"],
       "acceptance_criteria": [
         "Struct Agent avec id, type (claude/gemini/codex), status, worktreePath",
@@ -72,7 +72,7 @@
         "Le projet compile sans erreur"
       ],
       "technical_notes": "Utiliser structs (value types) pour les modèles. Préférer let à var. Ajouter Sendable pour compatibilité actors.",
-      "completed_at": null
+      "completed_at": "2026-02-02T23:30:00.000Z"
     },
     {
       "id": "US-004",
