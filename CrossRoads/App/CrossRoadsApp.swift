@@ -8,9 +8,17 @@ struct CrossRoadsApp: App {
 
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            MainWindowView()
                 .environment(\.appState, appState)
+                .frame(
+                    minWidth: Theme.Layout.minWindowWidth,
+                    minHeight: Theme.Layout.minWindowHeight
+                )
         }
         .windowStyle(.automatic)
+        .defaultSize(
+            width: Theme.Layout.defaultWindowWidth,
+            height: Theme.Layout.defaultWindowHeight
+        )
     }
 }

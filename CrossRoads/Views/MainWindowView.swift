@@ -1,0 +1,484 @@
+//
+//  MainWindowView.swift
+//  CrossRoads
+//
+//  Created by Nexus on 2026-02-02.
+//  Main window layout with NavigationSplitView (sidebar, content, inspector)
+//
+
+import SwiftUI
+
+// MARK: - MainWindowView
+
+struct MainWindowView: View {
+    @Environment(\.appState) private var appState
+
+    /// Column visibility state
+    @State private var columnVisibility: NavigationSplitViewVisibility = .all
+
+    /// Controls the inspector visibility
+    @State private var showInspector: Bool = true
+
+    /// Controls the new worktree sheet
+    @State private var showNewWorktreeSheet: Bool = false
+
+    var body: some View {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            // MARK: - Sidebar (240px)
+            SidebarColumn(showNewWorktreeSheet: $showNewWorktreeSheet)
+                .navigationSplitViewColumnWidth(min: 200, ideal: Theme.Layout.sidebarWidth, max: 300)
+        } content: {
+            // MARK: - Content Area
+            ContentColumn()
+        } detail: {
+            // MARK: - Inspector Panel (320px) - Logs
+            if showInspector {
+                InspectorColumn()
+                    .navigationSplitViewColumnWidth(min: 280, ideal: Theme.Layout.inspectorWidth, max: 400)
+            }
+        }
+        .navigationSplitViewStyle(.balanced)
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                // New Worktree Button
+                Button {
+                    showNewWorktreeSheet = true
+                } label: {
+                    Label("New Worktree", systemImage: "plus.rectangle.on.folder")
+                }
+                .help("Create a new worktree (⌘N)")
+
+                // Toggle Inspector Button
+                Button {
+                    withAnimation(.easeInOut(duration: Theme.Animation.normal)) {
+                        showInspector.toggle()
+                    }
+                } label: {
+                    Label(
+                        showInspector ? "Hide Inspector" : "Show Inspector",
+                        systemImage: showInspector ? "sidebar.trailing" : "sidebar.trailing"
+                    )
+                }
+                .help("Toggle logs panel")
+
+                Divider()
+
+                // Settings Button
+                Button {
+                    // TODO: Open settings (US-019)
+                    #if os(macOS)
+                    NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+                    #endif
+                } label: {
+                    Label("Settings", systemImage: "gearshape")
+                }
+                .help("Open settings (⌘,)")
+            }
+        }
+        .background(Color.bgApp)
+        .preferredColorScheme(.dark)
+    }
+}
+
+// MARK: - Sidebar Column
+
+private struct SidebarColumn: View {
+    @Environment(\.appState) private var appState
+    @Binding var showNewWorktreeSheet: Bool
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text("Worktrees")
+                    .font(.h2)
+                    .foregroundStyle(Color.textPrimary)
+
+                Spacer()
+
+                Text("\(appState.worktrees.count)")
+                    .font(.small)
+                    .foregroundStyle(Color.textSecondary)
+                    .padding(.horizontal, Theme.Spacing.sm)
+                    .padding(.vertical, Theme.Spacing.xs)
+                    .background(Color.bgElevated)
+                    .clipShape(Capsule())
+            }
+            .padding(.horizontal, Theme.Spacing.md)
+            .padding(.vertical, Theme.Spacing.sm)
+
+            Divider()
+                .background(Color.borderMuted)
+
+            // Worktrees List
+            if appState.worktrees.isEmpty {
+                EmptyStateView(
+                    icon: "folder.badge.plus",
+                    title: "No Worktrees",
+                    message: "Create a worktree to start working with AI agents"
+                ) {
+                    showNewWorktreeSheet = true
+                }
+            } else {
+                List(selection: Binding(
+                    get: { appState.selectedWorktree?.id },
+                    set: { id in
+                        if let id = id {
+                            appState.selectWorktree(appState.worktrees.first { $0.id == id })
+                        } else {
+                            appState.selectWorktree(nil)
+                        }
+                    }
+                )) {
+                    ForEach(appState.worktrees) { worktree in
+                        WorktreeRow(worktree: worktree)
+                            .tag(worktree.id)
+                    }
+                }
+                .listStyle(.sidebar)
+                .scrollContentBackground(.hidden)
+            }
+        }
+        .background(Color.bgSurface)
+    }
+}
+
+// MARK: - Content Column
+
+private struct ContentColumn: View {
+    @Environment(\.appState) private var appState
+
+    var body: some View {
+        Group {
+            if let worktree = appState.selectedWorktree {
+                WorktreeDetailView(worktree: worktree)
+            } else {
+                EmptySelectionView()
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.bgApp)
+    }
+}
+
+// MARK: - Inspector Column (Logs)
+
+private struct InspectorColumn: View {
+    @Environment(\.appState) private var appState
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Image(systemName: "terminal")
+                    .foregroundStyle(Color.terminalCyan)
+
+                Text("Logs")
+                    .font(.h2)
+                    .foregroundStyle(Color.textPrimary)
+
+                Spacer()
+
+                Button {
+                    appState.clearLogs()
+                } label: {
+                    Image(systemName: "trash")
+                        .foregroundStyle(Color.textSecondary)
+                }
+                .buttonStyle(.plain)
+                .help("Clear logs (⌘L)")
+            }
+            .padding(.horizontal, Theme.Spacing.md)
+            .padding(.vertical, Theme.Spacing.sm)
+            .frame(height: Theme.Component.logHeaderHeight)
+
+            Divider()
+                .background(Color.borderMuted)
+
+            // Logs Area
+            LogsListView(logs: appState.filteredLogs)
+        }
+        .background(Color.bgCanvas)
+    }
+}
+
+// MARK: - Worktree Row (Placeholder for US-012)
+
+private struct WorktreeRow: View {
+    let worktree: Worktree
+
+    var body: some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            // Status indicator
+            Circle()
+                .fill(Color.statusInfo)
+                .frame(width: Theme.Component.statusDotSize, height: Theme.Component.statusDotSize)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(worktree.name)
+                    .font(.body14)
+                    .foregroundStyle(Color.textPrimary)
+                    .lineLimit(1)
+
+                Text(worktree.branch)
+                    .font(.small)
+                    .foregroundStyle(Color.textSecondary)
+                    .lineLimit(1)
+            }
+
+            Spacer()
+        }
+        .padding(.vertical, Theme.Spacing.xs)
+        .contentShape(Rectangle())
+    }
+}
+
+// MARK: - Worktree Detail View (Placeholder)
+
+private struct WorktreeDetailView: View {
+    let worktree: Worktree
+
+    var body: some View {
+        VStack(spacing: Theme.Spacing.lg) {
+            // Header
+            VStack(spacing: Theme.Spacing.sm) {
+                Image(systemName: "arrow.triangle.branch")
+                    .font(.system(size: 48))
+                    .foregroundStyle(Color.accentPrimary)
+
+                Text(worktree.name)
+                    .font(.h1)
+                    .foregroundStyle(Color.textPrimary)
+
+                Text(worktree.branch)
+                    .font(.body14)
+                    .foregroundStyle(Color.textSecondary)
+            }
+
+            Divider()
+                .background(Color.borderMuted)
+                .padding(.horizontal, Theme.Spacing.xl)
+
+            // Path
+            HStack {
+                Text("Path:")
+                    .font(.small)
+                    .foregroundStyle(Color.textSecondary)
+
+                Text(worktree.path)
+                    .font(.code)
+                    .foregroundStyle(Color.textPrimary)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+            }
+            .padding(.horizontal, Theme.Spacing.lg)
+
+            Spacer()
+
+            // Action Buttons (Placeholder for US-013)
+            HStack(spacing: Theme.Spacing.md) {
+                Button {
+                    // TODO: Start agent (US-013)
+                } label: {
+                    Label("Start Agent", systemImage: "play.fill")
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Color.statusSuccess)
+
+                Button {
+                    // TODO: Stop agent (US-013)
+                } label: {
+                    Label("Stop", systemImage: "stop.fill")
+                }
+                .buttonStyle(.bordered)
+            }
+            .padding(.bottom, Theme.Spacing.xl)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - Empty Selection View
+
+private struct EmptySelectionView: View {
+    var body: some View {
+        VStack(spacing: Theme.Spacing.md) {
+            Image(systemName: "arrow.triangle.branch")
+                .font(.system(size: 64))
+                .foregroundStyle(Color.textTertiary)
+
+            Text("Select a Worktree")
+                .font(.h1)
+                .foregroundStyle(Color.textSecondary)
+
+            Text("Choose a worktree from the sidebar\nor create a new one to get started")
+                .font(.body14)
+                .foregroundStyle(Color.textTertiary)
+                .multilineTextAlignment(.center)
+        }
+    }
+}
+
+// MARK: - Empty State View
+
+private struct EmptyStateView: View {
+    let icon: String
+    let title: String
+    let message: String
+    let action: () -> Void
+
+    var body: some View {
+        VStack(spacing: Theme.Spacing.md) {
+            Spacer()
+
+            Image(systemName: icon)
+                .font(.system(size: 48))
+                .foregroundStyle(Color.textTertiary)
+
+            Text(title)
+                .font(.h2)
+                .foregroundStyle(Color.textSecondary)
+
+            Text(message)
+                .font(.small)
+                .foregroundStyle(Color.textTertiary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, Theme.Spacing.md)
+
+            Button("Create Worktree") {
+                action()
+            }
+            .buttonStyle(.borderedProminent)
+            .tint(Color.accentPrimary)
+            .padding(.top, Theme.Spacing.sm)
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+// MARK: - Logs List View (Placeholder for US-011)
+
+private struct LogsListView: View {
+    let logs: [LogEntry]
+
+    var body: some View {
+        if logs.isEmpty {
+            VStack(spacing: Theme.Spacing.sm) {
+                Spacer()
+                Image(systemName: "text.alignleft")
+                    .font(.system(size: 32))
+                    .foregroundStyle(Color.textTertiary)
+                Text("No logs yet")
+                    .font(.small)
+                    .foregroundStyle(Color.textTertiary)
+                Spacer()
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 2) {
+                        ForEach(logs) { log in
+                            LogLineView(log: log)
+                                .id(log.id)
+                        }
+                    }
+                    .padding(Theme.Spacing.sm)
+                }
+                .onChange(of: logs.count) { _, _ in
+                    // Auto-scroll to bottom
+                    if let lastLog = logs.last {
+                        withAnimation {
+                            proxy.scrollTo(lastLog.id, anchor: .bottom)
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// MARK: - Log Line View (Placeholder for US-011)
+
+private struct LogLineView: View {
+    let log: LogEntry
+
+    var body: some View {
+        HStack(alignment: .top, spacing: Theme.Spacing.sm) {
+            // Timestamp
+            Text(log.formattedTimestamp)
+                .font(.terminal)
+                .foregroundStyle(Color.textTertiary)
+
+            // Level indicator
+            Text(log.level.rawValue.uppercased())
+                .font(.terminal)
+                .foregroundStyle(levelColor)
+                .frame(width: 50, alignment: .leading)
+
+            // Source
+            if !log.source.isEmpty {
+                Text("[\(log.source)]")
+                    .font(.terminal)
+                    .foregroundStyle(Color.textSecondary)
+            }
+
+            // Message
+            Text(log.message)
+                .font(.terminal)
+                .foregroundStyle(Color.textPrimary)
+                .lineLimit(nil)
+
+            Spacer()
+        }
+        .padding(.vertical, 2)
+    }
+
+    private var levelColor: Color {
+        switch log.level {
+        case .debug:
+            return Color.textTertiary
+        case .info:
+            return Color.terminalCyan
+        case .warn:
+            return Color.terminalYellow
+        case .error:
+            return Color.terminalRed
+        }
+    }
+}
+
+// MARK: - Preview
+
+#if DEBUG
+struct MainWindowView_Previews: PreviewProvider {
+    static var previews: some View {
+        MainWindowView()
+            .frame(width: Theme.Layout.minWindowWidth, height: Theme.Layout.minWindowHeight)
+            .environment(\.appState, previewAppState())
+    }
+
+    static func previewAppState() -> AppState {
+        let state = AppState(services: MockServiceContainer())
+
+        // Add sample worktrees
+        state.worktrees = [
+            Worktree(path: "/Users/dev/project/wt-feature-1", branch: "feature/auth", agentId: nil),
+            Worktree(path: "/Users/dev/project/wt-feature-2", branch: "feature/api", agentId: nil),
+            Worktree(path: "/Users/dev/project/wt-bugfix", branch: "bugfix/login", agentId: nil)
+        ]
+
+        // Add sample logs
+        state.logs = [
+            LogEntry(level: .info, source: "claude", worktree: nil, message: "Starting agent..."),
+            LogEntry(level: .debug, source: "git", worktree: nil, message: "Creating worktree at /Users/dev/project/wt-feature-1"),
+            LogEntry(level: .warn, source: "mcp", worktree: nil, message: "Connection retry in 5s"),
+            LogEntry(level: .error, source: "process", worktree: nil, message: "Process terminated unexpectedly")
+        ]
+
+        return state
+    }
+}
+#endif

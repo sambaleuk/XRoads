@@ -163,7 +163,7 @@
       "title": "AppState & DI Container",
       "description": "En tant que développeur, je veux un état global observable et un container d'injection de dépendances pour une architecture propre.",
       "priority": "high",
-      "status": "pending",
+      "status": "complete",
       "depends_on": ["US-004", "US-005", "US-007"],
       "acceptance_criteria": [
         "Classe AppState @Observable avec @MainActor",
@@ -176,14 +176,14 @@
         "Le projet compile sans erreur"
       ],
       "technical_notes": "Utiliser @Observable (iOS 17+/macOS 14+) plutôt que ObservableObject pour meilleure performance. Injecter via @Environment.",
-      "completed_at": null
+      "completed_at": "2026-02-02T23:00:00.000Z"
     },
     {
       "id": "US-009",
       "title": "MainWindowView Layout",
       "description": "En tant qu'utilisateur, je veux une fenêtre principale avec sidebar, zone centrale et panneau de logs pour voir l'état de mes agents.",
       "priority": "high",
-      "status": "pending",
+      "status": "complete",
       "depends_on": ["US-002", "US-008"],
       "acceptance_criteria": [
         "NavigationSplitView avec trois colonnes",
@@ -196,7 +196,7 @@
         "Le projet compile et s'affiche correctement"
       ],
       "technical_notes": "NavigationSplitView pour macOS. .frame(minWidth:minHeight:) sur WindowGroup. Utiliser .background(Color.bgApp).",
-      "completed_at": null
+      "completed_at": "2026-02-02T23:30:00.000Z"
     },
     {
       "id": "US-010",
