@@ -22,8 +22,12 @@ struct MainWindowView: View {
     /// Controls the new worktree sheet
     @State private var showNewWorktreeSheet: Bool = false
 
+    /// Controls the command palette
+    @State private var showCommandPalette: Bool = false
+
     var body: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
+        ZStack {
+            NavigationSplitView(columnVisibility: $columnVisibility) {
             // MARK: - Sidebar (240px)
             SidebarView(showNewWorktreeSheet: $showNewWorktreeSheet)
                 .navigationSplitViewColumnWidth(min: 200, ideal: Theme.Layout.sidebarWidth, max: 300)
@@ -79,6 +83,78 @@ struct MainWindowView: View {
         .preferredColorScheme(.dark)
         .sheet(isPresented: $showNewWorktreeSheet) {
             WorktreeCreateSheet()
+        }
+
+            // Command Palette Overlay
+            if showCommandPalette {
+                Color.black.opacity(0.4)
+                    .ignoresSafeArea()
+                    .onTapGesture {
+                        showCommandPalette = false
+                    }
+
+                VStack {
+                    CommandPaletteView(onCommand: handleCommand)
+                        .padding(.top, 100)
+                    Spacer()
+                }
+            }
+        }
+        // MARK: - Notification Handlers
+        .onReceive(NotificationCenter.default.publisher(for: .showNewWorktreeSheet)) { _ in
+            showNewWorktreeSheet = true
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .closeSelectedWorktree)) { _ in
+            closeSelectedWorktree()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .stopSelectedAgent)) { _ in
+            stopSelectedAgent()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .clearLogs)) { _ in
+            appState.clearLogs()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .showCommandPalette)) { _ in
+            showCommandPalette = true
+        }
+    }
+
+    // MARK: - Command Handlers
+
+    private func handleCommand(_ command: PaletteCommand) {
+        switch command.id {
+        case "new-worktree":
+            showNewWorktreeSheet = true
+        case "close-worktree":
+            closeSelectedWorktree()
+        case "stop-agent":
+            stopSelectedAgent()
+        case "start-agent":
+            startSelectedAgent()
+        case "clear-logs":
+            appState.clearLogs()
+        default:
+            break
+        }
+    }
+
+    private func closeSelectedWorktree() {
+        guard let worktree = appState.selectedWorktree else { return }
+        appState.removeWorktree(worktree)
+    }
+
+    private func stopSelectedAgent() {
+        guard let worktree = appState.selectedWorktree else { return }
+        Task {
+            let viewModel = SessionViewModel(services: appState.services)
+            await viewModel.stopAgent(worktreeId: worktree.id)
+        }
+    }
+
+    private func startSelectedAgent() {
+        guard let worktree = appState.selectedWorktree else { return }
+        Task {
+            let viewModel = SessionViewModel(services: appState.services)
+            await viewModel.startAgent(worktreeId: worktree.id)
         }
     }
 }

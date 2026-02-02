@@ -364,7 +364,7 @@
       "title": "Keyboard Shortcuts",
       "description": "En tant qu'utilisateur, je veux des raccourcis clavier pour être plus productif.",
       "priority": "low",
-      "status": "pending",
+      "status": "complete",
       "depends_on": ["US-009", "US-016"],
       "acceptance_criteria": [
         "⌘N ouvre WorktreeCreateSheet",
@@ -376,7 +376,7 @@
         "Le projet compile et les raccourcis fonctionnent"
       ],
       "technical_notes": "Utiliser .commands { } dans App pour menu commands. .keyboardShortcut() sur les boutons.",
-      "completed_at": null
+      "completed_at": "2026-02-02T05:00:00.000Z"
     },
     {
       "id": "US-019",
