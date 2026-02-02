@@ -79,7 +79,7 @@
       "title": "GitService Actor",
       "description": "En tant que développeur, je veux un service Git thread-safe pour gérer les worktrees de manière concurrente.",
       "priority": "critical",
-      "status": "pending",
+      "status": "complete",
       "depends_on": ["US-003"],
       "acceptance_criteria": [
         "Actor GitService avec méthodes async",
@@ -93,14 +93,14 @@
         "Le projet compile sans erreur"
       ],
       "technical_notes": "Utiliser actor pour thread-safety automatique. Process.executableURL = /usr/bin/git. Capturer stderr pour les messages d'erreur.",
-      "completed_at": null
+      "completed_at": "2026-02-02T23:50:00.000Z"
     },
     {
       "id": "US-005",
       "title": "ProcessRunner Actor",
       "description": "En tant que développeur, je veux un gestionnaire de processus thread-safe pour lancer et monitorer les CLIs avec streaming d'output.",
       "priority": "critical",
-      "status": "pending",
+      "status": "complete",
       "depends_on": ["US-003"],
       "acceptance_criteria": [
         "Actor ProcessRunner avec tracking des processus par UUID",
@@ -114,7 +114,7 @@
         "Le projet compile sans erreur"
       ],
       "technical_notes": "Utiliser readabilityHandler pour streaming async. Stocker [UUID: Process] dans l'actor. Attention aux retain cycles avec [weak self] si nécessaire.",
-      "completed_at": null
+      "completed_at": "2026-02-02T00:10:00.000Z"
     },
     {
       "id": "US-006",

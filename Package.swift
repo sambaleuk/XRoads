@@ -28,7 +28,8 @@ let package = Package(
                 "Models/Worktree.swift",
                 "Models/LogEntry.swift",
                 "Models/Session.swift",
-                "Services/GitService.swift"
+                "Services/GitService.swift",
+                "Services/ProcessRunner.swift"
             ]
         )
     ]
