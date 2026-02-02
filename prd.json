@@ -303,7 +303,7 @@
       "title": "ConfigChecker Service",
       "description": "En tant qu'utilisateur, je veux que l'app vérifie les prérequis au lancement pour éviter les erreurs.",
       "priority": "medium",
-      "status": "pending",
+      "status": "complete",
       "depends_on": ["US-005"],
       "acceptance_criteria": [
         "Actor ConfigChecker avec méthodes de vérification",
@@ -317,7 +317,7 @@
         "Le projet compile sans erreur"
       ],
       "technical_notes": "Utiliser Process avec /usr/bin/which pour vérifier. Stocker résultats dans UserDefaults pour ne pas re-checker à chaque fois.",
-      "completed_at": null
+      "completed_at": "2026-02-02T02:30:00.000Z"
     },
     {
       "id": "US-016",
