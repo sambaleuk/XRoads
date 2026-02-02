@@ -121,7 +121,7 @@
       "title": "CrossRoads MCP Server (TypeScript)",
       "description": "En tant que développeur, je veux un serveur MCP minimaliste en TypeScript avec 3 tools pour le streaming de logs et statuts.",
       "priority": "critical",
-      "status": "pending",
+      "status": "complete",
       "depends_on": [],
       "acceptance_criteria": [
         "Projet Node.js crossroads-mcp/ avec package.json et tsconfig.json",
@@ -135,7 +135,7 @@
         "npm run build compile sans erreur"
       ],
       "technical_notes": "MCP SDK v1.x. Garder le serveur ultra-léger (<200 lignes). Limiter logs en mémoire (derniers 1000). Server stdio pour communication.",
-      "completed_at": null
+      "completed_at": "2026-02-02T21:55:00.000Z"
     },
     {
       "id": "US-007",

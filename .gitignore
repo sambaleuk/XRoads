@@ -85,3 +85,8 @@ iOSInjectionProject/
 # Nexus
 .nexus/
 progress.txt
+
+# Node.js (crossroads-mcp)
+node_modules/
+crossroads-mcp/node_modules/
+crossroads-mcp/dist/
