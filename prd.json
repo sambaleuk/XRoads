@@ -1,0 +1,431 @@
+{
+  "feature_name": "CrossRoads v1 - Multi-CLI Orchestrator",
+  "description": "Application macOS native SwiftUI pour orchestrer plusieurs agents AI (Claude Code, Gemini CLI, Codex) travaillant en parallèle sur des git worktrees isolés, avec un MCP minimaliste pour le streaming de logs et statuts.",
+  "branch": "feat/crossroads-v1",
+  "created_at": "2026-02-02T22:00:00.000Z",
+  "status": "in_progress",
+  "goals": [
+    "Orchestrer Claude Code, Gemini CLI et Codex en parallèle",
+    "Isoler chaque agent dans son propre git worktree",
+    "Streamer les logs en temps réel via MCP custom",
+    "Interface SwiftUI native macOS avec thème Dark Pro",
+    "Architecture MVVM avec actors pour thread-safety"
+  ],
+  "non_goals": [
+    "Mode Full Agentic (v2)",
+    "Orchestration automatique par Claude (v2)",
+    "Support Windows/Linux (macOS only)",
+    "Intégration VibeTape (MCP custom à la place)"
+  ],
+  "user_stories": [
+    {
+      "id": "US-001",
+      "title": "Setup Projet Xcode macOS",
+      "description": "En tant que développeur, je veux un projet Xcode SwiftUI macOS correctement configuré pour pouvoir commencer le développement de CrossRoads.",
+      "priority": "critical",
+      "status": "complete",
+      "depends_on": [],
+      "acceptance_criteria": [
+        "Projet Xcode créé avec target macOS 14.0+",
+        "Structure dossiers: App/, Models/, Services/, Views/, ViewModels/, Resources/",
+        "Info.plist configuré avec nom app CrossRoads",
+        "Fichier .gitignore pour Xcode/Swift",
+        "Le projet compile sans erreur (xcodebuild)"
+      ],
+      "technical_notes": "Utiliser SwiftUI App lifecycle (@main). Minimum deployment target macOS 14.0 pour les dernières APIs SwiftUI.",
+      "completed_at": "2026-02-02T22:45:00.000Z"
+    },
+    {
+      "id": "US-002",
+      "title": "Theme Dark Pro & Extensions",
+      "description": "En tant que développeur, je veux un système de thème Dark Pro avec extensions Color pour avoir une UI cohérente inspirée de GitHub Dark.",
+      "priority": "critical",
+      "status": "pending",
+      "depends_on": ["US-001"],
+      "acceptance_criteria": [
+        "Extension Color avec toutes les couleurs Dark Pro (bgApp, bgCanvas, bgSurface, bgElevated)",
+        "Extension Color avec couleurs de texte (textPrimary, textSecondary, textTertiary)",
+        "Extension Color avec accents (accentPrimary, statusSuccess, statusWarning, statusError)",
+        "Extension Font avec styles typography (mono, system, sizes)",
+        "Fichier Theme.swift centralisé",
+        "Le projet compile sans erreur"
+      ],
+      "technical_notes": "Couleurs depuis NEXUS_ART_DIRECTION.md: bgApp=#0d1117, bgSurface=#161b22, accentPrimary=#388bfd, etc. Utiliser Color(hex:) initializer.",
+      "completed_at": null
+    },
+    {
+      "id": "US-003",
+      "title": "Modèles de données Codable",
+      "description": "En tant que développeur, je veux des modèles de données Swift bien typés pour représenter les agents, worktrees, logs et sessions.",
+      "priority": "critical",
+      "status": "pending",
+      "depends_on": ["US-001"],
+      "acceptance_criteria": [
+        "Struct Agent avec id, type (claude/gemini/codex), status, worktreePath",
+        "Struct Worktree avec id, path, branch, agentId, createdAt",
+        "Struct LogEntry avec timestamp, level, source, worktree, message, metadata",
+        "Struct Session avec id, name, worktrees, status, createdAt",
+        "Enum AgentType: String, Codable (claude, gemini, codex)",
+        "Enum AgentStatus: String, Codable (idle, running, planning, complete, error)",
+        "Enum LogLevel: String, Codable (debug, info, warn, error)",
+        "Tous les modèles sont Codable, Identifiable, Hashable",
+        "Le projet compile sans erreur"
+      ],
+      "technical_notes": "Utiliser structs (value types) pour les modèles. Préférer let à var. Ajouter Sendable pour compatibilité actors.",
+      "completed_at": null
+    },
+    {
+      "id": "US-004",
+      "title": "GitService Actor",
+      "description": "En tant que développeur, je veux un service Git thread-safe pour gérer les worktrees de manière concurrente.",
+      "priority": "critical",
+      "status": "pending",
+      "depends_on": ["US-003"],
+      "acceptance_criteria": [
+        "Actor GitService avec méthodes async",
+        "Méthode createWorktree(repoPath:branch:worktreePath:) async throws",
+        "Méthode listWorktrees(repoPath:) async throws -> [String]",
+        "Méthode removeWorktree(repoPath:worktreePath:) async throws",
+        "Méthode getCurrentBranch(path:) async throws -> String",
+        "Méthode getLastCommit(path:) async throws -> (sha:String, message:String)",
+        "Gestion des erreurs avec enum GitError",
+        "Utilise Process avec currentDirectoryURL",
+        "Le projet compile sans erreur"
+      ],
+      "technical_notes": "Utiliser actor pour thread-safety automatique. Process.executableURL = /usr/bin/git. Capturer stderr pour les messages d'erreur.",
+      "completed_at": null
+    },
+    {
+      "id": "US-005",
+      "title": "ProcessRunner Actor",
+      "description": "En tant que développeur, je veux un gestionnaire de processus thread-safe pour lancer et monitorer les CLIs avec streaming d'output.",
+      "priority": "critical",
+      "status": "pending",
+      "depends_on": ["US-003"],
+      "acceptance_criteria": [
+        "Actor ProcessRunner avec tracking des processus par UUID",
+        "Méthode launch(executable:arguments:workingDirectory:onOutput:) async throws -> UUID",
+        "Méthode terminate(id:) pour arrêter un processus",
+        "Méthode isRunning(id:) -> Bool",
+        "Méthode sendInput(id:text:) pour stdin",
+        "Streaming output via Pipe.fileHandleForReading.readabilityHandler",
+        "Callback onOutput appelé sur MainActor pour UI",
+        "Gestion du terminationStatus",
+        "Le projet compile sans erreur"
+      ],
+      "technical_notes": "Utiliser readabilityHandler pour streaming async. Stocker [UUID: Process] dans l'actor. Attention aux retain cycles avec [weak self] si nécessaire.",
+      "completed_at": null
+    },
+    {
+      "id": "US-006",
+      "title": "CrossRoads MCP Server (TypeScript)",
+      "description": "En tant que développeur, je veux un serveur MCP minimaliste en TypeScript avec 3 tools pour le streaming de logs et statuts.",
+      "priority": "critical",
+      "status": "pending",
+      "depends_on": [],
+      "acceptance_criteria": [
+        "Projet Node.js crossroads-mcp/ avec package.json et tsconfig.json",
+        "Dépendance @modelcontextprotocol/sdk",
+        "Tool emit_log avec input: level, source, worktree, message, metadata?",
+        "Tool update_status avec input: agent, worktree, status, task?, progress?",
+        "Tool get_state avec output: agents[], logs[], worktrees[]",
+        "Format JSON structuré pour les logs",
+        "Stockage en mémoire (pas de persistence fichier)",
+        "Script npm start pour lancer le serveur",
+        "npm run build compile sans erreur"
+      ],
+      "technical_notes": "MCP SDK v1.x. Garder le serveur ultra-léger (<200 lignes). Limiter logs en mémoire (derniers 1000). Server stdio pour communication.",
+      "completed_at": null
+    },
+    {
+      "id": "US-007",
+      "title": "MCPClient Actor Swift",
+      "description": "En tant que développeur, je veux un client MCP Swift pour communiquer avec le serveur crossroads-mcp via JSON-RPC.",
+      "priority": "critical",
+      "status": "pending",
+      "depends_on": ["US-005", "US-006"],
+      "acceptance_criteria": [
+        "Actor MCPClient pour communication thread-safe",
+        "Méthode start() async throws pour lancer le serveur MCP",
+        "Méthode emitLog(level:source:worktree:message:metadata:) async throws",
+        "Méthode updateStatus(agent:worktree:status:task:progress:) async throws",
+        "Méthode getState() async throws -> MCPState",
+        "Communication via stdin/stdout du Process",
+        "Parsing JSON-RPC responses",
+        "Struct MCPState avec agents, logs, worktrees",
+        "Le projet compile sans erreur"
+      ],
+      "technical_notes": "Utiliser ProcessRunner pour lancer node crossroads-mcp. Encoder/Decoder JSON pour JSON-RPC. Protocol MCP utilise stdio.",
+      "completed_at": null
+    },
+    {
+      "id": "US-008",
+      "title": "AppState & DI Container",
+      "description": "En tant que développeur, je veux un état global observable et un container d'injection de dépendances pour une architecture propre.",
+      "priority": "high",
+      "status": "pending",
+      "depends_on": ["US-004", "US-005", "US-007"],
+      "acceptance_criteria": [
+        "Classe AppState @Observable avec @MainActor",
+        "Propriétés: sessions, selectedSession, selectedWorktree, logs, isLoading, error",
+        "Services injectés: gitService, processRunner, mcpClient",
+        "Protocol ServiceContainer pour DI",
+        "Implémentation DefaultServiceContainer avec services réels",
+        "Implémentation MockServiceContainer pour tests",
+        "AppState initialisé dans CrossRoadsApp.swift",
+        "Le projet compile sans erreur"
+      ],
+      "technical_notes": "Utiliser @Observable (iOS 17+/macOS 14+) plutôt que ObservableObject pour meilleure performance. Injecter via @Environment.",
+      "completed_at": null
+    },
+    {
+      "id": "US-009",
+      "title": "MainWindowView Layout",
+      "description": "En tant qu'utilisateur, je veux une fenêtre principale avec sidebar, zone centrale et panneau de logs pour voir l'état de mes agents.",
+      "priority": "high",
+      "status": "pending",
+      "depends_on": ["US-002", "US-008"],
+      "acceptance_criteria": [
+        "NavigationSplitView avec trois colonnes",
+        "Sidebar (240px) avec liste des sessions/worktrees",
+        "Zone centrale avec détails de la sélection",
+        "Panneau inspecteur (320px) avec logs",
+        "Background avec couleurs Dark Pro",
+        "Toolbar avec boutons: New Worktree, Settings",
+        "Taille fenêtre minimum 1280x800",
+        "Le projet compile et s'affiche correctement"
+      ],
+      "technical_notes": "NavigationSplitView pour macOS. .frame(minWidth:minHeight:) sur WindowGroup. Utiliser .background(Color.bgApp).",
+      "completed_at": null
+    },
+    {
+      "id": "US-010",
+      "title": "SidebarView - Sessions",
+      "description": "En tant qu'utilisateur, je veux voir la liste de mes worktrees dans la sidebar pour naviguer entre eux.",
+      "priority": "high",
+      "status": "pending",
+      "depends_on": ["US-009", "US-012"],
+      "acceptance_criteria": [
+        "List avec ForEach sur worktrees",
+        "Chaque item affiche WorktreeCard",
+        "Sélection via @Binding selectedWorktree",
+        "Section header 'Worktrees' avec compteur",
+        "Bouton + pour ajouter un worktree",
+        "Style .sidebar pour List",
+        "Le projet compile et la sidebar s'affiche"
+      ],
+      "technical_notes": "Utiliser List(selection:) pour la sélection. WorktreeCard comme row customisée.",
+      "completed_at": null
+    },
+    {
+      "id": "US-011",
+      "title": "TerminalView - Logs",
+      "description": "En tant qu'utilisateur, je veux voir les logs en temps réel dans un terminal pour monitorer mes agents.",
+      "priority": "high",
+      "status": "pending",
+      "depends_on": ["US-002", "US-003"],
+      "acceptance_criteria": [
+        "ScrollView avec LazyVStack pour performance",
+        "Chaque LogEntry affiché avec LogLineView",
+        "Timestamp formaté [HH:mm:ss]",
+        "Couleur par level: debug=tertiary, info=cyan, warn=yellow, error=red",
+        "Source et worktree affichés",
+        "Font monospace (SF Mono)",
+        "Auto-scroll vers le bas sur nouveaux logs",
+        "Background bgCanvas (#010409)",
+        "Le projet compile et les logs s'affichent"
+      ],
+      "technical_notes": "ScrollViewReader avec scrollTo pour auto-scroll. .id() sur chaque log pour le scroll. Limiter à 500 logs affichés pour performance.",
+      "completed_at": null
+    },
+    {
+      "id": "US-012",
+      "title": "WorktreeCard & StatusBadge",
+      "description": "En tant qu'utilisateur, je veux voir chaque worktree comme une carte avec son statut visuel pour comprendre l'état de mes agents.",
+      "priority": "high",
+      "status": "pending",
+      "depends_on": ["US-002", "US-003"],
+      "acceptance_criteria": [
+        "WorktreeCard avec nom, branche, agent type",
+        "StatusBadge avec dot coloré selon status",
+        "Couleurs: running=green, idle=blue, error=red, planning=yellow",
+        "Animation pulse sur status running",
+        "Icône par agent type (claude/gemini/codex)",
+        "Affichage du path tronqué",
+        "Hover state avec bgElevated",
+        "Le projet compile et les cards s'affichent"
+      ],
+      "technical_notes": "Utiliser .animation(.easeInOut.repeatForever()) pour pulse. SF Symbols pour icônes ou custom.",
+      "completed_at": null
+    },
+    {
+      "id": "US-013",
+      "title": "SessionViewModel @MainActor",
+      "description": "En tant que développeur, je veux un ViewModel MVVM pour gérer la logique des sessions et worktrees.",
+      "priority": "high",
+      "status": "pending",
+      "depends_on": ["US-008"],
+      "acceptance_criteria": [
+        "Classe SessionViewModel avec @MainActor",
+        "@Published worktrees, selectedWorktree, logs, isLoading, error",
+        "Méthode createWorktree(name:repoPath:agentType:) async",
+        "Méthode startAgent(worktreeId:) async",
+        "Méthode stopAgent(worktreeId:) async",
+        "Méthode deleteWorktree(worktreeId:) async",
+        "Injection des services via init",
+        "Gestion des erreurs avec do/catch",
+        "Le projet compile sans erreur"
+      ],
+      "technical_notes": "Pattern MVVM avec @MainActor pour thread-safety UI. Utiliser defer { isLoading = false } pour cleanup.",
+      "completed_at": null
+    },
+    {
+      "id": "US-014",
+      "title": "CLI Adapters Protocol",
+      "description": "En tant que développeur, je veux un système d'adaptateurs pour supporter différents CLIs de manière extensible.",
+      "priority": "medium",
+      "status": "pending",
+      "depends_on": ["US-005"],
+      "acceptance_criteria": [
+        "Protocol CLIAdapter avec méthodes launch, stop, sendCommand",
+        "Struct ClaudeAdapter: CLIAdapter avec path /usr/local/bin/claude",
+        "Struct GeminiAdapter: CLIAdapter avec path pour gemini cli",
+        "Struct CodexAdapter: CLIAdapter avec path pour codex cli",
+        "Enum CLIType avec factory method adapter(for:)",
+        "Chaque adapter retourne les arguments corrects pour son CLI",
+        "Le projet compile sans erreur"
+      ],
+      "technical_notes": "Pattern Strategy avec protocol. Les paths peuvent être configurables via Settings. Gemini CLI: gemini, Codex: codex ou openai.",
+      "completed_at": null
+    },
+    {
+      "id": "US-015",
+      "title": "ConfigChecker Service",
+      "description": "En tant qu'utilisateur, je veux que l'app vérifie les prérequis au lancement pour éviter les erreurs.",
+      "priority": "medium",
+      "status": "pending",
+      "depends_on": ["US-005"],
+      "acceptance_criteria": [
+        "Actor ConfigChecker avec méthodes de vérification",
+        "Méthode checkGit() async -> Bool (which git)",
+        "Méthode checkClaude() async -> Bool (which claude)",
+        "Méthode checkGemini() async -> Bool",
+        "Méthode checkCodex() async -> Bool",
+        "Méthode checkAll() async -> ConfigStatus avec détails",
+        "Struct ConfigStatus avec statut par outil",
+        "Affichage alert si prérequis manquants",
+        "Le projet compile sans erreur"
+      ],
+      "technical_notes": "Utiliser Process avec /usr/bin/which pour vérifier. Stocker résultats dans UserDefaults pour ne pas re-checker à chaque fois.",
+      "completed_at": null
+    },
+    {
+      "id": "US-016",
+      "title": "WorktreeCreateSheet",
+      "description": "En tant qu'utilisateur, je veux un formulaire pour créer un nouveau worktree avec choix de l'agent.",
+      "priority": "medium",
+      "status": "pending",
+      "depends_on": ["US-009", "US-013"],
+      "acceptance_criteria": [
+        "Sheet modale avec Form",
+        "TextField pour nom du worktree",
+        "TextField pour chemin du repo avec bouton Browse",
+        "Picker pour type d'agent (Claude/Gemini/Codex)",
+        "TextField pour nom de branche (auto-généré)",
+        "Boutons Cancel et Create",
+        "Validation: nom requis, repo existe, agent disponible",
+        "Create déclenche viewModel.createWorktree()",
+        "Le projet compile et le sheet fonctionne"
+      ],
+      "technical_notes": "Utiliser .sheet(isPresented:). NSOpenPanel pour sélection dossier. Validation avec @State et computed property isValid.",
+      "completed_at": null
+    },
+    {
+      "id": "US-017",
+      "title": "LogEntry Streaming",
+      "description": "En tant qu'utilisateur, je veux voir les logs apparaître en temps réel depuis le MCP.",
+      "priority": "medium",
+      "status": "pending",
+      "depends_on": ["US-007", "US-011", "US-013"],
+      "acceptance_criteria": [
+        "MCPClient émet les logs via AsyncStream<LogEntry>",
+        "SessionViewModel subscribe au stream de logs",
+        "Nouveaux logs ajoutés à la liste @Published",
+        "UI se met à jour automatiquement",
+        "Polling getState() toutes les 500ms ou push depuis MCP",
+        "Gestion de la déconnexion MCP",
+        "Le streaming fonctionne et les logs s'affichent en temps réel"
+      ],
+      "technical_notes": "Utiliser AsyncStream pour le streaming. Task avec while loop pour polling. Attention à la cancellation avec Task.isCancelled.",
+      "completed_at": null
+    },
+    {
+      "id": "US-018",
+      "title": "Keyboard Shortcuts",
+      "description": "En tant qu'utilisateur, je veux des raccourcis clavier pour être plus productif.",
+      "priority": "low",
+      "status": "pending",
+      "depends_on": ["US-009", "US-016"],
+      "acceptance_criteria": [
+        "⌘N ouvre WorktreeCreateSheet",
+        "⌘K ouvre Command Palette (simple pour v1)",
+        "⌘W ferme le worktree sélectionné",
+        "⌘. arrête l'agent du worktree sélectionné",
+        "⌘L clear les logs",
+        "Raccourcis via .keyboardShortcut() ou Commands",
+        "Le projet compile et les raccourcis fonctionnent"
+      ],
+      "technical_notes": "Utiliser .commands { } dans App pour menu commands. .keyboardShortcut() sur les boutons.",
+      "completed_at": null
+    },
+    {
+      "id": "US-019",
+      "title": "Settings & Persistence",
+      "description": "En tant qu'utilisateur, je veux que mes préférences soient sauvegardées entre les sessions.",
+      "priority": "low",
+      "status": "pending",
+      "depends_on": ["US-009"],
+      "acceptance_criteria": [
+        "SettingsView avec Form",
+        "@AppStorage pour préférences simples",
+        "Config paths des CLIs (claude, gemini, codex)",
+        "Chemin par défaut des repos",
+        "Toggle pour theme dark/light (bonus)",
+        "Persistence dans UserDefaults ou config.json",
+        "Settings scene dans App",
+        "Le projet compile et les settings persistent"
+      ],
+      "technical_notes": "Settings { SettingsView() } dans App. @AppStorage pour UserDefaults. FileManager pour config.json si besoin.",
+      "completed_at": null
+    }
+  ],
+  "technical_considerations": [
+    "macOS 14.0+ requis pour @Observable et dernières APIs SwiftUI",
+    "Utiliser actors (GitService, ProcessRunner, MCPClient) pour thread-safety",
+    "@MainActor obligatoire sur tous les ViewModels",
+    "Structs Codable + Sendable pour les modèles de données",
+    "MCP Server en TypeScript séparé (crossroads-mcp/)",
+    "Communication MCP via stdin/stdout JSON-RPC",
+    "Thème Dark Pro basé sur NEXUS_ART_DIRECTION.md",
+    "Skills Swift chargées: swift-language, swift-concurrency, memory-management, swiftui, process-management, mvvm-architecture, file-operations"
+  ],
+  "success_metrics": [
+    "L'app compile et lance sur macOS 14+",
+    "Création d'un worktree et lancement d'un agent fonctionne",
+    "Les logs s'affichent en temps réel",
+    "Les 3 CLIs (Claude, Gemini, Codex) peuvent être lancés",
+    "L'UI est responsive et suit le thème Dark Pro"
+  ],
+  "next_version": {
+    "name": "CrossRoads v2 - Full Agentic Mode",
+    "description": "Mode où Claude orchestre automatiquement la création de worktrees et l'assignation des tâches aux agents",
+    "planned_features": [
+      "Claude pilote l'orchestration multi-agents",
+      "Création automatique de worktrees selon PRD",
+      "Assignation intelligente des tâches (PRD-claude, PRD-gemini, PRD-codex)",
+      "Merge automatique des résultats",
+      "Dashboard orbital animé style Destiny",
+      "Intégration AGENT.md et notes/ par worktree"
+    ]
+  }
+}
