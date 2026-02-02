@@ -142,7 +142,7 @@
       "title": "MCPClient Actor Swift",
       "description": "En tant que développeur, je veux un client MCP Swift pour communiquer avec le serveur crossroads-mcp via JSON-RPC.",
       "priority": "critical",
-      "status": "pending",
+      "status": "complete",
       "depends_on": ["US-005", "US-006"],
       "acceptance_criteria": [
         "Actor MCPClient pour communication thread-safe",
@@ -156,7 +156,7 @@
         "Le projet compile sans erreur"
       ],
       "technical_notes": "Utiliser ProcessRunner pour lancer node crossroads-mcp. Encoder/Decoder JSON pour JSON-RPC. Protocol MCP utilise stdio.",
-      "completed_at": null
+      "completed_at": "2026-02-02T22:30:00.000Z"
     },
     {
       "id": "US-008",

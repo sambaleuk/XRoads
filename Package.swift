@@ -29,7 +29,8 @@ let package = Package(
                 "Models/LogEntry.swift",
                 "Models/Session.swift",
                 "Services/GitService.swift",
-                "Services/ProcessRunner.swift"
+                "Services/ProcessRunner.swift",
+                "Services/MCPClient.swift"
             ]
         )
     ]
