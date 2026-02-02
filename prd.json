@@ -243,7 +243,7 @@
       "title": "WorktreeCard & StatusBadge",
       "description": "En tant qu'utilisateur, je veux voir chaque worktree comme une carte avec son statut visuel pour comprendre l'état de mes agents.",
       "priority": "high",
-      "status": "pending",
+      "status": "complete",
       "depends_on": ["US-002", "US-003"],
       "acceptance_criteria": [
         "WorktreeCard avec nom, branche, agent type",
@@ -256,7 +256,7 @@
         "Le projet compile et les cards s'affichent"
       ],
       "technical_notes": "Utiliser .animation(.easeInOut.repeatForever()) pour pulse. SF Symbols pour icônes ou custom.",
-      "completed_at": null
+      "completed_at": "2026-02-02T00:15:00.000Z"
     },
     {
       "id": "US-013",

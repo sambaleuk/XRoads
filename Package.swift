@@ -22,6 +22,7 @@ let package = Package(
                 "Views/ContentView.swift",
                 "Views/MainWindowView.swift",
                 "Views/TerminalView.swift",
+                "Views/WorktreeCard.swift",
                 "Resources/Theme.swift",
                 "Models/AgentType.swift",
                 "Models/AgentStatus.swift",
