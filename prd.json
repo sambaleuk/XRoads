@@ -40,7 +40,7 @@
       "title": "Theme Dark Pro & Extensions",
       "description": "En tant que développeur, je veux un système de thème Dark Pro avec extensions Color pour avoir une UI cohérente inspirée de GitHub Dark.",
       "priority": "critical",
-      "status": "pending",
+      "status": "complete",
       "depends_on": ["US-001"],
       "acceptance_criteria": [
         "Extension Color avec toutes les couleurs Dark Pro (bgApp, bgCanvas, bgSurface, bgElevated)",
@@ -51,7 +51,7 @@
         "Le projet compile sans erreur"
       ],
       "technical_notes": "Couleurs depuis NEXUS_ART_DIRECTION.md: bgApp=#0d1117, bgSurface=#161b22, accentPrimary=#388bfd, etc. Utiliser Color(hex:) initializer.",
-      "completed_at": null
+      "completed_at": "2026-02-02T23:15:00.000Z"
     },
     {
       "id": "US-003",

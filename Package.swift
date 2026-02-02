@@ -19,7 +19,8 @@ let package = Package(
             ],
             sources: [
                 "App/CrossRoadsApp.swift",
-                "Views/ContentView.swift"
+                "Views/ContentView.swift",
+                "Resources/Theme.swift"
             ]
         )
     ]
