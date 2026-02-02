@@ -23,6 +23,9 @@ final class AppState {
     /// Currently selected worktree
     var selectedWorktree: Worktree?
 
+    /// All agents indexed by their ID
+    var agents: [UUID: Agent] = [:]
+
     /// Log entries for display
     var logs: [LogEntry] = []
 
@@ -106,6 +109,11 @@ final class AppState {
             selectedWorktree = nil
         }
 
+        // Remove associated agent
+        if let agentId = worktree.agentId {
+            agents.removeValue(forKey: agentId)
+        }
+
         // Remove from session
         if var session = selectedSession {
             session.worktrees.removeAll { $0 == worktree.id }
@@ -114,6 +122,24 @@ final class AppState {
                 selectedSession = session
             }
         }
+    }
+
+    // MARK: - Agent Management
+
+    /// Gets the agent for a worktree
+    func agent(for worktree: Worktree) -> Agent? {
+        guard let agentId = worktree.agentId else { return nil }
+        return agents[agentId]
+    }
+
+    /// Adds or updates an agent
+    func setAgent(_ agent: Agent) {
+        agents[agent.id] = agent
+    }
+
+    /// Removes an agent
+    func removeAgent(_ agentId: UUID) {
+        agents.removeValue(forKey: agentId)
     }
 
     // MARK: - Log Management

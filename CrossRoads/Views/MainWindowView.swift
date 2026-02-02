@@ -25,7 +25,7 @@ struct MainWindowView: View {
     var body: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             // MARK: - Sidebar (240px)
-            SidebarColumn(showNewWorktreeSheet: $showNewWorktreeSheet)
+            SidebarView(showNewWorktreeSheet: $showNewWorktreeSheet)
                 .navigationSplitViewColumnWidth(min: 200, ideal: Theme.Layout.sidebarWidth, max: 300)
         } content: {
             // MARK: - Content Area
@@ -77,69 +77,6 @@ struct MainWindowView: View {
         }
         .background(Color.bgApp)
         .preferredColorScheme(.dark)
-    }
-}
-
-// MARK: - Sidebar Column
-
-private struct SidebarColumn: View {
-    @Environment(\.appState) private var appState
-    @Binding var showNewWorktreeSheet: Bool
-
-    var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            HStack {
-                Text("Worktrees")
-                    .font(.h2)
-                    .foregroundStyle(Color.textPrimary)
-
-                Spacer()
-
-                Text("\(appState.worktrees.count)")
-                    .font(.small)
-                    .foregroundStyle(Color.textSecondary)
-                    .padding(.horizontal, Theme.Spacing.sm)
-                    .padding(.vertical, Theme.Spacing.xs)
-                    .background(Color.bgElevated)
-                    .clipShape(Capsule())
-            }
-            .padding(.horizontal, Theme.Spacing.md)
-            .padding(.vertical, Theme.Spacing.sm)
-
-            Divider()
-                .background(Color.borderMuted)
-
-            // Worktrees List
-            if appState.worktrees.isEmpty {
-                EmptyStateView(
-                    icon: "folder.badge.plus",
-                    title: "No Worktrees",
-                    message: "Create a worktree to start working with AI agents"
-                ) {
-                    showNewWorktreeSheet = true
-                }
-            } else {
-                List(selection: Binding(
-                    get: { appState.selectedWorktree?.id },
-                    set: { id in
-                        if let id = id {
-                            appState.selectWorktree(appState.worktrees.first { $0.id == id })
-                        } else {
-                            appState.selectWorktree(nil)
-                        }
-                    }
-                )) {
-                    ForEach(appState.worktrees) { worktree in
-                        WorktreeRow(worktree: worktree)
-                            .tag(worktree.id)
-                    }
-                }
-                .listStyle(.sidebar)
-                .scrollContentBackground(.hidden)
-            }
-        }
-        .background(Color.bgSurface)
     }
 }
 
@@ -199,37 +136,6 @@ private struct InspectorColumn: View {
             LogsListView(logs: appState.filteredLogs)
         }
         .background(Color.bgCanvas)
-    }
-}
-
-// MARK: - Worktree Row (Placeholder for US-012)
-
-private struct WorktreeRow: View {
-    let worktree: Worktree
-
-    var body: some View {
-        HStack(spacing: Theme.Spacing.sm) {
-            // Status indicator
-            Circle()
-                .fill(Color.statusInfo)
-                .frame(width: Theme.Component.statusDotSize, height: Theme.Component.statusDotSize)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(worktree.name)
-                    .font(.body14)
-                    .foregroundStyle(Color.textPrimary)
-                    .lineLimit(1)
-
-                Text(worktree.branch)
-                    .font(.small)
-                    .foregroundStyle(Color.textSecondary)
-                    .lineLimit(1)
-            }
-
-            Spacer()
-        }
-        .padding(.vertical, Theme.Spacing.xs)
-        .contentShape(Rectangle())
     }
 }
 
@@ -316,45 +222,6 @@ private struct EmptySelectionView: View {
                 .foregroundStyle(Color.textTertiary)
                 .multilineTextAlignment(.center)
         }
-    }
-}
-
-// MARK: - Empty State View
-
-private struct EmptyStateView: View {
-    let icon: String
-    let title: String
-    let message: String
-    let action: () -> Void
-
-    var body: some View {
-        VStack(spacing: Theme.Spacing.md) {
-            Spacer()
-
-            Image(systemName: icon)
-                .font(.system(size: 48))
-                .foregroundStyle(Color.textTertiary)
-
-            Text(title)
-                .font(.h2)
-                .foregroundStyle(Color.textSecondary)
-
-            Text(message)
-                .font(.small)
-                .foregroundStyle(Color.textTertiary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, Theme.Spacing.md)
-
-            Button("Create Worktree") {
-                action()
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(Color.accentPrimary)
-            .padding(.top, Theme.Spacing.sm)
-
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

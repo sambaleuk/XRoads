@@ -203,7 +203,7 @@
       "title": "SidebarView - Sessions",
       "description": "En tant qu'utilisateur, je veux voir la liste de mes worktrees dans la sidebar pour naviguer entre eux.",
       "priority": "high",
-      "status": "pending",
+      "status": "complete",
       "depends_on": ["US-009", "US-012"],
       "acceptance_criteria": [
         "List avec ForEach sur worktrees",
@@ -215,7 +215,7 @@
         "Le projet compile et la sidebar s'affiche"
       ],
       "technical_notes": "Utiliser List(selection:) pour la sélection. WorktreeCard comme row customisée.",
-      "completed_at": null
+      "completed_at": "2026-02-02T01:00:00.000Z"
     },
     {
       "id": "US-011",
