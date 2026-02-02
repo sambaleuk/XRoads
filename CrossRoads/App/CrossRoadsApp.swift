@@ -24,11 +24,10 @@ struct CrossRoadsApp: App {
             CrossRoadsCommands(appState: appState)
         }
 
-        // Settings window (US-019 placeholder)
+        // Settings window (US-019)
         #if os(macOS)
         Settings {
-            SettingsPlaceholderView()
-                .frame(minWidth: 450, minHeight: 300)
+            SettingsView()
         }
         #endif
     }
@@ -122,26 +121,3 @@ extension Notification.Name {
     static let showCommandPalette = Notification.Name("showCommandPalette")
 }
 
-// MARK: - Settings Placeholder
-
-/// Placeholder view for settings (US-019)
-struct SettingsPlaceholderView: View {
-    var body: some View {
-        VStack(spacing: Theme.Spacing.lg) {
-            Image(systemName: "gearshape.2")
-                .font(.system(size: 48))
-                .foregroundStyle(Color.textTertiary)
-
-            Text("Settings")
-                .font(.h1)
-                .foregroundStyle(Color.textPrimary)
-
-            Text("Settings will be available in a future update")
-                .font(.body14)
-                .foregroundStyle(Color.textSecondary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.bgApp)
-        .preferredColorScheme(.dark)
-    }
-}

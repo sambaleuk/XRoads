@@ -383,7 +383,7 @@
       "title": "Settings & Persistence",
       "description": "En tant qu'utilisateur, je veux que mes préférences soient sauvegardées entre les sessions.",
       "priority": "low",
-      "status": "pending",
+      "status": "complete",
       "depends_on": ["US-009"],
       "acceptance_criteria": [
         "SettingsView avec Form",
@@ -396,7 +396,7 @@
         "Le projet compile et les settings persistent"
       ],
       "technical_notes": "Settings { SettingsView() } dans App. @AppStorage pour UserDefaults. FileManager pour config.json si besoin.",
-      "completed_at": null
+      "completed_at": "2026-02-02T06:00:00.000Z"
     }
   ],
   "technical_considerations": [

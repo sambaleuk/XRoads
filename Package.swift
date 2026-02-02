@@ -26,6 +26,7 @@ let package = Package(
                 "Views/WorktreeCard.swift",
                 "Views/WorktreeCreateSheet.swift",
                 "Views/CommandPaletteView.swift",
+                "Views/SettingsView.swift",
                 "Resources/Theme.swift",
                 "Models/AgentType.swift",
                 "Models/AgentStatus.swift",
