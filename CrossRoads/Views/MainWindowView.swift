@@ -358,95 +358,13 @@ private struct EmptyStateView: View {
     }
 }
 
-// MARK: - Logs List View (Placeholder for US-011)
+// MARK: - Logs List View (uses TerminalView from US-011)
 
 private struct LogsListView: View {
     let logs: [LogEntry]
 
     var body: some View {
-        if logs.isEmpty {
-            VStack(spacing: Theme.Spacing.sm) {
-                Spacer()
-                Image(systemName: "text.alignleft")
-                    .font(.system(size: 32))
-                    .foregroundStyle(Color.textTertiary)
-                Text("No logs yet")
-                    .font(.small)
-                    .foregroundStyle(Color.textTertiary)
-                Spacer()
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-        } else {
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 2) {
-                        ForEach(logs) { log in
-                            LogLineView(log: log)
-                                .id(log.id)
-                        }
-                    }
-                    .padding(Theme.Spacing.sm)
-                }
-                .onChange(of: logs.count) { _, _ in
-                    // Auto-scroll to bottom
-                    if let lastLog = logs.last {
-                        withAnimation {
-                            proxy.scrollTo(lastLog.id, anchor: .bottom)
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-// MARK: - Log Line View (Placeholder for US-011)
-
-private struct LogLineView: View {
-    let log: LogEntry
-
-    var body: some View {
-        HStack(alignment: .top, spacing: Theme.Spacing.sm) {
-            // Timestamp
-            Text(log.formattedTimestamp)
-                .font(.terminal)
-                .foregroundStyle(Color.textTertiary)
-
-            // Level indicator
-            Text(log.level.rawValue.uppercased())
-                .font(.terminal)
-                .foregroundStyle(levelColor)
-                .frame(width: 50, alignment: .leading)
-
-            // Source
-            if !log.source.isEmpty {
-                Text("[\(log.source)]")
-                    .font(.terminal)
-                    .foregroundStyle(Color.textSecondary)
-            }
-
-            // Message
-            Text(log.message)
-                .font(.terminal)
-                .foregroundStyle(Color.textPrimary)
-                .lineLimit(nil)
-
-            Spacer()
-        }
-        .padding(.vertical, 2)
-    }
-
-    private var levelColor: Color {
-        switch log.level {
-        case .debug:
-            return Color.textTertiary
-        case .info:
-            return Color.terminalCyan
-        case .warn:
-            return Color.terminalYellow
-        case .error:
-            return Color.terminalRed
-        }
+        TerminalView(logs: logs)
     }
 }
 

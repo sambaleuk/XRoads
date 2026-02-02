@@ -21,6 +21,7 @@ let package = Package(
                 "App/CrossRoadsApp.swift",
                 "Views/ContentView.swift",
                 "Views/MainWindowView.swift",
+                "Views/TerminalView.swift",
                 "Resources/Theme.swift",
                 "Models/AgentType.swift",
                 "Models/AgentStatus.swift",

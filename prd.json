@@ -222,7 +222,7 @@
       "title": "TerminalView - Logs",
       "description": "En tant qu'utilisateur, je veux voir les logs en temps réel dans un terminal pour monitorer mes agents.",
       "priority": "high",
-      "status": "pending",
+      "status": "complete",
       "depends_on": ["US-002", "US-003"],
       "acceptance_criteria": [
         "ScrollView avec LazyVStack pour performance",
@@ -236,7 +236,7 @@
         "Le projet compile et les logs s'affichent"
       ],
       "technical_notes": "ScrollViewReader avec scrollTo pour auto-scroll. .id() sur chaque log pour le scroll. Limiter à 500 logs affichés pour performance.",
-      "completed_at": null
+      "completed_at": "2026-02-02T23:45:00.000Z"
     },
     {
       "id": "US-012",
