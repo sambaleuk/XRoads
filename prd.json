@@ -284,7 +284,7 @@
       "title": "CLI Adapters Protocol",
       "description": "En tant que développeur, je veux un système d'adaptateurs pour supporter différents CLIs de manière extensible.",
       "priority": "medium",
-      "status": "pending",
+      "status": "complete",
       "depends_on": ["US-005"],
       "acceptance_criteria": [
         "Protocol CLIAdapter avec méthodes launch, stop, sendCommand",
@@ -296,7 +296,7 @@
         "Le projet compile sans erreur"
       ],
       "technical_notes": "Pattern Strategy avec protocol. Les paths peuvent être configurables via Settings. Gemini CLI: gemini, Codex: codex ou openai.",
-      "completed_at": null
+      "completed_at": "2026-02-02T02:00:00.000Z"
     },
     {
       "id": "US-015",
