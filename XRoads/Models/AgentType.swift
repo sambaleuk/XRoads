@@ -31,4 +31,22 @@ enum AgentType: String, Codable, Hashable, Sendable, CaseIterable {
         case .codex: return Color(red: 0.4, green: 1.0, blue: 0.5)      // Green glow
         }
     }
+
+    /// CLI display name for slot headers (e.g., "CLAUDE CODE")
+    var cliDisplayName: String {
+        switch self {
+        case .claude: return "CLAUDE CODE"
+        case .gemini: return "GEMINI CLI"
+        case .codex: return "CODEX"
+        }
+    }
+
+    /// Short name for compact display
+    var shortName: String {
+        switch self {
+        case .claude: return "CC"
+        case .gemini: return "GM"
+        case .codex: return "CX"
+        }
+    }
 }

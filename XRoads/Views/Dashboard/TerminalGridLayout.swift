@@ -88,9 +88,9 @@ struct TerminalGridLayout: View {
     }
 }
 
-// MARK: - Neon Brain Connection
+// MARK: - Neon Brain Connection (Cord/Tube Style)
 
-/// Glowing synaptic connection from brain center to slot
+/// Curved tube-like synaptic connection from brain center to slot
 struct NeonBrainConnection: View {
     let center: CGPoint
     let angle: Double
@@ -101,157 +101,218 @@ struct NeonBrainConnection: View {
 
     @State private var pulsePhase: Double = 0
     @State private var impulsePosition: CGFloat = 0
-    @State private var glowIntensity: Double = 0.5
+    @State private var glowIntensity: Double = 0.3
 
     // Neon colors
     private let neonCyan = Color(red: 0.0, green: 0.9, blue: 1.0)
     private let neonMagenta = Color(red: 1.0, green: 0.2, blue: 0.8)
+    private let cordBaseColor = Color(red: 0.15, green: 0.18, blue: 0.25)
 
     private var isActive: Bool { slotStatus.isActive }
-    private var connectionColor: Color { isActive ? slotColor : neonCyan.opacity(0.4) }
 
     var body: some View {
         let endPoint = CGPoint(
-            x: center.x + (radius - 80) * CGFloat(cos(angle * .pi / 180)),
-            y: center.y + (radius - 80) * CGFloat(sin(angle * .pi / 180))
+            x: center.x + (radius - 60) * CGFloat(cos(angle * .pi / 180)),
+            y: center.y + (radius - 60) * CGFloat(sin(angle * .pi / 180))
         )
 
         ZStack {
-            // Outer glow layer
-            connectionPath(to: endPoint)
+            // Layer 1: Dark cord base (always visible)
+            cordPath(to: endPoint)
                 .stroke(
-                    connectionColor.opacity(0.4 * glowIntensity),
-                    style: StrokeStyle(lineWidth: 12, lineCap: .round)
-                )
-                .blur(radius: 8)
-
-            // Middle glow layer
-            connectionPath(to: endPoint)
-                .stroke(
-                    connectionColor.opacity(0.6 * glowIntensity),
-                    style: StrokeStyle(lineWidth: 6, lineCap: .round)
-                )
-                .blur(radius: 4)
-
-            // Core connection line
-            connectionPath(to: endPoint)
-                .stroke(
-                    LinearGradient(
-                        colors: [
-                            neonCyan.opacity(isActive ? 0.9 : 0.3),
-                            connectionColor.opacity(isActive ? 0.8 : 0.2)
-                        ],
-                        startPoint: .init(x: 0.5, y: 0.5),
-                        endPoint: unitPoint(for: angle)
-                    ),
-                    style: StrokeStyle(lineWidth: isActive ? 3 : 1.5, lineCap: .round)
+                    cordBaseColor,
+                    style: StrokeStyle(lineWidth: 14, lineCap: .round, lineJoin: .round)
                 )
 
-            // Animated electricity effect (dashed)
-            if isConfigured {
-                connectionPath(to: endPoint)
-                    .stroke(
-                        connectionColor,
-                        style: StrokeStyle(
-                            lineWidth: 1,
-                            lineCap: .round,
-                            dash: [4, 8],
-                            dashPhase: CGFloat(pulsePhase * 30)
-                        )
-                    )
-                    .opacity(0.7)
-            }
+            // Layer 2: Inner cord highlight
+            cordPath(to: endPoint)
+                .stroke(
+                    cordBaseColor.opacity(0.8),
+                    style: StrokeStyle(lineWidth: 10, lineCap: .round, lineJoin: .round)
+                )
 
-            // Traveling impulse for active connections
+            // Layer 3: Outer glow (only when active)
             if isActive {
-                impulseView(to: endPoint)
+                cordPath(to: endPoint)
+                    .stroke(
+                        slotColor.opacity(0.5 * glowIntensity),
+                        style: StrokeStyle(lineWidth: 20, lineCap: .round, lineJoin: .round)
+                    )
+                    .blur(radius: 12)
             }
 
-            // Connection endpoint glow
-            if isConfigured {
-                endpointGlow(at: endPoint)
+            // Layer 4: Mid glow (only when active)
+            if isActive {
+                cordPath(to: endPoint)
+                    .stroke(
+                        slotColor.opacity(0.7 * glowIntensity),
+                        style: StrokeStyle(lineWidth: 12, lineCap: .round, lineJoin: .round)
+                    )
+                    .blur(radius: 6)
             }
+
+            // Layer 5: Core glow line (only when active)
+            if isActive {
+                cordPath(to: endPoint)
+                    .stroke(
+                        LinearGradient(
+                            colors: [neonCyan, slotColor, slotColor.opacity(0.8)],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ),
+                        style: StrokeStyle(lineWidth: 4, lineCap: .round, lineJoin: .round)
+                    )
+            }
+
+            // Layer 6: Energy particles traveling along cord (only when active)
+            if isActive {
+                energyParticles(to: endPoint)
+            }
+
+            // Layer 7: Connection point at slot end
+            connectionNode(at: endPoint)
         }
         .onAppear { startAnimations() }
+        .onChange(of: isActive) { _, newValue in
+            if newValue {
+                startActiveAnimations()
+            }
+        }
     }
 
-    private func connectionPath(to endPoint: CGPoint) -> Path {
+    // MARK: - Curved Cord Path
+
+    private func cordPath(to endPoint: CGPoint) -> Path {
         Path { path in
             path.move(to: center)
-            path.addLine(to: endPoint)
+
+            // Offset perpendicular to the line for curve
+            let dx = endPoint.x - center.x
+            let dy = endPoint.y - center.y
+            let len = sqrt(dx * dx + dy * dy)
+            let perpX = -dy / len * 30 // Curve amount
+            let perpY = dx / len * 30
+
+            // Add some wave to the curve
+            let ctrl1 = CGPoint(
+                x: center.x + dx * 0.3 + perpX,
+                y: center.y + dy * 0.3 + perpY
+            )
+            let ctrl2 = CGPoint(
+                x: center.x + dx * 0.7 - perpX * 0.5,
+                y: center.y + dy * 0.7 - perpY * 0.5
+            )
+
+            path.addCurve(to: endPoint, control1: ctrl1, control2: ctrl2)
         }
     }
 
-    private func unitPoint(for angle: Double) -> UnitPoint {
-        UnitPoint(
-            x: 0.5 + 0.5 * cos(angle * .pi / 180),
-            y: 0.5 + 0.5 * sin(angle * .pi / 180)
-        )
-    }
+    // MARK: - Energy Particles
 
-    private func impulseView(to endPoint: CGPoint) -> some View {
-        let currentX = center.x + (endPoint.x - center.x) * impulsePosition
-        let currentY = center.y + (endPoint.y - center.y) * impulsePosition
+    private func energyParticles(to endPoint: CGPoint) -> some View {
+        let positions = [impulsePosition, (impulsePosition + 0.33).truncatingRemainder(dividingBy: 1.0), (impulsePosition + 0.66).truncatingRemainder(dividingBy: 1.0)]
 
         return ZStack {
-            // Outer glow
-            Circle()
-                .fill(slotColor)
-                .frame(width: 24, height: 24)
-                .blur(radius: 12)
+            ForEach(0..<3, id: \.self) { i in
+                let t = positions[i]
+                let point = pointOnCurve(from: center, to: endPoint, t: t)
 
-            // Inner glow
-            Circle()
-                .fill(slotColor)
-                .frame(width: 12, height: 12)
-                .blur(radius: 4)
+                ZStack {
+                    // Particle glow
+                    Circle()
+                        .fill(slotColor)
+                        .frame(width: 16, height: 16)
+                        .blur(radius: 8)
 
-            // Core
-            Circle()
-                .fill(.white)
-                .frame(width: 6, height: 6)
+                    // Particle core
+                    Circle()
+                        .fill(.white)
+                        .frame(width: 6, height: 6)
+                }
+                .position(point)
+                .opacity(Double(i == 0 ? 1.0 : 0.6))
+            }
         }
-        .position(x: currentX, y: currentY)
     }
 
-    private func endpointGlow(at point: CGPoint) -> some View {
+    private func pointOnCurve(from start: CGPoint, to end: CGPoint, t: CGFloat) -> CGPoint {
+        let dx = end.x - start.x
+        let dy = end.y - start.y
+        let len = sqrt(dx * dx + dy * dy)
+        let perpX = -dy / len * 30
+        let perpY = dx / len * 30
+
+        let ctrl1 = CGPoint(x: start.x + dx * 0.3 + perpX, y: start.y + dy * 0.3 + perpY)
+        let ctrl2 = CGPoint(x: start.x + dx * 0.7 - perpX * 0.5, y: start.y + dy * 0.7 - perpY * 0.5)
+
+        // Cubic Bezier calculation
+        let mt = 1 - t
+        let mt2 = mt * mt
+        let mt3 = mt2 * mt
+        let t2 = t * t
+        let t3 = t2 * t
+
+        let x = mt3 * start.x + 3 * mt2 * t * ctrl1.x + 3 * mt * t2 * ctrl2.x + t3 * end.x
+        let y = mt3 * start.y + 3 * mt2 * t * ctrl1.y + 3 * mt * t2 * ctrl2.y + t3 * end.y
+
+        return CGPoint(x: x, y: y)
+    }
+
+    // MARK: - Connection Node
+
+    private func connectionNode(at point: CGPoint) -> some View {
         ZStack {
-            // Outer glow
-            Circle()
-                .fill(connectionColor.opacity(0.5 * glowIntensity))
-                .frame(width: 20, height: 20)
-                .blur(radius: 8)
+            if isActive {
+                // Active glow
+                Circle()
+                    .fill(slotColor.opacity(0.6))
+                    .frame(width: 24, height: 24)
+                    .blur(radius: 10)
 
-            // Inner glow
-            Circle()
-                .fill(connectionColor.opacity(0.8))
-                .frame(width: 10, height: 10)
-                .blur(radius: 3)
+                Circle()
+                    .fill(slotColor)
+                    .frame(width: 14, height: 14)
+                    .blur(radius: 4)
 
-            // Core dot
-            Circle()
-                .fill(isActive ? .white : connectionColor)
-                .frame(width: 5, height: 5)
+                Circle()
+                    .fill(.white)
+                    .frame(width: 8, height: 8)
+            } else if isConfigured {
+                // Configured but inactive
+                Circle()
+                    .fill(cordBaseColor)
+                    .frame(width: 12, height: 12)
+
+                Circle()
+                    .fill(slotColor.opacity(0.4))
+                    .frame(width: 6, height: 6)
+            } else {
+                // Empty slot
+                Circle()
+                    .fill(cordBaseColor)
+                    .frame(width: 10, height: 10)
+            }
         }
         .position(point)
     }
 
+    // MARK: - Animations
+
     private func startAnimations() {
-        // Pulse animation for electricity
-        withAnimation(.linear(duration: 0.8).repeatForever(autoreverses: false)) {
-            pulsePhase = 1.0
+        // Pulse for glow
+        withAnimation(.easeInOut(duration: 2.0).repeatForever(autoreverses: true)) {
+            glowIntensity = isActive ? 1.0 : 0.3
         }
 
-        // Glow pulsing
-        withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
-            glowIntensity = isActive ? 1.0 : 0.6
-        }
-
-        // Impulse traveling (only for active)
         if isActive {
-            withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: false)) {
-                impulsePosition = 1.0
-            }
+            startActiveAnimations()
+        }
+    }
+
+    private func startActiveAnimations() {
+        // Energy particles traveling
+        withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: false)) {
+            impulsePosition = 1.0
         }
     }
 }

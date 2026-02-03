@@ -3,7 +3,7 @@
 //  XRoads
 //
 //  Created by Nexus on 2026-02-03.
-//  Individual terminal slot component for the dashboard
+//  Individual terminal slot component for the dashboard - Redesigned to match reference
 //
 
 import SwiftUI
@@ -15,250 +15,308 @@ struct TerminalSlotView: View {
     @Binding var slot: TerminalSlot
     let onStart: () -> Void
     let onStop: () -> Void
-    /// Callback for sending input to the process
     var onSendInput: ((String) -> Void)?
-    /// Whether to show the input bar (defaults to true when configured)
     var showInputBar: Bool = true
 
     @State private var isHovered: Bool = false
-    @State private var showAgentPicker: Bool = false
-    @State private var showWorktreePicker: Bool = false
-    @State private var showActionPicker: Bool = false
+    @State private var showConfigPopover: Bool = false
     @State private var selectedAction: ActionType? = nil
+
+    // Neon colors matching the brain
+    private let neonCyan = Color(red: 0.0, green: 0.9, blue: 1.0)
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
+            // Header bar
             slotHeader
 
-            Divider()
-                .background(borderColor.opacity(0.5))
-
-            // Content area
+            // Main content area
             if slot.isConfigured {
-                terminalContent
+                terminalOutputArea
             } else {
-                configurationContent
+                emptySlotContent
             }
         }
-        .frame(width: 200, height: showInputBar && slot.isConfigured ? 210 : 180)
-        .background(Color.bgSurface)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg))
+        .frame(width: 220, height: 160)
+        .background(Color(red: 0.08, green: 0.09, blue: 0.12))
+        .clipShape(RoundedRectangle(cornerRadius: 8))
         .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.lg)
-                .stroke(borderColor, lineWidth: isHovered || slot.status.isActive ? 2 : 1)
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(
+                    slot.status.isActive ? agentColor.opacity(0.8) : Color(white: 0.2),
+                    lineWidth: slot.status.isActive ? 1.5 : 1
+                )
         )
-        .shadow(color: slot.status.isActive ? borderColor.opacity(0.3) : .clear, radius: 8)
+        .shadow(
+            color: slot.status.isActive ? agentColor.opacity(0.4) : .clear,
+            radius: slot.status.isActive ? 12 : 0
+        )
         .scaleEffect(isHovered ? 1.02 : 1.0)
         .animation(.easeInOut(duration: 0.15), value: isHovered)
-        .onHover { hovering in
-            isHovered = hovering
-        }
+        .onHover { isHovered = $0 }
     }
 
-    // MARK: - Slot Header
+    // MARK: - Header
 
     private var slotHeader: some View {
-        HStack(spacing: Theme.Spacing.sm) {
-            // Status indicator
-            Circle()
-                .fill(statusColor)
-                .frame(width: 8, height: 8)
-                .overlay(
-                    Circle()
-                        .stroke(statusColor.opacity(0.5), lineWidth: 2)
-                        .scaleEffect(slot.status.isActive ? 1.5 : 1.0)
-                        .opacity(slot.status.isActive ? 0.5 : 0)
-                        .animation(
-                            slot.status.isActive ?
-                                .easeInOut(duration: 1.0).repeatForever(autoreverses: true) :
-                                .default,
-                            value: slot.status.isActive
-                        )
-                )
+        HStack(spacing: 6) {
+            // Slot label
+            Text("SLOT \(slot.slotNumber)")
+                .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                .foregroundStyle(Color.white.opacity(0.9))
 
-            // Slot title
-            Text(slot.displayName)
-                .font(.small)
-                .fontWeight(.medium)
-                .foregroundStyle(Color.textPrimary)
-                .lineLimit(1)
+            // Agent indicator (colored dot + name)
+            if let agent = slot.agentType {
+                Circle()
+                    .fill(agentColor)
+                    .frame(width: 6, height: 6)
+                    .shadow(color: agentColor, radius: 3)
+
+                Text(agent.cliDisplayName)
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundStyle(agentColor)
+            }
 
             Spacer()
 
-            // Agent type badge
-            if let agentType = slot.agentType {
-                AgentTypeBadge(agentType: agentType)
-            }
-
-            // Action type badge
-            if let action = selectedAction {
-                ActionTypeBadge(actionType: action)
-            }
-
-            // Action button
-            slotActionButton
+            // Config/Action button
+            headerActionButton
         }
-        .padding(.horizontal, Theme.Spacing.sm)
-        .padding(.vertical, Theme.Spacing.xs)
-        .frame(height: 32)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color(red: 0.1, green: 0.11, blue: 0.14))
     }
 
-    // MARK: - Action Button
+    // MARK: - Header Action Button
 
     @ViewBuilder
-    private var slotActionButton: some View {
+    private var headerActionButton: some View {
         if slot.status.canStart {
             Button(action: onStart) {
                 Image(systemName: "play.fill")
-                    .font(.system(size: 10))
+                    .font(.system(size: 9))
                     .foregroundStyle(Color.statusSuccess)
             }
             .buttonStyle(.plain)
-            .help("Start agent")
         } else if slot.status.canStop {
             Button(action: onStop) {
                 Image(systemName: "stop.fill")
-                    .font(.system(size: 10))
+                    .font(.system(size: 9))
                     .foregroundStyle(Color.statusError)
             }
             .buttonStyle(.plain)
-            .help("Stop agent")
-        } else if slot.status == .empty {
+        } else {
             Button {
-                showAgentPicker = true
+                showConfigPopover = true
             } label: {
                 Image(systemName: "plus")
-                    .font(.system(size: 10))
-                    .foregroundStyle(Color.textSecondary)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.5))
             }
             .buttonStyle(.plain)
-            .help("Configure slot")
-            .popover(isPresented: $showAgentPicker) {
-                AgentPickerMenu(selectedAgent: Binding(
-                    get: { slot.agentType },
-                    set: { slot.agentType = $0 }
-                ), showWorktreePicker: $showWorktreePicker)
+            .popover(isPresented: $showConfigPopover, arrowEdge: .bottom) {
+                SlotConfigPopover(
+                    slot: $slot,
+                    selectedAction: $selectedAction,
+                    worktrees: appState.worktrees
+                )
             }
         }
     }
 
-    // MARK: - Terminal Content
+    // MARK: - Terminal Output Area
 
-    private var terminalContent: some View {
+    private var terminalOutputArea: some View {
         VStack(spacing: 0) {
-            // Mini terminal output
-            ScrollView {
-                VStack(alignment: .leading, spacing: 2) {
-                    ForEach(slot.recentLogs) { log in
-                        MiniLogLine(log: log)
+            // Terminal output
+            ScrollViewReader { proxy in
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 1) {
+                        ForEach(slot.recentLogs) { log in
+                            TerminalOutputLine(log: log, agentColor: agentColor)
+                                .id(log.id)
+                        }
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
+                }
+                .onChange(of: slot.logs.count) { _, _ in
+                    if let lastLog = slot.recentLogs.last {
+                        withAnimation(.easeOut(duration: 0.1)) {
+                            proxy.scrollTo(lastLog.id, anchor: .bottom)
+                        }
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .padding(Theme.Spacing.xs)
-            .frame(maxHeight: .infinity)
-            .background(Color.bgCanvas)
+            .background(Color(red: 0.05, green: 0.06, blue: 0.08))
 
-            // Progress bar (if running)
+            // Progress bar (when active)
             if slot.status.isActive && slot.progress > 0 {
-                ProgressView(value: slot.progress)
-                    .progressViewStyle(.linear)
-                    .tint(borderColor)
-                    .frame(height: 3)
-            }
-
-            // Current task footer
-            if let task = slot.currentTask {
-                HStack {
-                    Text(task)
-                        .font(.xs)
-                        .foregroundStyle(Color.textSecondary)
-                        .lineLimit(1)
-                    Spacer()
+                GeometryReader { geo in
+                    Rectangle()
+                        .fill(agentColor)
+                        .frame(width: geo.size.width * slot.progress, height: 2)
+                        .shadow(color: agentColor, radius: 3)
                 }
-                .padding(.horizontal, Theme.Spacing.xs)
-                .padding(.vertical, 4)
-                .background(Color.bgElevated)
+                .frame(height: 2)
             }
 
-            // Input bar (when visible and process is running)
+            // Input bar (when process running)
             if showInputBar && slot.processId != nil {
                 CompactTerminalInputBar(
-                    onSubmit: { text in
-                        onSendInput?(text)
-                    },
-                    isEnabled: slot.status.canStop, // Only enable when process can be stopped (is running)
+                    onSubmit: { text in onSendInput?(text) },
+                    isEnabled: slot.status.canStop,
                     isWaitingForInput: slot.status == .needsInput
                 )
             }
         }
     }
 
-    // MARK: - Configuration Content
+    // MARK: - Empty Slot Content
 
-    private var configurationContent: some View {
-        VStack(spacing: Theme.Spacing.sm) {
+    private var emptySlotContent: some View {
+        VStack(spacing: 8) {
             Spacer()
 
-            // Agent picker
-            VStack(spacing: Theme.Spacing.xs) {
-                Text("Agent")
-                    .font(.xs)
-                    .foregroundStyle(Color.textTertiary)
+            Text("Select Agent")
+                .font(.system(size: 13, weight: .medium))
+                .foregroundStyle(Color.white.opacity(0.5))
 
-                Menu {
+            Text("Worktree needed")
+                .font(.system(size: 10))
+                .foregroundStyle(Color.white.opacity(0.3))
+
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color(red: 0.05, green: 0.06, blue: 0.08))
+        .contentShape(Rectangle())
+        .onTapGesture {
+            showConfigPopover = true
+        }
+    }
+
+    // MARK: - Computed
+
+    private var agentColor: Color {
+        slot.agentType?.neonColor ?? neonCyan
+    }
+}
+
+// MARK: - Terminal Output Line
+
+private struct TerminalOutputLine: View {
+    let log: LogEntry
+    let agentColor: Color
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 4) {
+            Text(">")
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
+                .foregroundStyle(lineColor)
+
+            Text(log.message)
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(lineColor)
+                .lineLimit(2)
+        }
+    }
+
+    private var lineColor: Color {
+        switch log.level {
+        case .error: return Color(red: 1.0, green: 0.4, blue: 0.4)
+        case .warn: return Color(red: 1.0, green: 0.8, blue: 0.3)
+        case .info: return agentColor
+        case .debug: return Color.white.opacity(0.5)
+        }
+    }
+}
+
+// MARK: - Slot Config Popover
+
+private struct SlotConfigPopover: View {
+    @Binding var slot: TerminalSlot
+    @Binding var selectedAction: ActionType?
+    let worktrees: [Worktree]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            // Title
+            Text("Configure Slot \(slot.slotNumber)")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(Color.white)
+
+            Divider()
+                .background(Color.white.opacity(0.2))
+
+            // Agent selection
+            VStack(alignment: .leading, spacing: 4) {
+                Text("AGENT")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.5))
+
+                HStack(spacing: 8) {
                     ForEach(AgentType.allCases, id: \.self) { agent in
-                        Button {
-                            slot.agentType = agent
-                            // Reset action when agent changes (compatibility may differ)
-                            selectedAction = nil
-                        } label: {
-                            Label(agent.displayName, systemImage: agent.iconName)
-                        }
+                        AgentSelectButton(
+                            agent: agent,
+                            isSelected: slot.agentType == agent,
+                            onSelect: {
+                                slot.agentType = agent
+                                selectedAction = nil
+                            }
+                        )
                     }
-                } label: {
-                    HStack {
-                        if let agent = slot.agentType {
-                            Image(systemName: agent.iconName)
-                            Text(agent.displayName)
-                        } else {
-                            Text("Select Agent")
-                                .foregroundStyle(Color.textTertiary)
-                        }
-                        Spacer()
-                        Image(systemName: "chevron.down")
-                            .font(.system(size: 10))
-                    }
-                    .font(.small)
-                    .foregroundStyle(Color.textPrimary)
-                    .padding(.horizontal, Theme.Spacing.sm)
-                    .padding(.vertical, Theme.Spacing.xs)
-                    .background(Color.bgElevated)
-                    .cornerRadius(Theme.Radius.sm)
                 }
-                .menuStyle(.borderlessButton)
             }
 
-            // Action picker (only visible when agent is selected)
+            // Action selection
             if slot.agentType != nil {
-                VStack(spacing: Theme.Spacing.xs) {
-                    Text("Action")
-                        .font(.xs)
-                        .foregroundStyle(Color.textTertiary)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("ACTION")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.5))
 
-                    actionPickerButton
+                    Menu {
+                        ForEach(ActionType.allCases, id: \.self) { action in
+                            Button {
+                                selectedAction = action
+                            } label: {
+                                Label(action.displayName, systemImage: action.iconName)
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            if let action = selectedAction {
+                                Image(systemName: action.iconName)
+                                Text(action.displayName)
+                            } else {
+                                Text("Select Action")
+                                    .foregroundStyle(Color.white.opacity(0.5))
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.down")
+                                .font(.system(size: 9))
+                        }
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.white.opacity(0.9))
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
+                        .background(Color.white.opacity(0.1))
+                        .cornerRadius(4)
+                    }
+                    .menuStyle(.borderlessButton)
                 }
             }
 
-            // Worktree picker
-            VStack(spacing: Theme.Spacing.xs) {
-                Text("Worktree")
-                    .font(.xs)
-                    .foregroundStyle(Color.textTertiary)
+            // Worktree selection
+            VStack(alignment: .leading, spacing: 4) {
+                Text("WORKTREE")
+                    .font(.system(size: 9, weight: .medium))
+                    .foregroundStyle(Color.white.opacity(0.5))
 
                 Menu {
-                    ForEach(appState.worktrees) { worktree in
+                    ForEach(worktrees) { worktree in
                         Button {
                             slot.worktree = worktree
                             if slot.agentType != nil {
@@ -268,107 +326,69 @@ struct TerminalSlotView: View {
                             Text(worktree.branch)
                         }
                     }
+
+                    if worktrees.isEmpty {
+                        Text("No worktrees available")
+                            .foregroundStyle(Color.white.opacity(0.3))
+                    }
                 } label: {
                     HStack {
-                        if let worktree = slot.worktree {
-                            Image(systemName: "arrow.triangle.branch")
-                            Text(worktree.branch)
+                        Image(systemName: "arrow.triangle.branch")
+                            .font(.system(size: 10))
+                        if let wt = slot.worktree {
+                            Text(wt.branch)
                         } else {
                             Text("Select Worktree")
-                                .foregroundStyle(Color.textTertiary)
+                                .foregroundStyle(Color.white.opacity(0.5))
                         }
                         Spacer()
                         Image(systemName: "chevron.down")
-                            .font(.system(size: 10))
+                            .font(.system(size: 9))
                     }
-                    .font(.small)
-                    .foregroundStyle(Color.textPrimary)
-                    .padding(.horizontal, Theme.Spacing.sm)
-                    .padding(.vertical, Theme.Spacing.xs)
-                    .background(Color.bgElevated)
-                    .cornerRadius(Theme.Radius.sm)
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.white.opacity(0.9))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 6)
+                    .background(Color.white.opacity(0.1))
+                    .cornerRadius(4)
                 }
                 .menuStyle(.borderlessButton)
             }
-
-            Spacer()
         }
-        .padding(Theme.Spacing.sm)
+        .padding(14)
+        .frame(width: 260)
+        .background(Color(red: 0.1, green: 0.11, blue: 0.14))
     }
+}
 
-    // MARK: - Action Picker Button
+// MARK: - Agent Select Button
 
-    private var actionPickerButton: some View {
-        Button {
-            showActionPicker = true
-        } label: {
-            HStack {
-                if let action = selectedAction {
-                    Image(systemName: action.iconName)
-                        .foregroundStyle(action.accentColor)
-                    Text(action.displayName)
-                    if action.includesUnitTests {
-                        Text("+ TU")
-                            .font(.system(size: 8, weight: .medium))
-                            .foregroundStyle(Color.statusInfo)
-                            .padding(.horizontal, 3)
-                            .padding(.vertical, 1)
-                            .background(Color.statusInfo.opacity(0.15))
-                            .cornerRadius(2)
-                    }
-                } else {
-                    Text("Select Action")
-                        .foregroundStyle(Color.textTertiary)
-                }
-                Spacer()
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 10))
+private struct AgentSelectButton: View {
+    let agent: AgentType
+    let isSelected: Bool
+    let onSelect: () -> Void
+
+    var body: some View {
+        Button(action: onSelect) {
+            VStack(spacing: 4) {
+                Image(systemName: agent.iconName)
+                    .font(.system(size: 14))
+
+                Text(agent.shortName)
+                    .font(.system(size: 8, weight: .medium))
             }
-            .font(.small)
-            .foregroundStyle(Color.textPrimary)
-            .padding(.horizontal, Theme.Spacing.sm)
-            .padding(.vertical, Theme.Spacing.xs)
-            .background(Color.bgElevated)
-            .cornerRadius(Theme.Radius.sm)
-        }
-        .buttonStyle(.plain)
-        .popover(isPresented: $showActionPicker) {
-            ActionPickerPopover(
-                selectedAction: $selectedAction,
-                cliType: slot.agentType,
-                onSelect: { action in
-                    selectedAction = action
-                }
+            .foregroundStyle(isSelected ? agent.neonColor : Color.white.opacity(0.5))
+            .frame(width: 50, height: 45)
+            .background(
+                RoundedRectangle(cornerRadius: 6)
+                    .fill(isSelected ? agent.neonColor.opacity(0.15) : Color.white.opacity(0.05))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 6)
+                    .stroke(isSelected ? agent.neonColor.opacity(0.5) : Color.clear, lineWidth: 1)
             )
         }
-    }
-
-    // MARK: - Computed Properties
-
-    private var borderColor: Color {
-        if let agentType = slot.agentType {
-            return agentType.slotBorderColor
-        }
-        return .slotBorderEmpty
-    }
-
-    private var statusColor: Color {
-        switch slot.status {
-        case .empty, .configuring:
-            return .textTertiary
-        case .ready:
-            return .statusInfo
-        case .starting, .running:
-            return .statusSuccess
-        case .paused:
-            return .statusWarning
-        case .completed:
-            return .accentPrimary
-        case .error:
-            return .statusError
-        case .needsInput, .waitingForInput:
-            return .statusWarning
-        }
+        .buttonStyle(.plain)
     }
 }
 
