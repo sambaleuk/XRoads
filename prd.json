@@ -283,7 +283,8 @@
       "title": "TerminalSlot Model Extension",
       "description": "Extend TerminalSlot to track action and input state",
       "priority": "high",
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-03T19:45:00Z",
       "depends_on": ["US-V3-001", "US-V3-004"],
       "acceptance_criteria": [
         "TerminalSlot has actionType: ActionType?",

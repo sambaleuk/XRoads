@@ -366,7 +366,7 @@ struct TerminalSlotView: View {
             return .accentPrimary
         case .error:
             return .statusError
-        case .needsInput:
+        case .needsInput, .waitingForInput:
             return .statusWarning
         }
     }

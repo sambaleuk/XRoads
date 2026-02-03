@@ -380,7 +380,7 @@ struct LargeTerminalSlotView: View {
         case .paused: return .statusWarning
         case .completed: return .accentPrimary
         case .error: return .statusError
-        case .needsInput: return .statusWarning
+        case .needsInput, .waitingForInput: return .statusWarning
         }
     }
 }
