@@ -994,3 +994,55 @@ Files created:
 Files modified:
 - Package.swift (added 4 SkillAdapter files)
 - prd.json (marked US-V3-006 complete)
+
+### Iteration 7 - US-V3-007 (Frictionless Repo Detection)
+- Created RepoDetector actor service for git repository auto-detection:
+  - RepoInfo struct for storing repo metadata (path, name, branch, lastAccessedAt)
+  - RepoDetectorError enum with localized error descriptions
+  - RepoDetectionResult struct for detection results
+  - detectCurrentDirectory() and detectRepository(at:) for repo detection
+  - isGitRepository(at:) for quick checks without caching
+  - getRepoInfo(at:) for detailed repo information
+  - Recent repos management: loadRecentRepos, addToRecentRepos, removeFromRecentRepos, clearRecentRepos
+  - getLastUsedRepo() for quick access to most recent repo
+  - generateBranchName(for:baseName:) for action-based branch naming (feat/, review/, test/, docs/, task/)
+  - generateWorktreePath(repoPath:branchName:) for deterministic worktree paths under ~/.xroads/worktrees/
+  - Shared instance via RepoDetector.shared
+- Created QuickActionBar UI component:
+  - QuickActionBar: full-featured bar with repo header, action buttons, and quick info
+  - QuickActionButton: individual action button with loading state, hover effects, skill count badge
+  - CompactQuickActionBar: sidebar-friendly compact version
+  - CompactActionButton: small action button with short names
+  - RecentReposList: list of recent repos with quick actions
+  - RecentRepoRow: row for displaying recent repo with hover actions
+  - ActionType.primaryActions computed property (implement, review, integrationTest, write)
+  - ActionType.shortName property for compact displays
+- Created comprehensive unit tests:
+  - RepoDetectorTests: RepoInfo init/Codable/Hashable, error descriptions, detection results,
+    branch name generation for all action types, sanitization, worktree path generation,
+    non-git directory handling, recent repos persistence/limits/duplicates
+  - QuickActionBarTests: action callbacks, last repo persistence, repo selection/removal,
+    display names, action integration
+  - CompactQuickActionBarTests: compact callbacks, all primary actions have short names
+  - RecentReposListTests: sorting, filtering, search
+- Integrated into GitInfoPanel:
+  - Added detectedRepo and recentRepos state properties
+  - Added quickActionSection showing CompactQuickActionBar when repo detected
+  - Added recentReposSection showing recent repos list
+  - Added onQuickAction callback for external handling
+  - Added detectCurrentRepo() to detect repo on view load
+  - Added switchToRepo() to change active project
+  - Added handleQuickAction() for default quick action handling
+  - Added private RecentRepoRow component for displaying recent repos
+- **Build verified**: `./scripts/swift-build.sh` completes successfully
+
+Files created:
+- XRoads/Services/RepoDetector.swift
+- XRoads/Views/Components/QuickActionBar.swift
+- Tests/Services/RepoDetectorTests.swift
+- Tests/Views/QuickActionBarTests.swift
+
+Files modified:
+- XRoads/Views/Dashboard/GitInfoPanel.swift (added quick action and recent repos integration)
+- Package.swift (added RepoDetector.swift, QuickActionBar.swift)
+- prd.json (marked US-V3-007 complete)

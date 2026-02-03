@@ -220,7 +220,8 @@
       "title": "Frictionless Repo Detection",
       "description": "Auto-detect git repo and offer quick actions",
       "priority": "medium",
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-03T18:30:00Z",
       "depends_on": ["US-V3-001"],
       "acceptance_criteria": [
         "On app launch, detect if CWD is git repo",

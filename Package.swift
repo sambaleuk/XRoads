@@ -37,6 +37,7 @@ let package = Package(
                 "Views/Components/FloatingInputWindow.swift",
                 "Views/Components/TerminalInputBar.swift",
                 "Views/Components/ActionPickerMenu.swift",
+                "Views/Components/QuickActionBar.swift",
                 // Dashboard v3 Views
                 "Views/Dashboard/XRoadsDashboardView.swift",
                 "Views/Dashboard/TerminalSlotView.swift",
@@ -83,6 +84,7 @@ let package = Package(
                 "Services/SkillAdapters/ClaudeSkillAdapter.swift",
                 "Services/SkillAdapters/GeminiSkillAdapter.swift",
                 "Services/SkillAdapters/CodexSkillAdapter.swift",
+                "Services/RepoDetector.swift",
                 "ViewModels/AppState.swift",
                 "ViewModels/SessionViewModel.swift",
                 "ViewModels/PRDLoaderViewModel.swift",

@@ -19,6 +19,11 @@ struct GitInfoPanel: View {
     @State private var trackingInfo: GitService.TrackingInfo?
     @State private var isLoading: Bool = true
     @State private var isFetching: Bool = false
+    @State private var detectedRepo: RepoInfo?
+    @State private var recentRepos: [RepoInfo] = []
+
+    /// Callback when a quick action is selected
+    var onQuickAction: ((ActionType, RepoInfo) -> Void)?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -33,6 +38,11 @@ struct GitInfoPanel: View {
             } else {
                 ScrollView {
                     VStack(spacing: Theme.Spacing.md) {
+                        // Quick Action Bar (if repo detected)
+                        if let repo = detectedRepo {
+                            quickActionSection(repo: repo)
+                        }
+
                         // Branch info
                         branchSection
 
@@ -52,6 +62,14 @@ struct GitInfoPanel: View {
 
                         // Worktrees
                         worktreesSection
+
+                        // Recent repos (if any)
+                        if !recentRepos.isEmpty {
+                            Divider()
+                                .background(Color.borderMuted)
+
+                            recentReposSection
+                        }
                     }
                     .padding(Theme.Spacing.sm)
                 }
@@ -71,6 +89,7 @@ struct GitInfoPanel: View {
         )
         .task {
             await loadGitInfo()
+            await detectCurrentRepo()
         }
     }
 
@@ -315,6 +334,50 @@ struct GitInfoPanel: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    // MARK: - Quick Action Section
+
+    @ViewBuilder
+    private func quickActionSection(repo: RepoInfo) -> some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+            Text("Quick Actions")
+                .font(.xs)
+                .foregroundStyle(Color.textTertiary)
+
+            CompactQuickActionBar(
+                repoInfo: repo,
+                onActionSelected: { action, repoInfo in
+                    handleQuickAction(action: action, repo: repoInfo)
+                }
+            )
+        }
+    }
+
+    // MARK: - Recent Repos Section
+
+    private var recentReposSection: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+            HStack {
+                Text("Recent Repos")
+                    .font(.xs)
+                    .foregroundStyle(Color.textTertiary)
+                Spacer()
+                Text("\(recentRepos.count)")
+                    .font(.system(size: 9))
+                    .foregroundStyle(Color.textTertiary)
+            }
+
+            VStack(spacing: 2) {
+                ForEach(recentRepos.prefix(3)) { repo in
+                    RecentRepoRow(repo: repo) {
+                        Task {
+                            await switchToRepo(repo)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // MARK: - Data Loading
 
     private func loadGitInfo() async {
@@ -349,6 +412,47 @@ struct GitInfoPanel: View {
         isLoading = false
     }
 
+    private func detectCurrentRepo() async {
+        let detector = RepoDetector.shared
+        let result = await detector.detectCurrentDirectory()
+
+        await MainActor.run {
+            if result.isGitRepo {
+                detectedRepo = result.repoInfo
+            }
+            // Filter out current repo from recent repos
+            recentRepos = result.recentRepos.filter { $0.path != result.repoInfo?.path }
+        }
+    }
+
+    private func switchToRepo(_ repo: RepoInfo) async {
+        // Update app state with the selected repo path
+        appState.projectPath = repo.path
+
+        // Reload git info
+        await loadGitInfo()
+        await detectCurrentRepo()
+    }
+
+    private func handleQuickAction(action: ActionType, repo: RepoInfo) {
+        // Call external handler if provided
+        if let handler = onQuickAction {
+            handler(action, repo)
+            return
+        }
+
+        // Default behavior: show worktree creation sheet with pre-filled values
+        appState.addLog(LogEntry(
+            level: .info,
+            source: "quick-action",
+            worktree: nil,
+            message: "Starting \(action.displayName) for \(repo.displayName)"
+        ))
+
+        // Trigger the worktree sheet
+        NotificationCenter.default.post(name: .showNewWorktreeSheet, object: nil)
+    }
+
     private func performFetch() async {
         isFetching = true
         let gitService = appState.services.gitService
@@ -366,6 +470,42 @@ struct GitInfoPanel: View {
         }
 
         isFetching = false
+    }
+}
+
+// MARK: - Recent Repo Row
+
+private struct RecentRepoRow: View {
+    let repo: RepoInfo
+    let onTap: () -> Void
+
+    @State private var isHovered: Bool = false
+
+    var body: some View {
+        Button(action: onTap) {
+            HStack(spacing: Theme.Spacing.xs) {
+                Image(systemName: "folder")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Color.textTertiary)
+
+                Text(repo.displayName)
+                    .font(.system(size: 10))
+                    .foregroundStyle(Color.textSecondary)
+                    .lineLimit(1)
+
+                Spacer()
+
+                Text(repo.branch)
+                    .font(.system(size: 9, design: .monospaced))
+                    .foregroundStyle(Color.terminalGreen)
+            }
+            .padding(.horizontal, Theme.Spacing.xs)
+            .padding(.vertical, 4)
+            .background(isHovered ? Color.bgElevated : Color.clear)
+            .cornerRadius(Theme.Radius.xs)
+        }
+        .buttonStyle(.plain)
+        .onHover { isHovered = $0 }
     }
 }
 
