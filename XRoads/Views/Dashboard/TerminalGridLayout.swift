@@ -182,6 +182,8 @@ struct LargeTerminalSlotView: View {
 
     let onStart: () -> Void
     let onStop: () -> Void
+    /// Callback for sending input to the process
+    var onSendInput: ((String) -> Void)?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -193,6 +195,11 @@ struct LargeTerminalSlotView: View {
 
             // Terminal output
             terminalOutput
+
+            // Input bar (when process is running)
+            if slot.processId != nil {
+                inputBar
+            }
 
             // Footer with controls
             footer
@@ -302,6 +309,17 @@ struct LargeTerminalSlotView: View {
                 }
             }
         }
+    }
+
+    private var inputBar: some View {
+        TerminalInputBar(
+            onSubmit: { text in
+                onSendInput?(text)
+            },
+            isEnabled: slot.status.canStop, // Only enable when process can be stopped (is running)
+            isWaitingForInput: slot.status == .needsInput,
+            placeholder: "Send input to agent..."
+        )
     }
 
     private var footer: some View {

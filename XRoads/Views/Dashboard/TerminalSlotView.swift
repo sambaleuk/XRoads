@@ -15,6 +15,10 @@ struct TerminalSlotView: View {
     @Binding var slot: TerminalSlot
     let onStart: () -> Void
     let onStop: () -> Void
+    /// Callback for sending input to the process
+    var onSendInput: ((String) -> Void)?
+    /// Whether to show the input bar (defaults to true when configured)
+    var showInputBar: Bool = true
 
     @State private var isHovered: Bool = false
     @State private var showAgentPicker: Bool = false
@@ -35,7 +39,7 @@ struct TerminalSlotView: View {
                 configurationContent
             }
         }
-        .frame(width: 200, height: 180)
+        .frame(width: 200, height: showInputBar && slot.isConfigured ? 210 : 180)
         .background(Color.bgSurface)
         .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.lg))
         .overlay(
@@ -169,6 +173,17 @@ struct TerminalSlotView: View {
                 .padding(.horizontal, Theme.Spacing.xs)
                 .padding(.vertical, 4)
                 .background(Color.bgElevated)
+            }
+
+            // Input bar (when visible and process is running)
+            if showInputBar && slot.processId != nil {
+                CompactTerminalInputBar(
+                    onSubmit: { text in
+                        onSendInput?(text)
+                    },
+                    isEnabled: slot.status.canStop, // Only enable when process can be stopped (is running)
+                    isWaitingForInput: slot.status == .needsInput
+                )
             }
         }
     }

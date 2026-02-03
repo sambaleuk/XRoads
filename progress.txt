@@ -864,3 +864,47 @@ Files created:
 Files modified:
 - Package.swift (added ActionRunner.swift)
 - prd.json (marked US-V3-003 complete)
+
+### Iteration 4 - US-V3-004 (Interactive Terminal Input)
+- Created TerminalInputBar.swift component with:
+  - Standard TerminalInputBar view for main terminal with multi-line support
+  - CompactTerminalInputBar for hexagonal slot views
+  - Shift+Enter for multi-line mode switching (expands to TextEditor)
+  - Cmd+Return to send in multi-line mode
+  - "Agent waiting for input" indicator with pulse animation
+  - Enabled/disabled states based on process running status
+  - Customizable placeholder text
+  - PulseModifier for animated indicators
+  - TerminalInputBarStyle enum for styling options
+- Created comprehensive TerminalInputBarTests.swift with:
+  - Text submission callback tests
+  - Multi-line input detection tests
+  - Disabled state when no process tests
+  - Empty input prevention tests
+  - Compact input bar tests
+  - Input validation tests
+  - Placeholder tests
+  - Input history support tests (future-proofing)
+  - TerminalInputBarStyle tests
+- Modified TerminalSlotView.swift:
+  - Added onSendInput callback parameter
+  - Added showInputBar toggle (default true when configured)
+  - Integrated CompactTerminalInputBar at bottom of terminal content
+  - Input bar only shows when processId is not nil
+  - Dynamic height adjustment when input bar is visible
+- Modified TerminalGridLayout.swift:
+  - Added onSendInput callback to LargeTerminalSlotView
+  - Added inputBar computed property with TerminalInputBar
+  - Input bar positioned between terminal output and footer
+- Updated Package.swift to include TerminalInputBar.swift
+- **Build verified**: `./scripts/swift-build.sh` completes successfully
+
+Files created:
+- XRoads/Views/Components/TerminalInputBar.swift
+- Tests/Views/TerminalInputBarTests.swift
+
+Files modified:
+- XRoads/Views/Dashboard/TerminalSlotView.swift (added input bar integration)
+- XRoads/Views/Dashboard/TerminalGridLayout.swift (added input bar to LargeTerminalSlotView)
+- Package.swift (added TerminalInputBar.swift)
+- prd.json (marked US-V3-004 complete)

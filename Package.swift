@@ -35,6 +35,7 @@ let package = Package(
                 "Views/Components/MacTextField.swift",
                 "Views/Components/ModalPanel.swift",
                 "Views/Components/FloatingInputWindow.swift",
+                "Views/Components/TerminalInputBar.swift",
                 // Dashboard v3 Views
                 "Views/Dashboard/XRoadsDashboardView.swift",
                 "Views/Dashboard/TerminalSlotView.swift",
