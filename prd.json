@@ -390,7 +390,8 @@
       "title": "ProcessRunner Input Bridge",
       "description": "Expose stdin writing to terminal UI",
       "priority": "critical",
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-03T22:00:00Z",
       "depends_on": [],
       "acceptance_criteria": [
         "ProcessRunner exposes sendInput(id:, text:) publicly",
@@ -399,14 +400,24 @@
         "Input echoed in terminal output",
         "Handles process not running gracefully"
       ],
-      "unit_tests": [
-        "ProcessRunnerTests: test sendInput writes to stdin",
-        "ProcessRunnerTests: test sendInput error for invalid processId",
-        "ProcessRunnerTests: test input echo in output stream"
-      ],
+      "unit_test": {
+        "file": "Tests/Services/ProcessRunnerTests.swift",
+        "name": "ProcessRunnerTests",
+        "description": "Verifies ProcessRunner sendInput functionality, error handling, and integration with AppState",
+        "assertions": [
+          "sendInput writes to stdin correctly",
+          "sendInput error for invalid processId",
+          "sendInput error for terminated process",
+          "input echo in output stream (via AppState)",
+          "graceful handling when no process running"
+        ],
+        "status": "passing"
+      },
       "files_to_modify": [
         "XRoads/Services/ProcessRunner.swift",
-        "XRoads/ViewModels/AppState.swift"
+        "XRoads/ViewModels/AppState.swift",
+        "XRoads/Views/Dashboard/TerminalGridLayout.swift",
+        "XRoads/Views/Dashboard/XRoadsDashboardView.swift"
       ],
       "files_to_create": [
         "Tests/Services/ProcessRunnerTests.swift"

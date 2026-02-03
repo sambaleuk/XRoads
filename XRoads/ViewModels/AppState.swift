@@ -195,6 +195,11 @@ final class AppState {
         return Double(completedStories) / Double(totalStories)
     }
 
+    /// Whether the dashboard should display the animated agentic pulse
+    var isAgenticPulseActive: Bool {
+        dashboardMode == .agentic && isOrchestrating
+    }
+
     // MARK: - Dashboard v3 Computed Properties
 
     /// Active terminal slots (slots that are currently running)
@@ -433,6 +438,117 @@ final class AppState {
     /// Gets logs for a specific terminal slot
     func logsForSlot(_ slot: TerminalSlot) -> [LogEntry] {
         slot.logs
+    }
+
+    // MARK: - Input Bridge (US-V3-013)
+
+    /// Sends input to a terminal slot's process stdin
+    /// - Parameters:
+    ///   - slotNumber: The slot number (1-6)
+    ///   - text: The text to send to stdin
+    /// - Returns: true if input was sent successfully, false otherwise
+    @discardableResult
+    func sendInputToSlot(_ slotNumber: Int, text: String) async -> Bool {
+        guard let index = terminalSlots.firstIndex(where: { $0.slotNumber == slotNumber }) else {
+            addLog(LogEntry(level: .error, source: "system", worktree: nil, message: "Slot \(slotNumber) not found"))
+            return false
+        }
+
+        guard let processId = terminalSlots[index].processId else {
+            addLog(LogEntry(level: .warn, source: "system", worktree: terminalSlots[index].worktree?.path, message: "No process running in slot \(slotNumber)"))
+            return false
+        }
+
+        do {
+            try await services.processRunner.sendInput(id: processId, text: text)
+
+            // Echo input in terminal output
+            let echoEntry = LogEntry(
+                level: .info,
+                source: "user",
+                worktree: terminalSlots[index].worktree?.path,
+                message: "▶ \(text)"
+            )
+            terminalSlots[index].addLog(echoEntry)
+            addLog(echoEntry)
+
+            // Add to input history
+            terminalSlots[index].addInput(text)
+
+            // If slot was waiting for input, transition back to running
+            if terminalSlots[index].status == .waitingForInput || terminalSlots[index].status == .needsInput {
+                terminalSlots[index].status = .running
+            }
+
+            return true
+        } catch {
+            let errorEntry = LogEntry(
+                level: .error,
+                source: "system",
+                worktree: terminalSlots[index].worktree?.path,
+                message: "Failed to send input: \(error.localizedDescription)"
+            )
+            terminalSlots[index].addLog(errorEntry)
+            addLog(errorEntry)
+            return false
+        }
+    }
+
+    /// Sends input to a worktree's running process
+    /// - Parameters:
+    ///   - worktreeId: The worktree's UUID
+    ///   - text: The text to send to stdin
+    /// - Returns: true if input was sent successfully, false otherwise
+    @discardableResult
+    func sendInputToWorktree(_ worktreeId: UUID, text: String) async -> Bool {
+        guard let processId = worktreeProcessIds[worktreeId] else {
+            let worktreePath = worktrees.first { $0.id == worktreeId }?.path
+            addLog(LogEntry(level: .warn, source: "system", worktree: worktreePath, message: "No process running for worktree"))
+            return false
+        }
+
+        guard let worktree = worktrees.first(where: { $0.id == worktreeId }) else {
+            addLog(LogEntry(level: .error, source: "system", worktree: nil, message: "Worktree not found"))
+            return false
+        }
+
+        do {
+            try await services.processRunner.sendInput(id: processId, text: text)
+
+            // Echo input in terminal output
+            let echoEntry = LogEntry(
+                level: .info,
+                source: "user",
+                worktree: worktree.path,
+                message: "▶ \(text)"
+            )
+            addLog(echoEntry)
+
+            return true
+        } catch {
+            addLog(LogEntry(
+                level: .error,
+                source: "system",
+                worktree: worktree.path,
+                message: "Failed to send input: \(error.localizedDescription)"
+            ))
+            return false
+        }
+    }
+
+    /// Gets the process ID for a terminal slot
+    /// - Parameter slotNumber: The slot number (1-6)
+    /// - Returns: The process UUID if a process is running, nil otherwise
+    func processIdForSlot(_ slotNumber: Int) -> UUID? {
+        terminalSlots.first { $0.slotNumber == slotNumber }?.processId
+    }
+
+    /// Checks if a terminal slot has a running process
+    /// - Parameter slotNumber: The slot number (1-6)
+    /// - Returns: true if a process is running in the slot
+    func isProcessRunningInSlot(_ slotNumber: Int) async -> Bool {
+        guard let processId = processIdForSlot(slotNumber) else { return false }
+        return await services.processRunner.isRunning(id: processId)
     }
 
     /// Updates the orchestrator visual state based on slot states

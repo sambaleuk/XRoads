@@ -61,7 +61,12 @@ struct XRoadsDashboardView: View {
             SingleTerminalLayout(
                 slot: $terminalSlots[0],
                 onStart: { startSlot(1) },
-                onStop: { stopSlot(1) }
+                onStop: { stopSlot(1) },
+                onSendInput: { [appState] text in
+                    Task {
+                        await appState.sendInputToSlot(1, text: text)
+                    }
+                }
             )
             .padding(Theme.Spacing.md)
 
@@ -70,7 +75,12 @@ struct XRoadsDashboardView: View {
                 slots: $terminalSlots,
                 orchestratorState: orchestratorState,
                 onStartSlot: startSlot,
-                onStopSlot: stopSlot
+                onStopSlot: stopSlot,
+                onSendInput: { [appState] slotNumber, text in
+                    Task {
+                        await appState.sendInputToSlot(slotNumber, text: text)
+                    }
+                }
             )
             .padding(Theme.Spacing.md)
         }

@@ -15,6 +15,8 @@ struct TerminalGridLayout: View {
     let orchestratorState: OrchestratorVisualState
     let onStartSlot: (Int) -> Void
     let onStopSlot: (Int) -> Void
+    /// Callback for sending input to a slot's process
+    var onSendInput: ((Int, String) -> Void)?
 
     var body: some View {
         GeometryReader { geometry in
@@ -38,7 +40,10 @@ struct TerminalGridLayout: View {
                     TerminalSlotView(
                         slot: $slots[index],
                         onStart: { onStartSlot(slot.slotNumber) },
-                        onStop: { onStopSlot(slot.slotNumber) }
+                        onStop: { onStopSlot(slot.slotNumber) },
+                        onSendInput: { text in
+                            onSendInput?(slot.slotNumber, text)
+                        }
                     )
                     .position(position)
                 }
@@ -162,12 +167,15 @@ struct SingleTerminalLayout: View {
     @Binding var slot: TerminalSlot
     let onStart: () -> Void
     let onStop: () -> Void
+    /// Callback for sending input to the process
+    var onSendInput: ((String) -> Void)?
 
     var body: some View {
         LargeTerminalSlotView(
             slot: $slot,
             onStart: onStart,
-            onStop: onStop
+            onStop: onStop,
+            onSendInput: onSendInput
         )
         .padding(Theme.Spacing.lg)
     }

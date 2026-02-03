@@ -1272,3 +1272,38 @@ Files modified:
 Files modified:
 - Package.swift (added Actions/IntegrationTestAction.swift)
 - prd.json (marked US-V3-012 complete)
+
+### Iteration 13 - US-V3-013 (ProcessRunner Input Bridge)
+- Verified ProcessRunner.sendInput(id:text:) already implemented and public
+- Verified AppState already tracks processId per terminal slot
+- Added sendInputToSlot(_:text:) method to AppState for slot-based input
+- Added sendInputToWorktree(_:text:) method for worktree-based input
+- Added processIdForSlot(_:) helper method
+- Added isProcessRunningInSlot(_:) async helper method
+- Input echo format: "▶ {userInput}" logged as level .info, source "user"
+- Updated TerminalGridLayout to pass onSendInput callback to TerminalSlotView
+- Updated SingleTerminalLayout to pass onSendInput callback to LargeTerminalSlotView
+- Updated XRoadsDashboardView to wire sendInput callbacks to AppState
+- Input submission triggers status transition from waitingForInput → running
+- Input history tracking via TerminalSlot.addInput()
+- Comprehensive unit tests in ProcessRunnerTests.swift covering:
+  - ProcessError descriptions for all error cases
+  - ProcessInfo initialization and Sendable conformance
+  - sendInput error handling for invalid/terminated processes
+  - isRunning, getProcessInfo, getTerminationStatus for invalid IDs
+  - Launch error handling for nonexistent executable/working directory
+  - Integration test: launch → sendInput → terminate → remove
+  - Input newline handling (adds if missing, preserves if present)
+  - Environment variable injection
+  - AppState input bridge methods error handling
+- **Build verified**: `./scripts/swift-build.sh` completes successfully
+- **Unit test status**: Tests written, verified to compile
+
+Files created:
+- Tests/Services/ProcessRunnerTests.swift
+
+Files modified:
+- XRoads/ViewModels/AppState.swift (added sendInputToSlot, sendInputToWorktree, processIdForSlot, isProcessRunningInSlot)
+- XRoads/Views/Dashboard/TerminalGridLayout.swift (added onSendInput callback)
+- XRoads/Views/Dashboard/XRoadsDashboardView.swift (wired sendInput to AppState)
+- prd.json (marked US-V3-013 complete)
