@@ -186,7 +186,8 @@
       "title": "Cross-CLI Skill Adapters",
       "description": "Adapt skill prompts for each CLI's format",
       "priority": "high",
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-03T18:00:00Z",
       "depends_on": ["US-V3-002"],
       "acceptance_criteria": [
         "SkillAdapter protocol with adaptSkill(for: AgentType)",

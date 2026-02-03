@@ -944,3 +944,53 @@ Files modified:
 - XRoads/Views/Dashboard/TerminalSlotView.swift (added action picker, ActionTypeBadge)
 - Package.swift (added ActionPickerMenu.swift)
 - prd.json (marked US-V3-005 complete)
+
+### Iteration 6 - US-V3-006 (Cross-CLI Skill Adapters)
+- Created SkillAdapter protocol in XRoads/Services/SkillAdapters/SkillAdapter.swift:
+  - adaptSkill(skill:context:) -> String for single skill adaptation
+  - adaptSkills(skills:context:) -> String for batch adaptation (default impl)
+  - replacePlaceholders(in:context:) for template processing
+  - replaceCommonPlaceholders() default helper for shared placeholders
+- Created SkillAdapterFactory with adapter(for: AgentType) factory method
+- Created AdaptedSkill wrapper struct for tracking adapted outputs
+- Created SkillAdapterError enum with comprehensive error cases
+- Created ClaudeSkillAdapter for Claude Code format:
+  - Markdown sections with ## headers
+  - Skill metadata with ID and version
+  - Required Tools section
+  - Instructions section with prompt content
+  - Execution Notes with TodoWrite and file reading hints
+  - Claude-specific placeholders: {{claude_tools}}, {{claude_style}}, {{thinking_mode}}
+- Created GeminiSkillAdapter for Gemini CLI format:
+  - Single # header for skill name
+  - Required Capabilities as bullet list
+  - Task Instructions section
+  - Numbered Workflow section with Analyze/Plan/Implement/Verify/Commit steps
+  - Gemini-specific placeholders: {{gemini_tools}}, {{gemini_style}}, {{execution_mode}}
+  - Execution mode detection: single/sequential/batch based on story count
+- Created CodexSkillAdapter for Codex format:
+  - Concise ## headers for skills
+  - Inline tools format with pipes: **Tools**: git | code-edit
+  - Instructions section
+  - Constraints section for worktree boundaries
+  - Expected Output section with completion criteria
+  - Codex-specific placeholders: {{codex_tools}}, {{codex_style}}, {{approval_mode}}
+  - Approval mode: suggest vs full-auto based on coordination notes
+- Created comprehensive unit tests in Tests/Services/SkillAdapters/SkillAdapterTests.swift:
+  - SkillAdapterTests: placeholder replacement, factory methods, multi-skill adaptation
+  - ClaudeSkillAdapterTests: agent type, formatting, sections, tools placeholder
+  - GeminiSkillAdapterTests: agent type, formatting, workflow, execution modes
+  - CodexSkillAdapterTests: agent type, inline tools, constraints, approval modes
+  - Cross-CLI test: same skill produces valid output for all CLIs
+- **Build verified**: `./scripts/swift-build.sh` completes successfully
+
+Files created:
+- XRoads/Services/SkillAdapters/SkillAdapter.swift
+- XRoads/Services/SkillAdapters/ClaudeSkillAdapter.swift
+- XRoads/Services/SkillAdapters/GeminiSkillAdapter.swift
+- XRoads/Services/SkillAdapters/CodexSkillAdapter.swift
+- Tests/Services/SkillAdapters/SkillAdapterTests.swift
+
+Files modified:
+- Package.swift (added 4 SkillAdapter files)
+- prd.json (marked US-V3-006 complete)
