@@ -1,0 +1,463 @@
+{
+  "version": "3.0",
+  "feature_name": "XRoads Nexus Loop Integration",
+  "description": "Système d'actions (loops) avec skills packagés, input interactif, et conformité multi-CLI (Claude, Gemini, Codex)",
+  "created_at": "2026-02-03",
+  "author": "Nexus",
+
+  "vision": {
+    "summary": "Transformer XRoads en orchestrateur de loops spécialisées avec skills contextuels",
+    "key_concepts": [
+      "Actions = Loops spécialisées (implement, review, test, write)",
+      "Skills = Packages de capacités chargés selon contexte",
+      "Conformité = Même interface pour Claude/Gemini/Codex",
+      "Frictionless = Auto-détection repo, pas de config manuelle",
+      "Interactive = Terminal reçoit input utilisateur (AskClaudeCode)"
+    ]
+  },
+
+  "gap_analysis": {
+    "current_state": {
+      "what_exists": [
+        "CLIAdapters pour Claude/Gemini/Codex (launchArguments, formatCommand)",
+        "AgentLauncher avec AGENT.md generation",
+        "Terminal slots sans input interactif",
+        "Worktree init via sheet modal (friction)"
+      ],
+      "what_missing": [
+        "Système d'actions/loops sélectionnables",
+        "Skill packaging et loading contextuel",
+        "Input interactif dans terminal (stdin)",
+        "Conformité skills cross-CLI",
+        "Frictionless repo detection"
+      ]
+    },
+
+    "gaps": [
+      {
+        "id": "GAP-001",
+        "title": "No Action Selection System",
+        "description": "User cannot select an action (loop type) to run. Only raw CLI launch exists.",
+        "impact": "critical",
+        "current": "AgentLauncher.launchAgent() avec instructions génériques",
+        "target": "ActionRunner avec loops typées (implement, review, test, write)"
+      },
+      {
+        "id": "GAP-002",
+        "title": "No Interactive Terminal Input",
+        "description": "Terminal displays output only. Cannot respond to AskClaudeCode prompts.",
+        "impact": "critical",
+        "current": "TerminalSlotView read-only, ProcessRunner.sendInput() non exposé",
+        "target": "InputBar dans slot + stdin bridge vers process"
+      },
+      {
+        "id": "GAP-003",
+        "title": "No Skill Packaging System",
+        "description": "Skills (commit, review-pr, prd, etc.) are not packaged or loadable.",
+        "impact": "high",
+        "current": "AGENT.md avec instructions texte brut",
+        "target": "SkillRegistry + SkillLoader + AGENT.md enrichi"
+      },
+      {
+        "id": "GAP-004",
+        "title": "No Cross-CLI Skill Conformity",
+        "description": "Skills are Claude-specific. Gemini/Codex have different APIs.",
+        "impact": "high",
+        "current": "CLIAdapter.formatCommand() basique",
+        "target": "SkillAdapter protocol avec implementations par CLI"
+      },
+      {
+        "id": "GAP-005",
+        "title": "Friction in Worktree Init",
+        "description": "Modal sheet required to create worktree. Should be auto/frictionless.",
+        "impact": "medium",
+        "current": "WorktreeCreateSheet avec form",
+        "target": "Auto-detect repo + quick-action buttons"
+      },
+      {
+        "id": "GAP-006",
+        "title": "Actions not unified Single/Agentic",
+        "description": "Single mode and Agentic mode have different flows.",
+        "impact": "medium",
+        "current": "XRoadsDashboardView switch par mode",
+        "target": "ActionRunner unifié, UI adapte la présentation"
+      }
+    ]
+  },
+
+  "user_stories": [
+    {
+      "id": "US-V3-001",
+      "title": "Action Type Model & Registry",
+      "description": "Define ActionType enum and ActionRegistry for managing available loops",
+      "priority": "critical",
+      "depends_on": [],
+      "acceptance_criteria": [
+        "ActionType enum: implement, review, test, write, custom",
+        "Each ActionType has: displayName, iconName, description, requiredSkills",
+        "ActionRegistry lists available actions per CLI",
+        "Actions are Codable for persistence"
+      ],
+      "files_to_create": [
+        "XRoads/Models/ActionType.swift",
+        "XRoads/Services/ActionRegistry.swift"
+      ],
+      "estimated_complexity": 3
+    },
+    {
+      "id": "US-V3-002",
+      "title": "Skill Model & SkillRegistry",
+      "description": "Define Skill model and registry for packaged capabilities",
+      "priority": "critical",
+      "depends_on": ["US-V3-001"],
+      "acceptance_criteria": [
+        "Skill struct: id, name, description, promptTemplate, requiredTools",
+        "SkillRegistry loads from ~/.xroads/skills/ or bundled",
+        "Skills have CLI compatibility flags (claude, gemini, codex)",
+        "SkillLoader injects skills into AGENT.md"
+      ],
+      "files_to_create": [
+        "XRoads/Models/Skill.swift",
+        "XRoads/Services/SkillRegistry.swift",
+        "XRoads/Services/SkillLoader.swift"
+      ],
+      "estimated_complexity": 5
+    },
+    {
+      "id": "US-V3-003",
+      "title": "ActionRunner Service",
+      "description": "Central service to execute actions with skill loading",
+      "priority": "critical",
+      "depends_on": ["US-V3-001", "US-V3-002"],
+      "acceptance_criteria": [
+        "ActionRunner.run(action:, agent:, worktree:, skills:)",
+        "Loads required skills for action",
+        "Generates enriched AGENT.md with skills",
+        "Launches CLI via AgentLauncher",
+        "Works for both Single and Agentic mode"
+      ],
+      "files_to_create": [
+        "XRoads/Services/ActionRunner.swift"
+      ],
+      "files_to_modify": [
+        "XRoads/Services/AgentLauncher.swift"
+      ],
+      "estimated_complexity": 8
+    },
+    {
+      "id": "US-V3-004",
+      "title": "Interactive Terminal Input",
+      "description": "Add input bar to terminal slots for stdin interaction",
+      "priority": "critical",
+      "depends_on": [],
+      "acceptance_criteria": [
+        "TerminalSlotView has InputBar at bottom",
+        "InputBar sends text to ProcessRunner.sendInput()",
+        "Supports multi-line input (shift+enter)",
+        "Shows 'Agent waiting for input' indicator when needed",
+        "Works in both Single and Agentic mode terminals"
+      ],
+      "files_to_modify": [
+        "XRoads/Views/Dashboard/TerminalSlotView.swift",
+        "XRoads/Views/Dashboard/TerminalGridLayout.swift"
+      ],
+      "files_to_create": [
+        "XRoads/Views/Components/TerminalInputBar.swift"
+      ],
+      "estimated_complexity": 5
+    },
+    {
+      "id": "US-V3-005",
+      "title": "Action Picker UI Component",
+      "description": "UI for selecting action type when configuring a slot",
+      "priority": "high",
+      "depends_on": ["US-V3-001"],
+      "acceptance_criteria": [
+        "ActionPickerMenu shows available actions",
+        "Actions grouped by category (dev, qa, ops)",
+        "Shows required skills per action",
+        "Disabled if CLI doesn't support required skills",
+        "Integrates into TerminalSlotView configuration flow"
+      ],
+      "files_to_create": [
+        "XRoads/Views/Components/ActionPickerMenu.swift"
+      ],
+      "files_to_modify": [
+        "XRoads/Views/Dashboard/TerminalSlotView.swift"
+      ],
+      "estimated_complexity": 4
+    },
+    {
+      "id": "US-V3-006",
+      "title": "Cross-CLI Skill Adapters",
+      "description": "Adapt skill prompts for each CLI's format",
+      "priority": "high",
+      "depends_on": ["US-V3-002"],
+      "acceptance_criteria": [
+        "SkillAdapter protocol with adaptSkill(for: AgentType)",
+        "ClaudeSkillAdapter handles Claude Code format",
+        "GeminiSkillAdapter handles Gemini CLI format",
+        "CodexSkillAdapter handles Codex format",
+        "Skill templates use {{placeholders}} for adaptation"
+      ],
+      "files_to_create": [
+        "XRoads/Services/SkillAdapters/SkillAdapter.swift",
+        "XRoads/Services/SkillAdapters/ClaudeSkillAdapter.swift",
+        "XRoads/Services/SkillAdapters/GeminiSkillAdapter.swift",
+        "XRoads/Services/SkillAdapters/CodexSkillAdapter.swift"
+      ],
+      "estimated_complexity": 6
+    },
+    {
+      "id": "US-V3-007",
+      "title": "Frictionless Repo Detection",
+      "description": "Auto-detect git repo and offer quick actions",
+      "priority": "medium",
+      "depends_on": ["US-V3-001"],
+      "acceptance_criteria": [
+        "On app launch, detect if CWD is git repo",
+        "Show QuickStartView with repo info + action buttons",
+        "One-click to start action (no worktree sheet)",
+        "Auto-create worktree if needed (branch naming convention)",
+        "Remember last used repo"
+      ],
+      "files_to_modify": [
+        "XRoads/Views/Dashboard/GitInfoPanel.swift",
+        "XRoads/Views/MainWindowView.swift"
+      ],
+      "files_to_create": [
+        "XRoads/Views/Components/QuickActionBar.swift"
+      ],
+      "estimated_complexity": 4
+    },
+    {
+      "id": "US-V3-008",
+      "title": "Built-in Skill Definitions",
+      "description": "Package core skills (commit, review-pr, prd, test, etc.)",
+      "priority": "high",
+      "depends_on": ["US-V3-002", "US-V3-006"],
+      "acceptance_criteria": [
+        "Bundled skills: commit, review-pr, prd, test-writer, code-reviewer",
+        "Each skill has prompt template + tool requirements",
+        "Skills versioned and updatable",
+        "User can add custom skills to ~/.xroads/skills/",
+        "Skills documented in SKILLS.md"
+      ],
+      "files_to_create": [
+        "XRoads/Resources/Skills/commit.skill.json",
+        "XRoads/Resources/Skills/review-pr.skill.json",
+        "XRoads/Resources/Skills/prd.skill.json",
+        "XRoads/Resources/Skills/test-writer.skill.json",
+        "XRoads/Resources/Skills/code-reviewer.skill.json"
+      ],
+      "estimated_complexity": 5
+    },
+    {
+      "id": "US-V3-009",
+      "title": "TerminalSlot Model Extension",
+      "description": "Extend TerminalSlot to track action and input state",
+      "priority": "high",
+      "depends_on": ["US-V3-001", "US-V3-004"],
+      "acceptance_criteria": [
+        "TerminalSlot has actionType: ActionType?",
+        "TerminalSlot has loadedSkills: [Skill]",
+        "TerminalSlot has needsInput: Bool",
+        "TerminalSlot has inputHistory: [String]",
+        "Slot status reflects input-waiting state"
+      ],
+      "files_to_modify": [
+        "XRoads/Models/TerminalSlot.swift"
+      ],
+      "estimated_complexity": 3
+    },
+    {
+      "id": "US-V3-010",
+      "title": "Implement Loop Action",
+      "description": "Create the 'implement' action (PRD → US → code)",
+      "priority": "critical",
+      "depends_on": ["US-V3-003", "US-V3-008"],
+      "acceptance_criteria": [
+        "ImplementAction loads prd.json from repo",
+        "Parses user stories and dependencies",
+        "Generates implementation plan",
+        "Executes code generation with progress",
+        "Commits changes per story"
+      ],
+      "files_to_create": [
+        "XRoads/Actions/ImplementAction.swift"
+      ],
+      "estimated_complexity": 8
+    },
+    {
+      "id": "US-V3-011",
+      "title": "Review Loop Action",
+      "description": "Create the 'review' action (code reviewer)",
+      "priority": "high",
+      "depends_on": ["US-V3-003", "US-V3-008"],
+      "acceptance_criteria": [
+        "ReviewAction analyzes staged/committed changes",
+        "Generates review report with issues",
+        "Suggests fixes with diff preview",
+        "Can auto-fix minor issues",
+        "Outputs review.md"
+      ],
+      "files_to_create": [
+        "XRoads/Actions/ReviewAction.swift"
+      ],
+      "estimated_complexity": 6
+    },
+    {
+      "id": "US-V3-012",
+      "title": "Test Loop Action",
+      "description": "Create the 'test' action (test writer)",
+      "priority": "high",
+      "depends_on": ["US-V3-003", "US-V3-008"],
+      "acceptance_criteria": [
+        "TestAction identifies untested code",
+        "Generates unit tests for functions",
+        "Runs tests and reports coverage",
+        "Can generate integration tests",
+        "Works with Swift, JS, Python"
+      ],
+      "files_to_create": [
+        "XRoads/Actions/TestAction.swift"
+      ],
+      "estimated_complexity": 6
+    },
+    {
+      "id": "US-V3-013",
+      "title": "ProcessRunner Input Bridge",
+      "description": "Expose stdin writing to terminal UI",
+      "priority": "critical",
+      "depends_on": [],
+      "acceptance_criteria": [
+        "ProcessRunner exposes sendInput(id:, text:) publicly",
+        "AppState tracks processId per slot",
+        "TerminalSlotView can call sendInput via binding",
+        "Input echoed in terminal output",
+        "Handles process not running gracefully"
+      ],
+      "files_to_modify": [
+        "XRoads/Services/ProcessRunner.swift",
+        "XRoads/ViewModels/AppState.swift"
+      ],
+      "estimated_complexity": 4
+    },
+    {
+      "id": "US-V3-014",
+      "title": "Unified Action Flow (Single & Agentic)",
+      "description": "Same action execution path for both modes",
+      "priority": "medium",
+      "depends_on": ["US-V3-003", "US-V3-009"],
+      "acceptance_criteria": [
+        "ActionRunner works identically in both modes",
+        "Single mode: action on slot[0]",
+        "Agentic mode: action per configured slot",
+        "Progress/status unified",
+        "Logs stream to correct terminal"
+      ],
+      "files_to_modify": [
+        "XRoads/Views/Dashboard/XRoadsDashboardView.swift",
+        "XRoads/Services/ActionRunner.swift"
+      ],
+      "estimated_complexity": 5
+    }
+  ],
+
+  "architecture": {
+    "new_components": {
+      "ActionType": "Enum defining loop types (implement, review, test, write)",
+      "Skill": "Packaged capability with prompt template and tool requirements",
+      "SkillRegistry": "Loads and manages available skills",
+      "SkillAdapter": "Adapts skills for specific CLI (Claude/Gemini/Codex)",
+      "ActionRunner": "Orchestrates action execution with skill loading",
+      "TerminalInputBar": "UI component for stdin input"
+    },
+    "data_flow": [
+      "User selects Action → ActionRunner loads Skills",
+      "ActionRunner → SkillAdapter → CLI-specific prompt",
+      "Prompt → AgentLauncher → ProcessRunner",
+      "ProcessRunner stdout → Terminal display",
+      "User input → ProcessRunner stdin → Agent"
+    ]
+  },
+
+  "skill_format": {
+    "example": {
+      "id": "commit",
+      "name": "Git Commit",
+      "version": "1.0.0",
+      "description": "Create a git commit with conventional message",
+      "category": "git",
+      "compatibility": ["claude", "gemini", "codex"],
+      "prompt_template": "Analyze staged changes and create a commit following conventional commits format. {{context}}",
+      "required_tools": ["git", "read", "write"],
+      "placeholders": {
+        "context": "Additional context from AGENT.md"
+      }
+    }
+  },
+
+  "ui_mockup": {
+    "single_mode_flow": [
+      "1. App detects repo → Shows QuickActionBar",
+      "2. User clicks 'Implement' → ActionPicker confirms",
+      "3. Terminal shows progress + accepts input",
+      "4. Agent asks question → User types response",
+      "5. Action completes → Summary shown"
+    ],
+    "agentic_mode_flow": [
+      "1. User configures slot: Agent + Action + Worktree",
+      "2. Cyberbrain shows action icons on synapses",
+      "3. Each slot runs its action independently",
+      "4. User can interact with any slot's terminal",
+      "5. Orchestrator coordinates merges"
+    ]
+  },
+
+  "implementation_phases": [
+    {
+      "phase": 1,
+      "name": "Core Models & Registry",
+      "stories": ["US-V3-001", "US-V3-002", "US-V3-009"],
+      "goal": "Define action and skill data structures"
+    },
+    {
+      "phase": 2,
+      "name": "Interactive Terminal",
+      "stories": ["US-V3-004", "US-V3-013"],
+      "goal": "Enable user input in terminal slots"
+    },
+    {
+      "phase": 3,
+      "name": "Action Execution",
+      "stories": ["US-V3-003", "US-V3-005", "US-V3-014"],
+      "goal": "ActionRunner with UI integration"
+    },
+    {
+      "phase": 4,
+      "name": "Skill Adapters",
+      "stories": ["US-V3-006", "US-V3-008"],
+      "goal": "Cross-CLI skill conformity"
+    },
+    {
+      "phase": 5,
+      "name": "Built-in Actions",
+      "stories": ["US-V3-010", "US-V3-011", "US-V3-012"],
+      "goal": "Implement, Review, Test loops"
+    },
+    {
+      "phase": 6,
+      "name": "Frictionless UX",
+      "stories": ["US-V3-007"],
+      "goal": "Auto-detect and quick-start"
+    }
+  ],
+
+  "success_metrics": [
+    "User can start an action in < 3 clicks",
+    "User can respond to agent questions in terminal",
+    "Same skill works on Claude, Gemini, and Codex",
+    "Actions available in both Single and Agentic modes"
+  ]
+}
