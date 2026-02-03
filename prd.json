@@ -96,7 +96,8 @@
       "title": "ActionRunner Service",
       "description": "Central service to execute actions with skill loading",
       "priority": "critical",
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-03T16:30:00Z",
       "depends_on": ["US-V3-001", "US-V3-002"],
       "acceptance_criteria": [
         "ActionRunner.run(action:, agent:, worktree:, skills:)",

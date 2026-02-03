@@ -76,6 +76,7 @@ let package = Package(
                 "Services/ActionRegistry.swift",
                 "Services/SkillRegistry.swift",
                 "Services/SkillLoader.swift",
+                "Services/ActionRunner.swift",
                 "ViewModels/AppState.swift",
                 "ViewModels/SessionViewModel.swift",
                 "ViewModels/PRDLoaderViewModel.swift",

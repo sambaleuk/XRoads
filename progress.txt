@@ -824,3 +824,43 @@ Files created:
 Files modified:
 - Package.swift (added Skill.swift, SkillRegistry.swift, SkillLoader.swift)
 - prd.json (marked US-V3-002 complete)
+
+### Iteration 3 - US-V3-003 (ActionRunner Service)
+- Created ActionRunner.swift as central service for action execution with skill loading
+- ActionRunnerError enum with comprehensive error cases:
+  - skillNotFound, skillsLoadFailed, agentMDGenerationFailed, agentLaunchFailed
+  - worktreePathInvalid, noSkillsLoaded, missingRequiredTool
+- ActionRunRequest struct for configuring action runs:
+  - actionType, agentType, worktreePath, additionalSkillIDs
+  - sessionID, prdPath, branchName, assignedStories, taskDescription, coordinationNotes
+- ActionRunResult struct tracking: processID, loadedSkills, agentMDPath, sessionID, startedAt
+- ActionRunner actor features:
+  - run(request:onOutput:) - main execution method with full workflow
+  - loadSkillsForAction(_:agent:) - load skills by action type
+  - checkSkillsAvailability(for:agent:) - verify skills before run
+  - runSingle() - convenience for Single mode execution
+  - runAgentic() - convenience for Agentic mode with orchestration context
+  - Active run tracking via activeRuns dictionary
+- Skill loading integrates with SkillRegistry.shared
+- AGENT.md generation via SkillLoader with proper SkillContext
+- CLI launch via ProcessRunner with environment variables for traceability:
+  - CROSSROADS_SESSION_ID, CROSSROADS_AGENT_TYPE, CROSSROADS_BRANCH
+  - CROSSROADS_ACTION_TYPE, CROSSROADS_ASSIGNED_STORIES, CROSSROADS_LOADED_SKILLS
+- Created comprehensive ActionRunnerTests.swift with tests for:
+  - Skill loading for each action type (implement, review, integrationTest, write)
+  - Custom action allowing empty skills
+  - AGENT.md generation includes skills
+  - Error handling for invalid worktree paths
+  - CLI launch delegation to AgentLauncher
+  - ActionRunRequest/ActionRunResult properties
+  - Active runs tracking
+  - ActionRunnerError descriptions
+- **Build verified**: `./scripts/swift-build.sh` completes successfully
+
+Files created:
+- XRoads/Services/ActionRunner.swift
+- Tests/Services/ActionRunnerTests.swift
+
+Files modified:
+- Package.swift (added ActionRunner.swift)
+- prd.json (marked US-V3-003 complete)
