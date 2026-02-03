@@ -908,3 +908,39 @@ Files modified:
 - XRoads/Views/Dashboard/TerminalGridLayout.swift (added input bar to LargeTerminalSlotView)
 - Package.swift (added TerminalInputBar.swift)
 - prd.json (marked US-V3-004 complete)
+
+### Iteration 5 - US-V3-005 (Action Picker UI Component)
+- Created ActionPickerMenu.swift with three display styles:
+  - Menu style: Dropdown menu with category sections
+  - Inline style: Expanded list with full descriptions and skill badges
+  - Compact style: Horizontal button bar for compact layouts
+- ActionPickerMenu features:
+  - Actions grouped by category (dev, qa, ops) with color coding
+  - Shows required skills per action with availability badge
+  - Disabled state for actions when CLI doesn't support required skills
+  - Selection callback and binding support
+  - Automatic skill loading from SkillRegistry
+  - "+ TU" badge for actions that include unit tests (implement action)
+- Created ActionPickerPopover wrapper with header showing CLI type
+- Added ActionTypeBadge component for displaying selected action in slot header
+- Integrated into TerminalSlotView configuration flow:
+  - Action picker appears after agent selection
+  - Action selection resets when agent changes (compatibility may differ)
+  - Selected action shown in slot header via ActionTypeBadge
+  - Uses ActionPickerPopover for expanded selection UI
+- Added ActionType.accentColor extension for category-based coloring
+- Created comprehensive unit tests:
+  - ActionPickerMenuTests: filtering by category, disabled state, selection callback, styles
+  - ActionPickerCLICompatibilityTests: CLI-specific action availability
+  - Tests for skills badge count calculation
+  - Tests for display names matching PRD definitions
+- **Build verified**: `./scripts/swift-build.sh` completes successfully
+
+Files created:
+- XRoads/Views/Components/ActionPickerMenu.swift
+- Tests/Views/ActionPickerMenuTests.swift
+
+Files modified:
+- XRoads/Views/Dashboard/TerminalSlotView.swift (added action picker, ActionTypeBadge)
+- Package.swift (added ActionPickerMenu.swift)
+- prd.json (marked US-V3-005 complete)

@@ -23,6 +23,8 @@ struct TerminalSlotView: View {
     @State private var isHovered: Bool = false
     @State private var showAgentPicker: Bool = false
     @State private var showWorktreePicker: Bool = false
+    @State private var showActionPicker: Bool = false
+    @State private var selectedAction: ActionType? = nil
 
     var body: some View {
         VStack(spacing: 0) {
@@ -87,6 +89,11 @@ struct TerminalSlotView: View {
             // Agent type badge
             if let agentType = slot.agentType {
                 AgentTypeBadge(agentType: agentType)
+            }
+
+            // Action type badge
+            if let action = selectedAction {
+                ActionTypeBadge(actionType: action)
             }
 
             // Action button
@@ -191,7 +198,7 @@ struct TerminalSlotView: View {
     // MARK: - Configuration Content
 
     private var configurationContent: some View {
-        VStack(spacing: Theme.Spacing.md) {
+        VStack(spacing: Theme.Spacing.sm) {
             Spacer()
 
             // Agent picker
@@ -204,6 +211,8 @@ struct TerminalSlotView: View {
                     ForEach(AgentType.allCases, id: \.self) { agent in
                         Button {
                             slot.agentType = agent
+                            // Reset action when agent changes (compatibility may differ)
+                            selectedAction = nil
                         } label: {
                             Label(agent.displayName, systemImage: agent.iconName)
                         }
@@ -229,6 +238,17 @@ struct TerminalSlotView: View {
                     .cornerRadius(Theme.Radius.sm)
                 }
                 .menuStyle(.borderlessButton)
+            }
+
+            // Action picker (only visible when agent is selected)
+            if slot.agentType != nil {
+                VStack(spacing: Theme.Spacing.xs) {
+                    Text("Action")
+                        .font(.xs)
+                        .foregroundStyle(Color.textTertiary)
+
+                    actionPickerButton
+                }
             }
 
             // Worktree picker
@@ -274,6 +294,53 @@ struct TerminalSlotView: View {
             Spacer()
         }
         .padding(Theme.Spacing.sm)
+    }
+
+    // MARK: - Action Picker Button
+
+    private var actionPickerButton: some View {
+        Button {
+            showActionPicker = true
+        } label: {
+            HStack {
+                if let action = selectedAction {
+                    Image(systemName: action.iconName)
+                        .foregroundStyle(action.accentColor)
+                    Text(action.displayName)
+                    if action.includesUnitTests {
+                        Text("+ TU")
+                            .font(.system(size: 8, weight: .medium))
+                            .foregroundStyle(Color.statusInfo)
+                            .padding(.horizontal, 3)
+                            .padding(.vertical, 1)
+                            .background(Color.statusInfo.opacity(0.15))
+                            .cornerRadius(2)
+                    }
+                } else {
+                    Text("Select Action")
+                        .foregroundStyle(Color.textTertiary)
+                }
+                Spacer()
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 10))
+            }
+            .font(.small)
+            .foregroundStyle(Color.textPrimary)
+            .padding(.horizontal, Theme.Spacing.sm)
+            .padding(.vertical, Theme.Spacing.xs)
+            .background(Color.bgElevated)
+            .cornerRadius(Theme.Radius.sm)
+        }
+        .buttonStyle(.plain)
+        .popover(isPresented: $showActionPicker) {
+            ActionPickerPopover(
+                selectedAction: $selectedAction,
+                cliType: slot.agentType,
+                onSelect: { action in
+                    selectedAction = action
+                }
+            )
+        }
     }
 
     // MARK: - Computed Properties
@@ -341,6 +408,44 @@ private struct AgentTypeBadge: View {
         case .claude: return "CC"
         case .gemini: return "GM"
         case .codex: return "CX"
+        }
+    }
+}
+
+// MARK: - Action Type Badge
+
+private struct ActionTypeBadge: View {
+    let actionType: ActionType
+
+    var body: some View {
+        HStack(spacing: 2) {
+            Image(systemName: actionType.iconName)
+                .font(.system(size: 8))
+            Text(shortName)
+                .font(.system(size: 9, weight: .medium))
+        }
+        .foregroundStyle(badgeColor)
+        .padding(.horizontal, 4)
+        .padding(.vertical, 2)
+        .background(badgeColor.opacity(0.15))
+        .cornerRadius(Theme.Radius.xs)
+    }
+
+    private var shortName: String {
+        switch actionType {
+        case .implement: return "IMP"
+        case .review: return "REV"
+        case .integrationTest: return "TST"
+        case .write: return "DOC"
+        case .custom: return "CUS"
+        }
+    }
+
+    private var badgeColor: Color {
+        switch actionType.category {
+        case .dev: return .statusInfo
+        case .qa: return .statusSuccess
+        case .ops: return .statusWarning
         }
     }
 }
