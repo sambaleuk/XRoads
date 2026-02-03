@@ -42,6 +42,7 @@ let package = Package(
                 "Views/Dashboard/TerminalSlotView.swift",
                 "Views/Dashboard/TerminalGridLayout.swift",
                 "Views/Dashboard/OrchestratorCreatureView.swift",
+                "Views/Dashboard/NeonBrainView.swift",
                 "Views/Dashboard/GitInfoPanel.swift",
                 "Resources/Theme.swift",
                 "Models/AgentType.swift",
