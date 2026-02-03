@@ -429,7 +429,8 @@
       "title": "Unified Action Flow (Single & Agentic)",
       "description": "Same action execution path for both modes",
       "priority": "medium",
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-03T23:00:00Z",
       "depends_on": ["US-V3-003", "US-V3-009"],
       "acceptance_criteria": [
         "ActionRunner works identically in both modes",
@@ -438,11 +439,19 @@
         "Progress/status unified",
         "Logs stream to correct terminal"
       ],
-      "unit_tests": [
-        "UnifiedFlowTests: test single mode uses slot[0]",
-        "UnifiedFlowTests: test agentic mode iterates all configured slots",
-        "UnifiedFlowTests: test log routing by slot"
-      ],
+      "unit_test": {
+        "file": "Tests/Integration/UnifiedFlowTests.swift",
+        "name": "UnifiedFlowTests",
+        "description": "Verifies unified action execution flow works identically in Single and Agentic modes",
+        "assertions": [
+          "Single mode uses slot[0] for action execution",
+          "Agentic mode iterates all configured slots",
+          "Log routing correctly targets slot-specific logs",
+          "Progress and status updates are unified across modes",
+          "ActionRunner works identically in both modes"
+        ],
+        "status": "passing"
+      },
       "files_to_create": [
         "Tests/Integration/UnifiedFlowTests.swift"
       ],

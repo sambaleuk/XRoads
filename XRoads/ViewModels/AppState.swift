@@ -572,6 +572,137 @@ final class AppState {
         }
     }
 
+    // MARK: - Unified Action Flow (US-V3-014)
+
+    /// Shared ActionRunner instance for unified action execution
+    private let actionRunner = ActionRunner()
+
+    /// Executes an action in a terminal slot using ActionRunner
+    /// Works identically for both Single and Agentic modes
+    /// - Parameters:
+    ///   - slotNumber: The slot number (1-6, or 1 for single mode)
+    ///   - slot: The terminal slot configuration
+    ///   - mode: The current dashboard mode
+    func executeActionInSlot(_ slotNumber: Int, slot: TerminalSlot, mode: DashboardMode) async {
+        guard let index = terminalSlots.firstIndex(where: { $0.slotNumber == slotNumber }) else {
+            addLog(LogEntry(level: .error, source: "system", worktree: nil, message: "Slot \(slotNumber) not found"))
+            return
+        }
+
+        guard let worktree = slot.worktree,
+              let agentType = slot.agentType,
+              let actionType = slot.actionType else {
+            addLog(LogEntry(level: .error, source: "system", worktree: slot.worktree?.path, message: "Slot not fully configured"))
+            terminalSlots[index].status = .error
+            return
+        }
+
+        // Log the execution mode for traceability
+        let modeDescription = mode == .single ? "Single mode (slot[0])" : "Agentic mode (slot[\(slotNumber)])"
+        addLog(LogEntry(level: .info, source: "system", worktree: worktree.path, message: "Starting action via \(modeDescription)"))
+
+        // Update slot status
+        terminalSlots[index].status = .starting
+        updateOrchestratorVisualState()
+
+        // Build the action request - same structure for both modes
+        let sessionID = UUID()
+        let slotIndex = index
+
+        // Create output handler that routes logs to the correct slot
+        let outputHandler: ProcessRunner.OutputHandler = { [weak self] output in
+            Task { @MainActor [weak self] in
+                guard let self = self else { return }
+                let entry = LogEntry(
+                    level: .debug,
+                    source: agentType.rawValue,
+                    worktree: worktree.path,
+                    message: output
+                )
+                // Route log to the specific slot
+                self.terminalSlots[slotIndex].addLog(entry)
+                // Also add to global logs
+                self.addLog(entry)
+            }
+        }
+
+        do {
+            // Use ActionRunner for unified execution
+            // The run method works identically regardless of mode
+            let request = ActionRunRequest(
+                actionType: actionType,
+                agentType: agentType,
+                worktreePath: worktree.path,
+                additionalSkillIDs: slot.loadedSkills.map { $0.id },
+                sessionID: sessionID,
+                prdPath: activePRDURL?.path,
+                branchName: worktree.branch,
+                assignedStories: [],
+                taskDescription: actionType.description,
+                coordinationNotes: mode == .agentic ? "Running in Agentic mode with other agents" : nil
+            )
+
+            let result = try await actionRunner.run(request: request, onOutput: outputHandler)
+
+            // Update slot with process info
+            terminalSlots[index].processId = result.processID
+            terminalSlots[index].loadedSkills = result.loadedSkills
+            terminalSlots[index].status = .running
+            terminalSlots[index].currentTask = "Running \(actionType.displayName)..."
+            terminalSlots[index].addLog(LogEntry(
+                level: .info,
+                source: agentType.rawValue,
+                worktree: worktree.path,
+                message: "Action started with \(result.loadedSkills.count) skills"
+            ))
+
+            updateOrchestratorVisualState()
+
+        } catch {
+            terminalSlots[index].status = .error
+            terminalSlots[index].addLog(LogEntry(
+                level: .error,
+                source: agentType.rawValue,
+                worktree: worktree.path,
+                message: "Failed to start action: \(error.localizedDescription)"
+            ))
+            addLog(LogEntry(
+                level: .error,
+                source: "system",
+                worktree: worktree.path,
+                message: "Action execution failed: \(error.localizedDescription)"
+            ))
+            updateOrchestratorVisualState()
+        }
+    }
+
+    /// Starts all configured slots in the current mode
+    /// For single mode: starts slot[0] only
+    /// For agentic mode: iterates all configured slots
+    func startAllSlotsForMode(_ mode: DashboardMode) async {
+        let slotsToStart: [TerminalSlot]
+
+        switch mode {
+        case .single:
+            // Single mode only uses slot[0] (slotNumber 1)
+            slotsToStart = terminalSlots.filter { $0.slotNumber == 1 && $0.isConfigured }
+        case .agentic:
+            // Agentic mode iterates all configured slots
+            slotsToStart = terminalSlots.filter { $0.isConfigured }
+        }
+
+        for slot in slotsToStart {
+            await executeActionInSlot(slot.slotNumber, slot: slot, mode: mode)
+        }
+    }
+
+    /// Stops all active slots
+    func stopAllSlots() async {
+        for slot in activeSlots {
+            await stopSlot(slot.slotNumber)
+        }
+    }
+
     // MARK: - Agent Management
 
     /// Gets the agent for a worktree

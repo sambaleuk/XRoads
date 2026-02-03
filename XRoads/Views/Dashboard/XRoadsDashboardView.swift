@@ -111,16 +111,21 @@ struct XRoadsDashboardView: View {
         guard terminalSlots[index].isConfigured else { return }
 
         terminalSlots[index].status = .starting
-
-        // Update orchestrator state
         updateOrchestratorState()
 
         Task {
-            // Simulate agent start (actual implementation would use ProcessRunner)
-            try? await Task.sleep(nanoseconds: 500_000_000)
+            // Use unified action execution via AppState
+            await appState.executeActionInSlot(
+                slotNumber,
+                slot: terminalSlots[index],
+                mode: dashboardMode
+            )
 
             await MainActor.run {
-                terminalSlots[index].status = .running
+                // Sync slot state from AppState after execution starts
+                if let updatedSlot = appState.terminalSlots.first(where: { $0.slotNumber == slotNumber }) {
+                    terminalSlots[index] = updatedSlot
+                }
                 updateOrchestratorState()
             }
         }
@@ -129,11 +134,22 @@ struct XRoadsDashboardView: View {
     private func stopSlot(_ slotNumber: Int) {
         guard let index = terminalSlots.firstIndex(where: { $0.slotNumber == slotNumber }) else { return }
 
-        terminalSlots[index].status = .ready
-        terminalSlots[index].progress = 0
-        terminalSlots[index].currentTask = nil
+        Task {
+            await appState.stopSlot(slotNumber)
 
-        updateOrchestratorState()
+            await MainActor.run {
+                // Sync slot state from AppState after stop
+                if let updatedSlot = appState.terminalSlots.first(where: { $0.slotNumber == slotNumber }) {
+                    terminalSlots[index] = updatedSlot
+                } else {
+                    terminalSlots[index].status = .ready
+                    terminalSlots[index].progress = 0
+                    terminalSlots[index].currentTask = nil
+                    terminalSlots[index].processId = nil
+                }
+                updateOrchestratorState()
+            }
+        }
     }
 
     private func startAllAgents() {

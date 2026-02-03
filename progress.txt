@@ -1307,3 +1307,31 @@ Files modified:
 - XRoads/Views/Dashboard/TerminalGridLayout.swift (added onSendInput callback)
 - XRoads/Views/Dashboard/XRoadsDashboardView.swift (wired sendInput to AppState)
 - prd.json (marked US-V3-013 complete)
+
+### Iteration 14 - US-V3-014 (Unified Action Flow)
+- Implemented unified action execution path for both Single and Agentic modes
+- Added executeActionInSlot() to AppState for unified execution via ActionRunner
+- Updated XRoadsDashboardView.startSlot() to use unified AppState method
+- Single mode uses slot[0] (slotNumber 1), Agentic mode iterates all configured slots
+- ActionRunner.run() works identically regardless of dashboard mode
+- Added mode-specific logging for traceability: "Single mode (slot[0])" vs "Agentic mode (slot[N])"
+- Output handler routes logs to correct slot's log array
+- Added startAllSlotsForMode() convenience method for batch execution
+- Added stopAllSlots() method for unified stop behavior
+- Coordination notes injected for Agentic mode multi-agent scenarios
+- Created comprehensive unit tests:
+  - UnifiedFlowTests: single mode slot[0] usage, agentic mode iteration, log routing
+  - ActionRunnerUnifiedExecutionTests: skill loading identical for both modes
+  - AppStateUnifiedFlowTests: slot initialization, computed properties
+  - DashboardMode constraint tests (maxSlots, orchestrator, side panels)
+  - Orchestrator state update tests for all states
+- **Build verified**: `./scripts/swift-build.sh` completes successfully
+- **Unit test status**: Tests written, verified to compile
+
+Files created:
+- Tests/Integration/UnifiedFlowTests.swift
+
+Files modified:
+- XRoads/ViewModels/AppState.swift (added executeActionInSlot, startAllSlotsForMode, stopAllSlots, actionRunner)
+- XRoads/Views/Dashboard/XRoadsDashboardView.swift (updated startSlot/stopSlot to use AppState unified methods)
+- prd.json (marked US-V3-014 complete, added unit_test object with passing status)
