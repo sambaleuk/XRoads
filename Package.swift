@@ -88,6 +88,7 @@ let package = Package(
                 // Actions
                 "Actions/ImplementAction.swift",
                 "Actions/ReviewAction.swift",
+                "Actions/IntegrationTestAction.swift",
                 "ViewModels/AppState.swift",
                 "ViewModels/SessionViewModel.swift",
                 "ViewModels/PRDLoaderViewModel.swift",
