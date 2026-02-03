@@ -8,9 +8,20 @@ struct PRDLoaderSheet: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.appState) private var appState
     @StateObject private var viewModel = PRDLoaderViewModel()
+    @State private var repoPath: String = ""
+    @State private var isStarting: Bool = false
 
     init(initialURL: URL? = nil) {
         self.initialURL = initialURL
+    }
+
+    private var repoURL: URL? {
+        guard !repoPath.isEmpty else { return nil }
+        return URL(fileURLWithPath: repoPath)
+    }
+
+    private var canStart: Bool {
+        viewModel.document != nil && repoURL != nil && !isStarting
     }
 
     var body: some View {
@@ -44,53 +55,101 @@ struct PRDLoaderSheet: View {
     }
 
     private var content: some View {
-        Group {
-            if let doc = viewModel.document {
-                ScrollView {
-                    VStack(alignment: .leading, spacing: Theme.Spacing.md) {
-                        Text(doc.featureName)
-                            .font(.title2)
-                            .foregroundStyle(Color.textPrimary)
-                        Text(doc.description)
-                            .foregroundStyle(Color.textSecondary)
-                        Divider()
-                        ForEach(doc.userStories) { story in
-                            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                                Text("\(story.id) – \(story.title)")
-                                    .font(.headline)
-                                    .foregroundStyle(Color.textPrimary)
-                                Text(story.description)
-                                    .font(.caption)
-                                    .foregroundStyle(Color.textSecondary)
-                                HStack {
-                                    Label(story.priority.rawValue.capitalized, systemImage: "exclamationmark.circle")
-                                    if !story.dependsOn.isEmpty {
-                                        Label("Depends on: \(story.dependsOn.joined(separator: ", "))", systemImage: "link")
-                                    }
-                                }
-                                .font(.caption2)
-                                .foregroundStyle(Color.textSecondary)
-                            }
-                            .padding(.vertical, Theme.Spacing.xs)
-                        }
+        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+            // Repository Path Selector
+            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                Text("Repository Path")
+                    .font(.headline)
+                    .foregroundStyle(Color.textPrimary)
+
+                HStack {
+                    TextField("Select repository...", text: $repoPath)
+                        .textFieldStyle(.roundedBorder)
+
+                    Button("Browse") {
+                        browseForRepo()
+                    }
+                    .buttonStyle(.bordered)
+                }
+
+                if !repoPath.isEmpty {
+                    let exists = FileManager.default.fileExists(atPath: repoPath)
+                    HStack(spacing: 4) {
+                        Image(systemName: exists ? "checkmark.circle.fill" : "xmark.circle.fill")
+                            .foregroundStyle(exists ? Color.statusSuccess : Color.statusError)
+                        Text(exists ? "Valid path" : "Path does not exist")
+                            .font(.caption)
+                            .foregroundStyle(exists ? Color.textSecondary : Color.statusError)
                     }
                 }
-            } else if let error = viewModel.errorMessage {
-                Text(error)
-                    .foregroundStyle(Color.statusError)
-            } else {
-                Text("Select a prd.json file to preview stories.")
-                    .foregroundStyle(Color.textSecondary)
+            }
+
+            Divider()
+
+            // PRD Preview
+            Group {
+                if let doc = viewModel.document {
+                    ScrollView {
+                        VStack(alignment: .leading, spacing: Theme.Spacing.md) {
+                            Text(doc.featureName)
+                                .font(.title2)
+                                .foregroundStyle(Color.textPrimary)
+                            Text(doc.description)
+                                .foregroundStyle(Color.textSecondary)
+
+                            HStack {
+                                Label("\(doc.userStories.count) stories", systemImage: "list.bullet")
+                                Spacer()
+                                let criticalCount = doc.userStories.filter { $0.priority == .critical }.count
+                                if criticalCount > 0 {
+                                    Label("\(criticalCount) critical", systemImage: "exclamationmark.triangle.fill")
+                                        .foregroundStyle(Color.statusWarning)
+                                }
+                            }
+                            .font(.caption)
+                            .foregroundStyle(Color.textSecondary)
+
+                            Divider()
+
+                            ForEach(doc.userStories) { story in
+                                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                                    Text("\(story.id) – \(story.title)")
+                                        .font(.headline)
+                                        .foregroundStyle(Color.textPrimary)
+                                    Text(story.description)
+                                        .font(.caption)
+                                        .foregroundStyle(Color.textSecondary)
+                                    HStack {
+                                        Label(story.priority.rawValue.capitalized, systemImage: "exclamationmark.circle")
+                                        if !story.dependsOn.isEmpty {
+                                            Label("Depends on: \(story.dependsOn.joined(separator: ", "))", systemImage: "link")
+                                        }
+                                    }
+                                    .font(.caption2)
+                                    .foregroundStyle(Color.textSecondary)
+                                }
+                                .padding(.vertical, Theme.Spacing.xs)
+                            }
+                        }
+                    }
+                } else if let error = viewModel.errorMessage {
+                    Text(error)
+                        .foregroundStyle(Color.statusError)
+                } else {
+                    Text("Select a prd.json file to preview stories.")
+                        .foregroundStyle(Color.textSecondary)
+                }
             }
         }
-        .frame(maxWidth: .infinity)
+        .padding(Theme.Spacing.md)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.bgSurface)
         .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md))
     }
 
     private var actions: some View {
         HStack {
-            Button("Browse…") {
+            Button("Load PRD…") {
                 browseForPRD()
             }
             .buttonStyle(.borderedProminent)
@@ -98,6 +157,7 @@ struct PRDLoaderSheet: View {
             if viewModel.document != nil {
                 Button("Reset") {
                     viewModel.reset()
+                    repoPath = ""
                     appState.setActivePRD(url: nil, name: nil)
                 }
             }
@@ -109,13 +169,48 @@ struct PRDLoaderSheet: View {
             }
             .buttonStyle(.bordered)
 
-            Button("Start Orchestration") {
-                // Future: trigger orchestrator once integrated
-                dismiss()
+            Button {
+                startOrchestration()
+            } label: {
+                if isStarting {
+                    ProgressView()
+                        .scaleEffect(0.8)
+                        .frame(width: 100)
+                } else {
+                    Text("Start Orchestration")
+                        .frame(width: 100)
+                }
             }
             .buttonStyle(.borderedProminent)
-            .disabled(viewModel.document == nil)
+            .tint(Color.statusSuccess)
+            .disabled(!canStart)
         }
+    }
+
+    private func startOrchestration() {
+        guard let doc = viewModel.document, let url = repoURL else { return }
+
+        isStarting = true
+
+        Task {
+            await appState.startOrchestration(document: doc, repoPath: url)
+            await MainActor.run {
+                isStarting = false
+                dismiss()
+            }
+        }
+    }
+
+    private func browseForRepo() {
+#if os(macOS)
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.message = "Select git repository"
+        if panel.runModal() == .OK, let url = panel.url {
+            repoPath = url.path
+        }
+#endif
     }
 
     private func browseForPRD() {

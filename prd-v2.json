@@ -3,7 +3,7 @@
   "description": "Mode où Claude orchestre automatiquement la création de worktrees et l'assignation des tâches aux agents (Gemini, Codex) basé sur un PRD. Claude devient le chef d'orchestre qui distribue le travail et coordonne les merges.",
   "branch": "feat/full-agentic-mode",
   "created_at": "2026-02-03T06:30:00.000Z",
-  "status": "in_progress",
+  "status": "complete",
   "goals": [
     "Claude orchestre automatiquement les agents Gemini et Codex",
     "Création automatique de worktrees selon le PRD",
@@ -82,7 +82,7 @@
       "title": "Agent Launcher",
       "description": "En tant qu'orchestrateur, je veux lancer les agents CLI dans leurs worktrees respectifs avec les bonnes instructions.",
       "priority": "critical",
-      "status": "pending",
+      "status": "complete",
       "depends_on": ["US-V2-003"],
       "acceptance_criteria": [
         "Méthode launchAgent(assignment:WorktreeAssignment, instructions:String) async throws -> AgentSession",
@@ -93,7 +93,7 @@
         "Le projet compile sans erreur"
       ],
       "technical_notes": "AGENT.md contient: stories assignées, contraintes, fichiers à ne pas toucher (réservés aux autres agents). Utiliser le MCP pour le reporting.",
-      "completed_at": null
+      "completed_at": "2026-02-03T11:30:00.000Z"
     },
     {
       "id": "US-V2-005",
@@ -150,7 +150,7 @@
         "Le projet compile sans erreur"
       ],
       "technical_notes": "Utiliser AsyncStream pour la subscription. L'orchestrateur peut réassigner une tâche si un agent est bloqué trop longtemps.",
-      "completed_at": null
+      "completed_at": "2026-02-03T11:48:00.000Z"
     },
     {
       "id": "US-V2-008",
@@ -233,7 +233,7 @@
       "title": "Full Agentic Mode Toggle",
       "description": "En tant qu'utilisateur, je veux un toggle pour activer/désactiver le mode Full Agentic dans l'UI.",
       "priority": "medium",
-      "status": "pending",
+      "status": "complete",
       "depends_on": ["US-V2-006"],
       "acceptance_criteria": [
         "Toggle 'Full Agentic Mode' dans la toolbar",
@@ -245,7 +245,7 @@
         "Le projet compile et le toggle fonctionne"
       ],
       "technical_notes": "Utiliser @AppStorage(\"fullAgenticMode\") var isFullAgenticMode: Bool. Conditionner l'affichage dans MainWindowView.",
-      "completed_at": null
+      "completed_at": "2026-02-03T11:50:00.000Z"
     },
     {
       "id": "US-V2-013",

@@ -81,6 +81,30 @@ final class AppState {
     private var agentCompletedStories: [String: Set<String>] = [:]
     private var agentErrorMessages: [String: [String]] = [:]
 
+    // MARK: - Orchestration State
+
+    /// Current orchestration session ID
+    private(set) var orchestrationSessionID: UUID?
+
+    /// Current orchestration state
+    var orchestrationState: OrchestratorState = .idle
+
+    /// Active worktree assignments for current orchestration
+    var activeWorktreeAssignments: [WorktreeAssignment] = []
+
+    /// Active agent sessions
+    var activeAgentSessions: [AgentSession] = []
+
+    /// Whether orchestration is in progress
+    var isOrchestrating: Bool {
+        switch orchestrationState {
+        case .idle, .complete, .error:
+            return false
+        default:
+            return true
+        }
+    }
+
     // MARK: - Private Properties
 
     /// Task for log streaming
@@ -762,6 +786,226 @@ final class AppState {
         await MainActor.run {
             self.historyRecords = records
         }
+    }
+
+    // MARK: - Orchestration Control
+
+    /// Starts a full orchestration from a PRD document
+    /// - Parameters:
+    ///   - document: The parsed PRD document
+    ///   - repoPath: Path to the git repository
+    func startOrchestration(document: PRDDocument, repoPath: URL) async {
+        guard !isOrchestrating else {
+            addLog(LogEntry(level: .warn, source: "orchestrator", worktree: nil, message: "Orchestration already in progress"))
+            return
+        }
+
+        let sessionID = UUID()
+        orchestrationSessionID = sessionID
+        orchestrationRepoPath = repoPath
+        orchestrationState = .analyzing
+
+        addLog(LogEntry(level: .info, source: "orchestrator", worktree: nil, message: "Starting orchestration for: \(document.featureName)"))
+
+        do {
+            // Step 1: Analyze PRD and create task groups
+            let analysis = try await services.orchestrator.analyzePRD(document)
+            orchestrationState = .distributing
+
+            addLog(LogEntry(level: .info, source: "orchestrator", worktree: nil, message: "Created \(analysis.taskGroups.count) task groups"))
+
+            // Step 2: Create worktrees for each task group
+            let worktreeAssignments = try await services.orchestrator.createWorktrees(for: analysis, repoPath: repoPath)
+            activeWorktreeAssignments = worktreeAssignments
+
+            addLog(LogEntry(level: .info, source: "orchestrator", worktree: nil, message: "Created \(worktreeAssignments.count) worktrees"))
+
+            // Step 3: Get task assignments
+            let taskAssignments = try await services.orchestrator.assignTasks(for: worktreeAssignments)
+
+            // Step 4: Register assignments for monitoring
+            registerAssignments(taskAssignments)
+
+            // Step 5: Launch agents in each worktree
+            orchestrationState = .monitoring
+            var sessions: [AgentSession] = []
+
+            for assignment in worktreeAssignments {
+                let instructions = buildAgentInstructions(for: assignment, prd: document)
+
+                do {
+                    let session = try await services.agentLauncher.launchAgent(
+                        assignment: assignment,
+                        prd: document,
+                        sessionID: sessionID,
+                        instructions: instructions,
+                        onOutput: { [weak self] output in
+                            Task { @MainActor in
+                                self?.addLog(LogEntry(
+                                    level: .debug,
+                                    source: assignment.agentType.rawValue,
+                                    worktree: assignment.worktreePath.path,
+                                    message: output
+                                ))
+                            }
+                        }
+                    )
+                    sessions.append(session)
+
+                    addLog(LogEntry(
+                        level: .info,
+                        source: "orchestrator",
+                        worktree: assignment.worktreePath.path,
+                        message: "Launched \(assignment.agentType.displayName) for stories: \(assignment.taskGroup.storyIds.joined(separator: ", "))"
+                    ))
+
+                    // Publish agent started event
+                    await services.agentEventBus.publish(event: AgentEvent(
+                        agentId: assignment.id.uuidString,
+                        agentType: assignment.agentType,
+                        kind: .storyStarted,
+                        storyId: assignment.taskGroup.storyIds.first,
+                        filePath: nil,
+                        message: "Agent started in \(assignment.branchName)"
+                    ))
+                } catch {
+                    addLog(LogEntry(
+                        level: .error,
+                        source: "orchestrator",
+                        worktree: assignment.worktreePath.path,
+                        message: "Failed to launch \(assignment.agentType.displayName): \(error.localizedDescription)"
+                    ))
+                }
+            }
+
+            activeAgentSessions = sessions
+
+            // Step 6: Start monitoring
+            startAgentStatusMonitoring(sessionID: sessionID, assignments: taskAssignments)
+            startAgentEventStream()
+
+            // Setup orchestrator notification for blocked agents
+            await services.agentEventBus.setOrchestratorHandler { [weak self] event in
+                await MainActor.run {
+                    self?.handleBlockedAgent(event: event)
+                }
+            }
+
+            addLog(LogEntry(level: .info, source: "orchestrator", worktree: nil, message: "Orchestration monitoring started with \(sessions.count) agents"))
+
+        } catch {
+            orchestrationState = .error(message: error.localizedDescription)
+            setError(.processError("Orchestration failed: \(error.localizedDescription)"))
+            addLog(LogEntry(level: .error, source: "orchestrator", worktree: nil, message: "Orchestration failed: \(error.localizedDescription)"))
+        }
+    }
+
+    /// Stops the current orchestration
+    func stopOrchestration() async {
+        guard isOrchestrating else { return }
+
+        addLog(LogEntry(level: .info, source: "orchestrator", worktree: nil, message: "Stopping orchestration..."))
+
+        // Stop monitoring
+        stopAgentStatusMonitoring()
+        stopAgentEventStream()
+
+        // Stop all agent processes
+        for session in activeAgentSessions {
+            do {
+                try await services.processRunner.terminate(id: session.processId)
+            } catch {
+                addLog(LogEntry(level: .debug, source: "orchestrator", worktree: nil, message: "Process \(session.processId) already terminated"))
+            }
+        }
+
+        // Clear state
+        activeAgentSessions.removeAll()
+        orchestrationState = .idle
+        orchestrationSessionID = nil
+
+        addLog(LogEntry(level: .info, source: "orchestrator", worktree: nil, message: "Orchestration stopped"))
+    }
+
+    /// Triggers merge coordination after all agents complete
+    func completeOrchestration() async {
+        guard isOrchestrating, !activeWorktreeAssignments.isEmpty else { return }
+
+        orchestrationState = .merging
+        addLog(LogEntry(level: .info, source: "orchestrator", worktree: nil, message: "Starting merge coordination..."))
+
+        guard let repoPath = orchestrationRepoPath else {
+            setError(.processError("No repository path set for merge"))
+            return
+        }
+
+        do {
+            let result = try await services.orchestrator.coordinateMerge(for: activeWorktreeAssignments)
+            mergeResult = result
+
+            if result.conflicts.isEmpty {
+                orchestrationState = .complete
+                addLog(LogEntry(level: .info, source: "orchestrator", worktree: nil, message: "Orchestration complete! Merged \(result.mergedBranches.count) branches"))
+
+                // Save to history
+                if let plan = mergePlan {
+                    let record = buildOrchestrationRecord(plan: plan, result: result)
+                    await services.historyService.append(record: record)
+                    historyRecords.insert(record, at: 0)
+                }
+            } else {
+                presentConflicts(from: result, repoPath: repoPath)
+                addLog(LogEntry(level: .warn, source: "orchestrator", worktree: nil, message: "Merge conflicts detected in \(result.conflicts.count) files"))
+            }
+        } catch {
+            orchestrationState = .error(message: error.localizedDescription)
+            setError(.processError("Merge coordination failed: \(error.localizedDescription)"))
+        }
+    }
+
+    /// Handles notification when an agent becomes blocked
+    private func handleBlockedAgent(event: AgentEvent) {
+        addLog(LogEntry(
+            level: .warn,
+            source: "orchestrator",
+            worktree: nil,
+            message: "Agent \(event.agentType?.displayName ?? event.agentId) blocked: \(event.message)"
+        ))
+        // The health monitoring will pick this up and show UI
+    }
+
+    /// Builds instructions for an agent based on its assignment
+    private func buildAgentInstructions(for assignment: WorktreeAssignment, prd: PRDDocument) -> String {
+        let storyIds = assignment.taskGroup.storyIds
+        let stories = prd.userStories.filter { storyIds.contains($0.id) }
+
+        var instructions = """
+        You are working on feature: \(prd.featureName)
+        Branch: \(assignment.branchName)
+
+        Your assigned stories:
+        """
+
+        for story in stories {
+            instructions += """
+
+            ## \(story.id) - \(story.title)
+            Priority: \(story.priority.rawValue)
+            \(story.description)
+            """
+        }
+
+        instructions += """
+
+        Instructions:
+        1. Implement each story according to its description
+        2. Use MCP emit_log to report progress
+        3. Write notes to notes/decisions.md for important decisions
+        4. Commit your changes when each story is complete
+        5. Report completion via MCP update_status when finished
+        """
+
+        return instructions
     }
 
     // MARK: - Health Monitoring Helpers

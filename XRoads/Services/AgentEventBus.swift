@@ -39,10 +39,21 @@ struct AgentEvent: Identifiable, Codable, Sendable {
     }
 }
 
+/// Callback type for orchestrator notifications
+typealias OrchestratorNotificationHandler = @Sendable (AgentEvent) async -> Void
+
 actor AgentEventBus {
     private var continuations: [UUID: AsyncStream<AgentEvent>.Continuation] = [:]
     private var history: [AgentEvent] = []
     private let historyLimit = 100
+
+    /// Optional handler called when an agent becomes blocked or needs help
+    private var orchestratorHandler: OrchestratorNotificationHandler?
+
+    /// Registers a handler to be notified when agents need orchestrator attention
+    func setOrchestratorHandler(_ handler: @escaping OrchestratorNotificationHandler) {
+        orchestratorHandler = handler
+    }
 
     func publish(event: AgentEvent) {
         history.append(event)
@@ -52,8 +63,13 @@ actor AgentEventBus {
 
         continuations.values.forEach { $0.yield(event) }
 
-        if event.kind == .blocked {
-            // Optionally trigger additional logic here if needed later
+        // Notify orchestrator for blocked/needsHelp events
+        if event.kind == .blocked || event.kind == .needsHelp {
+            if let handler = orchestratorHandler {
+                Task {
+                    await handler(event)
+                }
+            }
         }
     }
 
@@ -72,6 +88,29 @@ actor AgentEventBus {
 
     func recentEvents(limit: Int = 20) -> [AgentEvent] {
         Array(history.suffix(limit))
+    }
+
+    /// Returns events where agents are currently blocked
+    func blockedAgentEvents() -> [AgentEvent] {
+        // Get the latest event per agent and filter for blocked ones
+        var latestByAgent: [String: AgentEvent] = [:]
+        for event in history {
+            if let existing = latestByAgent[event.agentId] {
+                if event.timestamp > existing.timestamp {
+                    latestByAgent[event.agentId] = event
+                }
+            } else {
+                latestByAgent[event.agentId] = event
+            }
+        }
+        return latestByAgent.values.filter { $0.kind == .blocked || $0.kind == .needsHelp }
+    }
+
+    /// Clears all history and subscriptions
+    func reset() {
+        history.removeAll()
+        continuations.values.forEach { $0.finish() }
+        continuations.removeAll()
     }
 
     private func removeContinuation(_ token: UUID) {

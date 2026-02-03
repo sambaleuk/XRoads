@@ -22,6 +22,12 @@ protocol ServiceContainer: Sendable {
     /// Notes sync service
     var notesSyncService: NotesSyncService { get }
     var historyService: OrchestrationHistoryService { get }
+
+    /// Agent launcher for starting CLI agents in worktrees
+    var agentLauncher: AgentLauncher { get }
+
+    /// Claude orchestrator for Full Agentic Mode
+    var orchestrator: ClaudeOrchestrator { get }
 }
 
 // MARK: - DefaultServiceContainer
@@ -36,6 +42,8 @@ final class DefaultServiceContainer: ServiceContainer, @unchecked Sendable {
     let mergeCoordinator: MergeCoordinator
     let notesSyncService: NotesSyncService
     let historyService: OrchestrationHistoryService
+    let agentLauncher: AgentLauncher
+    let orchestrator: ClaudeOrchestrator
 
     init(
         gitService: GitService = GitService(),
@@ -53,6 +61,13 @@ final class DefaultServiceContainer: ServiceContainer, @unchecked Sendable {
         self.mergeCoordinator = mergeCoordinator
         self.notesSyncService = notesSyncService
         self.historyService = historyService
+        self.agentLauncher = AgentLauncher(processRunner: processRunner)
+        self.orchestrator = ClaudeOrchestrator(
+            gitService: gitService,
+            processRunner: processRunner,
+            mcpClient: mcpClient,
+            agentEventBus: agentEventBus
+        )
     }
 }
 
@@ -68,6 +83,8 @@ final class MockServiceContainer: ServiceContainer, @unchecked Sendable {
     let mergeCoordinator: MergeCoordinator
     let notesSyncService: NotesSyncService
     let historyService: OrchestrationHistoryService
+    let agentLauncher: AgentLauncher
+    let orchestrator: ClaudeOrchestrator
 
     init() {
         // Use default instances - in a full implementation, these would be mock versions
@@ -78,5 +95,12 @@ final class MockServiceContainer: ServiceContainer, @unchecked Sendable {
         self.mergeCoordinator = MergeCoordinator()
         self.notesSyncService = NotesSyncService()
         self.historyService = OrchestrationHistoryService()
+        self.agentLauncher = AgentLauncher(processRunner: processRunner)
+        self.orchestrator = ClaudeOrchestrator(
+            gitService: gitService,
+            processRunner: processRunner,
+            mcpClient: mcpClient,
+            agentEventBus: agentEventBus
+        )
     }
 }
