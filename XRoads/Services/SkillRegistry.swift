@@ -148,15 +148,113 @@ actor SkillRegistry {
         return true
     }
 
+    // MARK: - Bundled Skills
+
+    /// List of bundled skill IDs that come with the app
+    static let bundledSkillIDs: [String] = [
+        "commit",
+        "review-pr",
+        "prd",
+        "integration-test",
+        "code-reviewer"
+    ]
+
     // MARK: - Private Loading Methods
 
     /// Load bundled skills from the app's resources
     private func loadBundledSkills() {
-        // Define bundled skills inline (will be replaced by JSON resources in US-V3-008)
-        let bundledSkills = createBundledSkills()
-        for skill in bundledSkills {
-            skills[skill.id] = skill
+        // First try to load from bundled JSON resources
+        let loadedFromJSON = loadBundledSkillsFromJSON()
+
+        // If no JSON skills loaded (resources not available), fall back to inline definitions
+        if loadedFromJSON.isEmpty {
+            let fallbackSkills = createBundledSkills()
+            for skill in fallbackSkills {
+                skills[skill.id] = skill
+            }
+        } else {
+            for skill in loadedFromJSON {
+                skills[skill.id] = skill
+            }
         }
+    }
+
+    /// Load bundled skills from JSON resource files
+    /// Searches multiple locations: Bundle resources, executable directory, and working directory
+    /// - Returns: Array of loaded skills (empty if resources not available)
+    private func loadBundledSkillsFromJSON() -> [Skill] {
+        var loadedSkills: [Skill] = []
+
+        // Try to find the bundled Skills directory in multiple locations
+        let resourceURL = findBundledSkillsDirectory()
+        guard let skillsDir = resourceURL else {
+            // Resources not available - will use fallback inline definitions
+            return []
+        }
+
+        let fileManager = FileManager.default
+
+        for skillID in Self.bundledSkillIDs {
+            let skillFileURL = skillsDir.appendingPathComponent("\(skillID).skill.json")
+
+            guard fileManager.fileExists(atPath: skillFileURL.path) else {
+                continue
+            }
+
+            do {
+                let data = try Data(contentsOf: skillFileURL)
+                let decoder = JSONDecoder()
+                let skillFile = try decoder.decode(SkillFile.self, from: data)
+                let skill = skillFile.toSkill()
+                loadedSkills.append(skill)
+            } catch {
+                loadErrors.append(.invalidJSON(path: skillFileURL.path, underlyingError: error))
+            }
+        }
+
+        return loadedSkills
+    }
+
+    /// Find the bundled Skills directory by searching multiple candidate locations
+    /// - Returns: URL to Skills directory if found, nil otherwise
+    private func findBundledSkillsDirectory() -> URL? {
+        let fileManager = FileManager.default
+
+        // Candidate paths to search for Skills directory
+        var candidates: [URL] = []
+
+        // 1. Main bundle resources (for .app bundle)
+        if let bundleResourcePath = Bundle.main.resourcePath {
+            candidates.append(URL(fileURLWithPath: bundleResourcePath).appendingPathComponent("Skills"))
+        }
+
+        // 2. Bundle URL for SwiftPM resources (XRoads_XRoads.bundle)
+        if let bundleURL = Bundle.main.url(forResource: "XRoads_XRoads", withExtension: "bundle"),
+           let resourceBundle = Bundle(url: bundleURL),
+           let resourcePath = resourceBundle.resourcePath {
+            candidates.append(URL(fileURLWithPath: resourcePath).appendingPathComponent("Skills"))
+        }
+
+        // 3. Executable directory (for swift run - .build/debug/XRoads_XRoads.resources/)
+        let executableURL = URL(fileURLWithPath: Bundle.main.bundlePath)
+        candidates.append(executableURL.appendingPathComponent("XRoads_XRoads.resources/Skills"))
+
+        // 4. Current working directory (project root)/XRoads/Resources/Skills
+        let cwd = URL(fileURLWithPath: fileManager.currentDirectoryPath)
+        candidates.append(cwd.appendingPathComponent("XRoads/Resources/Skills"))
+
+        // 5. Relative to executable parent directory
+        let executableParent = executableURL.deletingLastPathComponent()
+        candidates.append(executableParent.appendingPathComponent("XRoads_XRoads.resources/Skills"))
+
+        // Search candidates and return the first one that exists
+        for candidate in candidates {
+            if fileManager.fileExists(atPath: candidate.path) {
+                return candidate
+            }
+        }
+
+        return nil
     }
 
     /// Load user skills from ~/.xroads/skills/
@@ -221,28 +319,73 @@ actor SkillRegistry {
         }
     }
 
-    /// Create the set of bundled default skills
-    /// These will be replaced by actual JSON resources in US-V3-008
+    /// Create the set of bundled default skills (fallback when JSON resources not available)
+    /// These mirror the JSON files in XRoads/Resources/Skills/
     private func createBundledSkills() -> [Skill] {
         [
             Skill(
                 id: "commit",
-                name: "Commit",
-                description: "Create git commits with conventional commit messages",
+                name: "Git Commit",
+                description: "Create git commits with conventional commit messages following project standards",
                 promptTemplate: """
-                    You are a git commit assistant. Follow these rules:
+                    You are a git commit assistant. Follow these rules strictly:
+
+                    ## Commit Message Format
                     1. Use conventional commit format: type(scope): description
-                    2. Keep the first line under 72 characters
-                    3. Add detailed body if needed
-                    4. Reference issues when applicable
+                    2. Types: feat, fix, docs, style, refactor, perf, test, build, ci, chore
+                    3. Keep the first line under 72 characters
+                    4. Add detailed body if changes are complex
+                    5. Reference issues when applicable (#123)
+
+                    ## Before Committing
+                    1. Review staged changes with `git diff --staged`
+                    2. Ensure all tests pass
+                    3. Verify no debug code or console.log statements
+                    4. Check for sensitive data (API keys, passwords)
+
+                    ## Commit Process
+                    1. Stage relevant files: `git add <files>`
+                    2. Create commit with descriptive message
+                    3. Include Co-Authored-By if pair programming
 
                     {{context}}
                     """,
-                requiredTools: ["git"],
+                requiredTools: ["git", "file-read"],
                 version: "1.0.0",
                 compatibleCLIs: Set(AgentType.allCases),
                 category: .git,
-                author: "XRoads"
+                author: "XRoads Team"
+            ),
+            Skill(
+                id: "review-pr",
+                name: "Pull Request Review",
+                description: "Review pull requests for code quality, bugs, security issues, and best practices",
+                promptTemplate: """
+                    You are a pull request reviewer. Conduct thorough code reviews following these guidelines:
+
+                    ## Review Checklist
+                    1. **Code Quality** - Is the code readable and well-structured?
+                    2. **Functionality** - Does the code do what it claims?
+                    3. **Security** - Input validation, no hardcoded secrets, proper auth?
+                    4. **Performance** - Efficient algorithms, no N+1 queries?
+                    5. **Testing** - Are tests included and adequate?
+                    6. **Documentation** - Are complex sections documented?
+
+                    ## Review Output Format
+                    - **MUST FIX**: Critical issues that block merge
+                    - **SHOULD FIX**: Important improvements
+                    - **CONSIDER**: Optional suggestions
+                    - **PRAISE**: Highlight good practices
+
+                    Include file:line references for all comments.
+
+                    {{context}}
+                    """,
+                requiredTools: ["git", "file-read"],
+                version: "1.0.0",
+                compatibleCLIs: Set(AgentType.allCases),
+                category: .review,
+                author: "XRoads Team"
             ),
             Skill(
                 id: "code-writer",
@@ -261,21 +404,25 @@ actor SkillRegistry {
                 version: "1.0.0",
                 compatibleCLIs: Set(AgentType.allCases),
                 category: .code,
-                author: "XRoads"
+                author: "XRoads Team"
             ),
             Skill(
                 id: "code-reviewer",
                 name: "Code Reviewer",
-                description: "Review code for issues, bugs, and improvements",
+                description: "Comprehensive code review for quality, security, performance, and best practices",
                 promptTemplate: """
-                    You are a code review assistant. Analyze code for:
-                    1. Bugs and potential issues
-                    2. Security vulnerabilities
-                    3. Performance problems
-                    4. Code style violations
-                    5. Best practice adherence
+                    You are a senior code reviewer. Analyze code systematically and provide actionable feedback.
 
-                    Provide actionable feedback with specific line references.
+                    ## Review Categories
+                    1. **Correctness** - Logic errors, null handling, race conditions
+                    2. **Security (OWASP Top 10)** - Injection, auth, data exposure
+                    3. **Performance** - Algorithm complexity, query efficiency
+                    4. **Maintainability** - Readability, DRY, SOLID principles
+                    5. **Testing** - Coverage gaps, edge cases
+
+                    ## Output Format
+                    [SEVERITY] file:line - Description
+                    Severities: CRITICAL, HIGH, MEDIUM, LOW
 
                     {{context}}
                     """,
@@ -283,19 +430,35 @@ actor SkillRegistry {
                 version: "1.0.0",
                 compatibleCLIs: Set(AgentType.allCases),
                 category: .review,
-                author: "XRoads"
+                author: "XRoads Team"
             ),
             Skill(
                 id: "prd",
-                name: "PRD Parser",
-                description: "Parse and execute PRD user stories",
+                name: "PRD Implementation",
+                description: "Parse and implement features from PRD user stories with mandatory unit tests",
                 promptTemplate: """
-                    You are implementing features from a PRD. Follow these rules:
-                    1. Read prd.json and find the first incomplete user story
-                    2. Implement exactly ONE story per iteration
-                    3. Include unit tests with the implementation
-                    4. Update prd.json status when complete
-                    5. Commit with format: feat(scope): US-XXX description
+                    You are implementing features from a PRD (Product Requirements Document). Follow the Nexus Loop methodology:
+
+                    ## Workflow
+                    1. **Read prd.json** - Find the first user story that is NOT complete
+                    2. **Read progress.txt** - Check the Learnings section for patterns
+                    3. **Read AGENTS.md** - Understand codebase patterns if it exists
+                    4. **Implement ONE story** - Only work on that single story
+                    5. **Run quality checks** - Build, typecheck, run tests
+
+                    ## Critical Rules
+                    ### If Checks PASS:
+                    - Update prd.json: set story status to "complete", add "completed_at" timestamp
+                    - Commit changes with message: `feat(scope): US-XXX description`
+                    - Append what worked to progress.txt
+
+                    ### If Checks FAIL:
+                    - Do NOT mark the story complete
+                    - Do NOT commit broken code
+                    - Append what went wrong to progress.txt
+
+                    ## Unit Tests are MANDATORY
+                    Every story implementation MUST include its unit tests.
 
                     {{context}}
                     """,
@@ -303,7 +466,7 @@ actor SkillRegistry {
                 version: "1.0.0",
                 compatibleCLIs: Set(AgentType.allCases),
                 category: .code,
-                author: "XRoads"
+                author: "XRoads Team"
             ),
             Skill(
                 id: "doc-generator",
@@ -346,15 +509,28 @@ actor SkillRegistry {
             Skill(
                 id: "integration-test",
                 name: "Integration Test Writer",
-                description: "Generate integration tests for service boundaries",
+                description: "Generate integration tests for service boundaries and component interactions (NOT unit tests)",
                 promptTemplate: """
-                    You are an integration test assistant. Create tests that:
-                    1. Test service boundaries and interfaces
-                    2. Mock external dependencies appropriately
-                    3. Verify data flow between components
-                    4. Cover error scenarios
+                    You are an integration test specialist. Create tests that verify how components work together.
 
-                    Do NOT write unit tests - those belong with the implementation.
+                    ## Important Distinction
+                    Integration tests are DIFFERENT from unit tests:
+                    - **Unit Tests**: Test individual functions/classes in isolation (written with implementations)
+                    - **Integration Tests**: Test how multiple components interact (this skill)
+
+                    ## Integration Test Focus Areas
+                    1. **Service Boundaries** - API endpoints, database operations, external services
+                    2. **Component Interactions** - Data flow, state management, event propagation
+                    3. **Error Scenarios** - Network failures, timeouts, partial failures
+
+                    ## Naming Convention
+                    - File: `{Feature}IntegrationTests.swift`
+                    - Location: `Tests/Integration/`
+
+                    ## Do NOT
+                    - Write unit tests (those belong with the implementation)
+                    - Mock everything (defeats the purpose)
+                    - Skip cleanup (tests must be idempotent)
 
                     {{context}}
                     """,
@@ -362,7 +538,7 @@ actor SkillRegistry {
                 version: "1.0.0",
                 compatibleCLIs: Set(AgentType.allCases),
                 category: .test,
-                author: "XRoads"
+                author: "XRoads Team"
             ),
             Skill(
                 id: "e2e-test",

@@ -253,7 +253,8 @@
       "title": "Built-in Skill Definitions",
       "description": "Package core skills (commit, review-pr, prd, integration-test, etc.)",
       "priority": "high",
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-03T19:00:00Z",
       "depends_on": ["US-V3-002", "US-V3-006"],
       "acceptance_criteria": [
         "Bundled skills: commit, review-pr, prd, integration-test, code-reviewer",

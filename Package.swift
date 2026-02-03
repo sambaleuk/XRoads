@@ -90,6 +90,9 @@ let package = Package(
                 "ViewModels/PRDLoaderViewModel.swift",
                 "Services/OrchestrationHistoryService.swift",
                 "Models/OrchestrationRecord.swift"
+            ],
+            resources: [
+                .copy("Resources/Skills")
             ]
         )
     ]

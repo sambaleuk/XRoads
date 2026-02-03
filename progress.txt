@@ -1046,3 +1046,49 @@ Files modified:
 - XRoads/Views/Dashboard/GitInfoPanel.swift (added quick action and recent repos integration)
 - Package.swift (added RepoDetector.swift, QuickActionBar.swift)
 - prd.json (marked US-V3-007 complete)
+
+### Iteration 8 - US-V3-008 (Built-in Skill Definitions)
+- Created 5 bundled skill JSON files in XRoads/Resources/Skills/:
+  - commit.skill.json: Git commit with conventional commit format, pre-commit checks
+  - review-pr.skill.json: Pull request review with checklist (quality, functionality, security, performance, testing, documentation)
+  - prd.skill.json: PRD implementation following Nexus Loop methodology with mandatory unit tests
+  - integration-test.skill.json: Integration test writer focusing on service boundaries (NOT unit tests)
+  - code-reviewer.skill.json: Comprehensive code review (correctness, security/OWASP, performance, maintainability, testing)
+- Updated SkillRegistry to support loading bundled skills from JSON:
+  - Added bundledSkillIDs static array
+  - Added loadBundledSkillsFromJSON() method that searches multiple locations (Bundle resources, executable directory, working directory)
+  - Added findBundledSkillsDirectory() helper for resource discovery
+  - Falls back to inline skill definitions if JSON resources not available
+- Updated fallback inline skill definitions to match JSON content:
+  - Added review-pr skill to fallback definitions
+  - Updated commit, prd, code-reviewer, integration-test to match JSON versions
+  - Standardized author to "XRoads Team"
+- Added SwiftPM resources configuration:
+  - Package.swift now includes `.copy("Resources/Skills")` for bundling JSON files
+- Created comprehensive BundledSkillsTests.swift with tests for:
+  - All bundled skills parse correctly
+  - Skill version format follows semver (X.Y.Z)
+  - Required tools are from valid set (git, file-read, file-edit, etc.)
+  - Compatible CLIs are valid (claude, gemini, codex)
+  - Categories are valid (git, code, test, docs, review, custom)
+  - Prompt templates contain {{context}} placeholder
+  - No duplicate skill IDs
+  - All expected skills are present
+  - Skill names are user-friendly (capitalized, descriptive)
+  - Descriptions are meaningful (>= 20 chars)
+  - Author is present
+- **Build verified**: `./scripts/swift-build.sh` completes successfully
+- **JSON validation**: All 5 skill files validated with Python json module
+
+Files created:
+- XRoads/Resources/Skills/commit.skill.json
+- XRoads/Resources/Skills/review-pr.skill.json
+- XRoads/Resources/Skills/prd.skill.json
+- XRoads/Resources/Skills/integration-test.skill.json
+- XRoads/Resources/Skills/code-reviewer.skill.json
+- Tests/XRoadsTests/Resources/BundledSkillsTests.swift
+
+Files modified:
+- XRoads/Services/SkillRegistry.swift (JSON loading, fallback skills, resource discovery)
+- Package.swift (added resources configuration)
+- prd.json (marked US-V3-008 complete)
