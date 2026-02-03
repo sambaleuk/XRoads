@@ -242,7 +242,8 @@ private struct ContentColumn: View {
             } else if let worktree = appState.selectedWorktree {
                 WorktreeDetailView(worktree: worktree)
             } else {
-                EmptySelectionView()
+                // Show Git Dashboard as quick start view
+                GitDashboardView()
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -363,10 +364,21 @@ private struct MCPStatusBadge: View {
     }
 }
 
-// MARK: - Worktree Detail View (Placeholder)
+// MARK: - Worktree Detail View
 
 private struct WorktreeDetailView: View {
+    @Environment(\.appState) private var appState
     let worktree: Worktree
+    @State private var isStarting = false
+    @State private var isStopping = false
+
+    private var agent: Agent? {
+        appState.agent(for: worktree)
+    }
+
+    private var isRunning: Bool {
+        agent?.status == .running
+    }
 
     var body: some View {
         VStack(spacing: Theme.Spacing.lg) {
@@ -383,6 +395,22 @@ private struct WorktreeDetailView: View {
                 Text(worktree.branch)
                     .font(.body14)
                     .foregroundStyle(Color.textSecondary)
+
+                if let agent = agent {
+                    HStack(spacing: Theme.Spacing.sm) {
+                        Circle()
+                            .fill(agent.status == .running ? Color.statusSuccess : Color.textTertiary)
+                            .frame(width: 8, height: 8)
+                        Text(agent.type.displayName)
+                            .font(.caption)
+                            .foregroundStyle(Color.textSecondary)
+                        Text("•")
+                            .foregroundStyle(Color.textTertiary)
+                        Text(agent.status.rawValue.capitalized)
+                            .font(.caption)
+                            .foregroundStyle(agent.status == .running ? Color.statusSuccess : Color.textSecondary)
+                    }
+                }
             }
 
             Divider()
@@ -405,26 +433,60 @@ private struct WorktreeDetailView: View {
 
             Spacer()
 
-            // Action Buttons (Placeholder for US-013)
+            // Action Buttons
             HStack(spacing: Theme.Spacing.md) {
                 Button {
-                    // TODO: Start agent (US-013)
+                    startAgent()
                 } label: {
-                    Label("Start Agent", systemImage: "play.fill")
+                    if isStarting {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                            .frame(width: 100)
+                    } else {
+                        Label("Start Agent", systemImage: "play.fill")
+                    }
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(Color.statusSuccess)
+                .disabled(isRunning || isStarting)
 
                 Button {
-                    // TODO: Stop agent (US-013)
+                    stopAgent()
                 } label: {
-                    Label("Stop", systemImage: "stop.fill")
+                    if isStopping {
+                        ProgressView()
+                            .scaleEffect(0.8)
+                            .frame(width: 60)
+                    } else {
+                        Label("Stop", systemImage: "stop.fill")
+                    }
                 }
                 .buttonStyle(.bordered)
+                .disabled(!isRunning || isStopping)
             }
             .padding(.bottom, Theme.Spacing.xl)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func startAgent() {
+        isStarting = true
+        Task {
+            await appState.startAgentForWorktree(worktree)
+            await MainActor.run {
+                isStarting = false
+            }
+        }
+    }
+
+    private func stopAgent() {
+        isStopping = true
+        Task {
+            await appState.stopAgentForWorktree(worktree)
+            await MainActor.run {
+                isStopping = false
+            }
+        }
     }
 }
 

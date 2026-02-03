@@ -31,6 +31,7 @@ let package = Package(
                 "Views/ProgressDashboardView.swift",
                 "Views/PRDLoaderSheet.swift",
                 "Views/OrchestrationHistorySheet.swift",
+                "Views/GitDashboardView.swift",
                 "Views/Components/MacTextField.swift",
                 "Views/Components/ModalPanel.swift",
                 "Views/Components/FloatingInputWindow.swift",

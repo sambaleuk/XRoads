@@ -112,6 +112,9 @@ extension Color {
     /// Terminal red - errors (#ff7b72)
     static let terminalRed = Color(hex: "#ff7b72")
 
+    /// Terminal magenta - accents (#bc8cff)
+    static let terminalMagenta = Color(hex: "#bc8cff")
+
     // MARK: - Glow Colors (with opacity)
 
     /// Primary accent glow - 15% opacity
@@ -156,6 +159,9 @@ extension Font {
     /// Heading 2 - 16px medium mono
     static let h2 = Font.mono(16, weight: .medium)
 
+    /// Heading 3 - 14px medium mono
+    static let h3 = Font.mono(14, weight: .medium)
+
     // MARK: - Body Sizes
 
     /// Body text - 14px normal mono
@@ -192,6 +198,7 @@ enum Theme {
     // MARK: - Border Radius
 
     enum Radius {
+        static let xs: CGFloat = 4
         static let sm: CGFloat = 6
         static let md: CGFloat = 8
         static let lg: CGFloat = 12

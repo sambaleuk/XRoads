@@ -70,20 +70,58 @@ extension CLIAdapter {
 struct ClaudeAdapter: CLIAdapter {
     let cliType: AgentType = .claude
 
-    /// Configurable path, defaults to standard installation location
+    /// Configurable path, auto-detected or custom
     var executablePath: String
 
     var displayName: String { "Claude Code" }
 
-    init(executablePath: String = "/usr/local/bin/claude") {
-        self.executablePath = executablePath
+    init(executablePath: String? = nil) {
+        self.executablePath = executablePath ?? Self.detectClaudePath()
+    }
+
+    /// Attempts to find claude CLI in common locations
+    private static func detectClaudePath() -> String {
+        let possiblePaths = [
+            "/usr/local/bin/claude",
+            "/opt/homebrew/bin/claude",
+            "\(NSHomeDirectory())/.nvm/versions/node/v20.19.4/bin/claude",
+            "\(NSHomeDirectory())/.nvm/versions/node/v22.0.0/bin/claude",
+            "\(NSHomeDirectory())/.local/bin/claude"
+        ]
+
+        for path in possiblePaths {
+            if FileManager.default.fileExists(atPath: path) {
+                return path
+            }
+        }
+
+        // Fallback: try to find via shell
+        if let path = try? shellWhich("claude") {
+            return path
+        }
+
+        return "/usr/local/bin/claude"
+    }
+
+    /// Uses shell to find executable
+    private static func shellWhich(_ command: String) throws -> String? {
+        let process = Process()
+        let pipe = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/bin/zsh")
+        process.arguments = ["-l", "-c", "which \(command)"]
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        process.waitUntilExit()
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return path?.isEmpty == false ? path : nil
     }
 
     func launchArguments(worktreePath: String) -> [String] {
-        // Claude Code CLI typically uses interactive mode
-        // --cwd sets the working directory
+        // Claude Code CLI in interactive mode
+        // Working directory is set by ProcessRunner, no need for --cwd
         return [
-            "--cwd", worktreePath,
             "--dangerously-skip-permissions"  // Skip permission prompts for automation
         ]
     }
@@ -100,20 +138,59 @@ struct ClaudeAdapter: CLIAdapter {
 struct GeminiAdapter: CLIAdapter {
     let cliType: AgentType = .gemini
 
-    /// Configurable path, defaults to standard installation location
+    /// Configurable path, auto-detected or custom
     var executablePath: String
 
     var displayName: String { "Gemini CLI" }
 
-    init(executablePath: String = "/usr/local/bin/gemini") {
-        self.executablePath = executablePath
+    init(executablePath: String? = nil) {
+        self.executablePath = executablePath ?? Self.detectGeminiPath()
+    }
+
+    /// Attempts to find gemini CLI in common locations
+    private static func detectGeminiPath() -> String {
+        let possiblePaths = [
+            "/opt/homebrew/bin/gemini",
+            "/usr/local/bin/gemini",
+            "\(NSHomeDirectory())/.local/bin/gemini",
+            "\(NSHomeDirectory())/.nvm/versions/node/v20.19.4/bin/gemini",
+            "\(NSHomeDirectory())/.nvm/versions/node/v22.0.0/bin/gemini"
+        ]
+
+        for path in possiblePaths {
+            if FileManager.default.fileExists(atPath: path) {
+                return path
+            }
+        }
+
+        // Fallback: try to find via shell
+        if let path = try? shellWhich("gemini") {
+            return path
+        }
+
+        return "/opt/homebrew/bin/gemini"
+    }
+
+    /// Uses shell to find executable
+    private static func shellWhich(_ command: String) throws -> String? {
+        let process = Process()
+        let pipe = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/bin/zsh")
+        process.arguments = ["-l", "-c", "which \(command)"]
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        process.waitUntilExit()
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return path?.isEmpty == false ? path : nil
     }
 
     func launchArguments(worktreePath: String) -> [String] {
         // Gemini CLI arguments for interactive mode with sandbox disabled
+        // Working directory is set by ProcessRunner
         return [
-            "--sandbox=false",  // Allow file system access
-            "--directory", worktreePath
+            "--sandbox=false"  // Allow file system access
         ]
     }
 
@@ -129,21 +206,60 @@ struct GeminiAdapter: CLIAdapter {
 struct CodexAdapter: CLIAdapter {
     let cliType: AgentType = .codex
 
-    /// Configurable path, defaults to standard installation location
+    /// Configurable path, auto-detected or custom
     var executablePath: String
 
     var displayName: String { "Codex" }
 
-    init(executablePath: String = "/usr/local/bin/codex") {
-        self.executablePath = executablePath
+    init(executablePath: String? = nil) {
+        self.executablePath = executablePath ?? Self.detectCodexPath()
+    }
+
+    /// Attempts to find codex CLI in common locations
+    private static func detectCodexPath() -> String {
+        let possiblePaths = [
+            "/opt/homebrew/bin/codex",
+            "/usr/local/bin/codex",
+            "\(NSHomeDirectory())/.nvm/versions/node/v20.19.4/bin/codex",
+            "\(NSHomeDirectory())/.nvm/versions/node/v22.0.0/bin/codex",
+            "\(NSHomeDirectory())/.local/bin/codex",
+            "\(NSHomeDirectory())/bin/codex"
+        ]
+
+        for path in possiblePaths {
+            if FileManager.default.fileExists(atPath: path) {
+                return path
+            }
+        }
+
+        // Fallback: try to find via shell
+        if let path = try? shellWhich("codex") {
+            return path
+        }
+
+        return "/usr/local/bin/codex"
+    }
+
+    /// Uses shell to find executable
+    private static func shellWhich(_ command: String) throws -> String? {
+        let process = Process()
+        let pipe = Pipe()
+        process.executableURL = URL(fileURLWithPath: "/bin/zsh")
+        process.arguments = ["-l", "-c", "which \(command)"]
+        process.standardOutput = pipe
+        process.standardError = FileHandle.nullDevice
+        try process.run()
+        process.waitUntilExit()
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        let path = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        return path?.isEmpty == false ? path : nil
     }
 
     func launchArguments(worktreePath: String) -> [String] {
         // Codex CLI arguments
-        // Uses approval mode to handle file changes
+        // Working directory is set by ProcessRunner
         return [
-            "--approval-mode", "full-auto",  // Approve all changes automatically
-            "--cwd", worktreePath
+            "--approval-mode", "full-auto"  // Approve all changes automatically
         ]
     }
 
@@ -181,12 +297,12 @@ extension AgentType {
         }
     }
 
-    /// Default executable path for this agent type
+    /// Default executable path for this agent type (used as fallback)
     var defaultExecutablePath: String {
         switch self {
-        case .claude: return "/usr/local/bin/claude"
-        case .gemini: return "/usr/local/bin/gemini"
-        case .codex: return "/usr/local/bin/codex"
+        case .claude: return ClaudeAdapter().executablePath
+        case .gemini: return GeminiAdapter().executablePath
+        case .codex: return CodexAdapter().executablePath
         }
     }
 }

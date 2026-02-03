@@ -241,6 +241,173 @@ actor GitService {
         try await runGit(arguments: ["add", file], currentDirectory: repoPath)
     }
 
+    // MARK: - Quick Start / Dashboard Operations
+
+    /// Information about a commit for display
+    struct CommitInfo: Sendable, Identifiable {
+        let sha: String
+        let shortSha: String
+        let message: String
+        let author: String
+        let date: Date
+        let relativeDate: String
+
+        var id: String { sha }
+    }
+
+    /// Information about a remote
+    struct RemoteInfo: Sendable, Identifiable {
+        let name: String
+        let fetchURL: String
+        let pushURL: String
+
+        var id: String { name }
+    }
+
+    /// Ahead/behind tracking info
+    struct TrackingInfo: Sendable {
+        let ahead: Int
+        let behind: Int
+        let remoteBranch: String?
+    }
+
+    /// Gets recent commits for the repository
+    /// - Parameters:
+    ///   - path: Path to repository or worktree
+    ///   - count: Number of commits to fetch (default 10)
+    /// - Returns: Array of CommitInfo
+    func getRecentCommits(path: String, count: Int = 10) async throws -> [CommitInfo] {
+        guard FileManager.default.fileExists(atPath: path) else {
+            throw GitError.pathNotFound(path: path)
+        }
+
+        // Format: sha|shortSha|message|author|timestamp|relativeDate
+        let output = try await runGit(
+            arguments: [
+                "log",
+                "-\(count)",
+                "--format=%H|%h|%s|%an|%ct|%cr"
+            ],
+            currentDirectory: path
+        )
+
+        var commits: [CommitInfo] = []
+        let lines = output.components(separatedBy: "\n").filter { !$0.isEmpty }
+
+        for line in lines {
+            let parts = line.components(separatedBy: "|")
+            guard parts.count >= 6 else { continue }
+
+            let timestamp = TimeInterval(parts[4]) ?? 0
+            let date = Date(timeIntervalSince1970: timestamp)
+
+            commits.append(CommitInfo(
+                sha: parts[0],
+                shortSha: parts[1],
+                message: parts[2],
+                author: parts[3],
+                date: date,
+                relativeDate: parts[5]
+            ))
+        }
+
+        return commits
+    }
+
+    /// Gets all configured remotes
+    /// - Parameter path: Path to repository
+    /// - Returns: Array of RemoteInfo
+    func getRemotes(path: String) async throws -> [RemoteInfo] {
+        guard FileManager.default.fileExists(atPath: path) else {
+            throw GitError.pathNotFound(path: path)
+        }
+
+        let output = try await runGit(
+            arguments: ["remote", "-v"],
+            currentDirectory: path
+        )
+
+        var remotes: [String: (fetch: String, push: String)] = [:]
+        let lines = output.components(separatedBy: "\n").filter { !$0.isEmpty }
+
+        for line in lines {
+            let parts = line.split(separator: "\t", maxSplits: 1)
+            guard parts.count >= 2 else { continue }
+
+            let name = String(parts[0])
+            let urlAndType = String(parts[1])
+
+            if urlAndType.hasSuffix("(fetch)") {
+                let url = urlAndType.replacingOccurrences(of: " (fetch)", with: "")
+                remotes[name, default: (fetch: "", push: "")].fetch = url
+            } else if urlAndType.hasSuffix("(push)") {
+                let url = urlAndType.replacingOccurrences(of: " (push)", with: "")
+                remotes[name, default: (fetch: "", push: "")].push = url
+            }
+        }
+
+        return remotes.map { RemoteInfo(name: $0.key, fetchURL: $0.value.fetch, pushURL: $0.value.push) }
+            .sorted { $0.name < $1.name }
+    }
+
+    /// Gets tracking info (ahead/behind) for current branch
+    /// - Parameter path: Path to repository
+    /// - Returns: TrackingInfo with ahead/behind counts
+    func getTrackingInfo(path: String) async throws -> TrackingInfo {
+        guard FileManager.default.fileExists(atPath: path) else {
+            throw GitError.pathNotFound(path: path)
+        }
+
+        // Get upstream branch
+        let upstreamOutput = try? await runGit(
+            arguments: ["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"],
+            currentDirectory: path
+        )
+        let remoteBranch = upstreamOutput?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard let remote = remoteBranch, !remote.isEmpty else {
+            return TrackingInfo(ahead: 0, behind: 0, remoteBranch: nil)
+        }
+
+        // Get ahead/behind counts
+        let countOutput = try await runGit(
+            arguments: ["rev-list", "--left-right", "--count", "HEAD...@{u}"],
+            currentDirectory: path
+        )
+
+        let counts = countOutput.trimmingCharacters(in: .whitespacesAndNewlines)
+            .split(separator: "\t")
+            .compactMap { Int($0) }
+
+        let ahead = counts.first ?? 0
+        let behind = counts.count > 1 ? counts[1] : 0
+
+        return TrackingInfo(ahead: ahead, behind: behind, remoteBranch: remote)
+    }
+
+    /// Gets the repository root path
+    /// - Parameter path: Any path within the repository
+    /// - Returns: Root path of the repository
+    func getRepoRoot(path: String) async throws -> String {
+        let output = try await runGit(
+            arguments: ["rev-parse", "--show-toplevel"],
+            currentDirectory: path
+        )
+        return output.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    /// Fetches from all remotes
+    /// - Parameter path: Path to repository
+    func fetchAll(path: String) async throws {
+        try await runGit(arguments: ["fetch", "--all"], currentDirectory: path)
+    }
+
+    /// Pulls current branch
+    /// - Parameter path: Path to repository
+    func pull(path: String) async throws {
+        try await runGit(arguments: ["pull"], currentDirectory: path)
+    }
+
     // MARK: - Private Helpers
 
     /// Runs a git command and returns the output

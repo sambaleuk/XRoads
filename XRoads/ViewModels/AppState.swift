@@ -62,6 +62,9 @@ final class AppState {
     private var repeatedMessageTracker: [String: (message: String, count: Int)] = [:]
     private var storyStartTimestamps: [String: [String: Date]] = [:]
 
+    /// Current project/repository path for Git Dashboard
+    var projectPath: String?
+
     /// Latest merge plan/result for Full Agentic Mode
     var mergePlan: MergePlan?
     var mergeResult: MergeResult?
@@ -294,6 +297,186 @@ final class AppState {
     /// Removes an agent
     func removeAgent(_ agentId: UUID) {
         agents.removeValue(forKey: agentId)
+    }
+
+    /// Running process IDs indexed by worktree ID
+    private var worktreeProcessIds: [UUID: UUID] = [:]
+
+    /// Starts an agent for a specific worktree
+    func startAgentForWorktree(_ worktree: Worktree) async {
+        guard var agent = agent(for: worktree) else {
+            addLog(LogEntry(level: .error, source: "system", worktree: worktree.path, message: "No agent assigned to this worktree"))
+            return
+        }
+
+        // Check if already running
+        if let existingProcessId = worktreeProcessIds[worktree.id],
+           await services.processRunner.isRunning(id: existingProcessId) {
+            addLog(LogEntry(level: .warn, source: "system", worktree: worktree.path, message: "Agent already running"))
+            return
+        }
+
+        // Emit to MCP: Agent starting
+        await emitToMCP(level: .info, source: agent.type.rawValue, worktree: worktree.path, message: "Starting agent...")
+
+        do {
+            let adapter = agent.type.adapter()
+
+            guard adapter.isAvailable() else {
+                await emitToMCP(level: .error, source: agent.type.rawValue, worktree: worktree.path, message: "CLI not found at \(adapter.executablePath)")
+                return
+            }
+
+            // Update agent status
+            agent.status = .running
+            setAgent(agent)
+
+            // Update MCP status
+            await updateMCPStatus(agent: agent.type.rawValue, worktree: worktree.path, status: .running, task: "Initializing")
+
+            // Launch the process with MCP-connected output handler
+            let agentType = agent.type
+            let worktreePath = worktree.path
+            let processId = try await services.processRunner.launch(
+                executable: adapter.executablePath,
+                arguments: adapter.launchArguments(worktreePath: worktree.path),
+                workingDirectory: worktree.path,
+                environment: nil
+            ) { [weak self] output in
+                Task { @MainActor [weak self] in
+                    guard let self = self else { return }
+                    await self.handleAgentOutput(output, agentType: agentType, worktreePath: worktreePath)
+                }
+            }
+
+            worktreeProcessIds[worktree.id] = processId
+            await emitToMCP(level: .info, source: agent.type.rawValue, worktree: worktree.path, message: "Agent started (PID: \(processId))")
+
+        } catch {
+            agent.status = .error
+            setAgent(agent)
+            await emitToMCP(level: .error, source: agent.type.rawValue, worktree: worktree.path, message: "Failed to start: \(error.localizedDescription)")
+            await updateMCPStatus(agent: agent.type.rawValue, worktree: worktree.path, status: .error, task: nil)
+        }
+    }
+
+    /// Handles agent output: parses for status markers, emits to MCP, and updates local state
+    private func handleAgentOutput(_ output: String, agentType: AgentType, worktreePath: String) async {
+        let trimmed = output.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        // Determine log level from content
+        let level: LogLevel = parseLogLevel(from: trimmed)
+
+        // Emit to MCP and local logs
+        await emitToMCP(level: level, source: agentType.rawValue, worktree: worktreePath, message: trimmed)
+
+        // Detect status changes from output patterns
+        await detectAndUpdateStatus(from: trimmed, agentType: agentType, worktreePath: worktreePath)
+    }
+
+    /// Parses log level from output content
+    private func parseLogLevel(from text: String) -> LogLevel {
+        let lower = text.lowercased()
+        if lower.contains("error") || lower.contains("failed") || lower.contains("exception") {
+            return .error
+        } else if lower.contains("warn") || lower.contains("warning") {
+            return .warn
+        } else if lower.contains("success") || lower.contains("complete") || lower.contains("done") {
+            return .info
+        }
+        return .debug
+    }
+
+    /// Detects status changes from agent output patterns
+    private func detectAndUpdateStatus(from text: String, agentType: AgentType, worktreePath: String) async {
+        let lower = text.lowercased()
+
+        // Detect completion
+        if lower.contains("task complete") || lower.contains("all done") || lower.contains("finished") {
+            await updateMCPStatus(agent: agentType.rawValue, worktree: worktreePath, status: .complete, task: "Completed")
+            // Update local agent status
+            if let worktree = worktrees.first(where: { $0.path == worktreePath }),
+               var agent = agent(for: worktree) {
+                agent.status = .idle
+                setAgent(agent)
+            }
+        }
+        // Detect planning phase
+        else if lower.contains("planning") || lower.contains("analyzing") || lower.contains("thinking") {
+            await updateMCPStatus(agent: agentType.rawValue, worktree: worktreePath, status: .planning, task: "Planning")
+        }
+        // Detect errors
+        else if lower.contains("error") || lower.contains("failed") {
+            await updateMCPStatus(agent: agentType.rawValue, worktree: worktreePath, status: .error, task: nil)
+        }
+        // Detect active work
+        else if lower.contains("writing") || lower.contains("editing") || lower.contains("creating") ||
+                lower.contains("running") || lower.contains("executing") {
+            // Extract task description (first 50 chars)
+            let task = String(text.prefix(50))
+            await updateMCPStatus(agent: agentType.rawValue, worktree: worktreePath, status: .running, task: task)
+        }
+    }
+
+    /// Emits a log to both MCP server and local logs
+    private func emitToMCP(level: LogLevel, source: String, worktree: String, message: String) async {
+        // Add to local logs
+        addLog(LogEntry(level: level, source: source, worktree: worktree, message: message))
+
+        // Emit to MCP server if connected
+        let mcpClient = services.mcpClient
+        if await mcpClient.serverIsRunning {
+            do {
+                try await mcpClient.emitLog(level: level, source: source, worktree: worktree, message: message)
+            } catch {
+                // Silently fail MCP emission - local logs still work
+                #if DEBUG
+                print("MCP emitLog failed: \(error)")
+                #endif
+            }
+        }
+    }
+
+    /// Updates agent status on MCP server
+    private func updateMCPStatus(agent: String, worktree: String, status: AgentStatus, task: String?) async {
+        let mcpClient = services.mcpClient
+        if await mcpClient.serverIsRunning {
+            do {
+                try await mcpClient.updateStatus(agent: agent, worktree: worktree, status: status, task: task)
+            } catch {
+                #if DEBUG
+                print("MCP updateStatus failed: \(error)")
+                #endif
+            }
+        }
+    }
+
+    /// Stops the agent for a specific worktree
+    func stopAgentForWorktree(_ worktree: Worktree) async {
+        guard var agent = agent(for: worktree) else { return }
+
+        guard let processId = worktreeProcessIds[worktree.id] else {
+            agent.status = .idle
+            setAgent(agent)
+            return
+        }
+
+        do {
+            try await services.processRunner.terminate(id: processId)
+            agent.status = .idle
+            setAgent(agent)
+            worktreeProcessIds.removeValue(forKey: worktree.id)
+            addLog(LogEntry(level: .info, source: agent.type.rawValue, worktree: worktree.path, message: "Agent stopped"))
+        } catch {
+            addLog(LogEntry(level: .warn, source: agent.type.rawValue, worktree: worktree.path, message: "Error stopping: \(error.localizedDescription)"))
+        }
+    }
+
+    /// Checks if an agent is running for a worktree
+    func isAgentRunning(for worktree: Worktree) async -> Bool {
+        guard let processId = worktreeProcessIds[worktree.id] else { return false }
+        return await services.processRunner.isRunning(id: processId)
     }
 
     // MARK: - Log Management
