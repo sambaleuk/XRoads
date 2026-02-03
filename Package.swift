@@ -2,23 +2,23 @@
 import PackageDescription
 
 let package = Package(
-    name: "CrossRoads",
+    name: "XRoads",
     platforms: [
         .macOS(.v14)
     ],
     products: [
-        .executable(name: "CrossRoads", targets: ["CrossRoads"])
+        .executable(name: "XRoads", targets: ["XRoads"])
     ],
     targets: [
         .executableTarget(
-            name: "CrossRoads",
-            path: "CrossRoads",
+            name: "XRoads",
+            path: "XRoads",
             exclude: [
-                "CrossRoads.entitlements",
+                "XRoads.entitlements",
                 "Resources/Assets.xcassets"
             ],
             sources: [
-                "App/CrossRoadsApp.swift",
+                "App/XRoadsApp.swift",
                 "Views/ContentView.swift",
                 "Views/MainWindowView.swift",
                 "Views/SidebarView.swift",
@@ -27,9 +27,17 @@ let package = Package(
                 "Views/WorktreeCreateSheet.swift",
                 "Views/CommandPaletteView.swift",
                 "Views/SettingsView.swift",
+                "Views/ConflictResolutionSheet.swift",
+                "Views/ProgressDashboardView.swift",
+                "Views/PRDLoaderSheet.swift",
+                "Views/OrchestrationHistorySheet.swift",
+                "Views/Components/MacTextField.swift",
+                "Views/Components/ModalPanel.swift",
                 "Resources/Theme.swift",
                 "Models/AgentType.swift",
                 "Models/AgentStatus.swift",
+                "Models/AgentDashboardEntry.swift",
+                "Models/AgentHealth.swift",
                 "Models/LogLevel.swift",
                 "Models/Agent.swift",
                 "Models/Worktree.swift",
@@ -39,10 +47,22 @@ let package = Package(
                 "Services/ProcessRunner.swift",
                 "Services/MCPClient.swift",
                 "Services/ServiceContainer.swift",
+                "Services/Orchestrator.swift",
+                "Services/ClaudeOrchestrator.swift",
+                "Services/AgentLauncher.swift",
+                "Services/AgentEventBus.swift",
+                "Services/AgentStatusMonitor.swift",
+                "Services/NotesSyncService.swift",
+                "Services/MergeCoordinator.swift",
+                "Services/WorktreeFactory.swift",
+                "Services/PRDParser.swift",
                 "Services/CLIAdapters.swift",
                 "Services/ConfigChecker.swift",
                 "ViewModels/AppState.swift",
-                "ViewModels/SessionViewModel.swift"
+                "ViewModels/SessionViewModel.swift",
+                "ViewModels/PRDLoaderViewModel.swift",
+                "Services/OrchestrationHistoryService.swift",
+                "Models/OrchestrationRecord.swift"
             ]
         )
     ]
