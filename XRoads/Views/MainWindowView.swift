@@ -39,7 +39,7 @@ struct MainWindowView: View {
     /// Controls the PRD loader sheet
     @State private var showPRDLoaderSheet: Bool = false
 
-    @AppStorage(UserDefaults.Keys.fullAgenticMode) private var isFullAgenticMode: Bool = false
+    @AppStorage(UserDefaults.Keys.fullAgenticMode) private var isFullAgenticMode: Bool = true
 
     var body: some View {
         mainContent
@@ -238,7 +238,21 @@ private struct ContentColumn: View {
     var body: some View {
         Group {
             if isFullAgenticMode {
-                ProgressDashboardView()
+                // New Dashboard v3 with hexagonal layout
+                XRoadsDashboardView(
+                    dashboardMode: Binding(
+                        get: { appState.dashboardMode },
+                        set: { appState.dashboardMode = $0 }
+                    ),
+                    terminalSlots: Binding(
+                        get: { appState.terminalSlots },
+                        set: { appState.terminalSlots = $0 }
+                    ),
+                    orchestratorState: Binding(
+                        get: { appState.orchestratorVisualState },
+                        set: { appState.orchestratorVisualState = $0 }
+                    )
+                )
             } else if let worktree = appState.selectedWorktree {
                 WorktreeDetailView(worktree: worktree)
             } else {

@@ -131,6 +131,57 @@ extension Color {
 
     /// Info glow - 15% opacity
     static let statusInfoGlow = Color(hex: "#79c0ff").opacity(0.15)
+
+    // MARK: - Orchestrator Creature Colors
+
+    /// Creature idle - gray neutral
+    static let creatureIdle = Color(hex: "#7d8590")
+
+    /// Creature planning - amber thinking
+    static let creaturePlanning = Color(hex: "#d29922")
+
+    /// Creature distributing - blue action
+    static let creatureDistributing = Color(hex: "#388bfd")
+
+    /// Creature monitoring - green active
+    static let creatureMonitoring = Color(hex: "#3fb950")
+
+    /// Creature synthesizing - purple gathering
+    static let creatureSynthesizing = Color(hex: "#bc8cff")
+
+    /// Creature celebrating - gold success
+    static let creatureCelebrating = Color(hex: "#ffd700")
+
+    /// Creature concerned - red alert
+    static let creatureConcerned = Color(hex: "#f85149")
+
+    /// Creature sleeping - dim gray
+    static let creatureSleeping = Color(hex: "#484f58")
+
+    // MARK: - Terminal Slot Border Colors
+
+    /// Claude agent border color
+    static let slotBorderClaude = Color(hex: "#388bfd")
+
+    /// Gemini agent border color
+    static let slotBorderGemini = Color(hex: "#d29922")
+
+    /// Codex agent border color
+    static let slotBorderCodex = Color(hex: "#3fb950")
+
+    /// Empty slot border color
+    static let slotBorderEmpty = Color(hex: "#30363d")
+
+    // MARK: - Dashboard Colors
+
+    /// Dashboard panel background
+    static let dashboardPanelBg = Color(hex: "#0d1117").opacity(0.95)
+
+    /// Connection line default
+    static let connectionLineDefault = Color(hex: "#30363d")
+
+    /// Connection line active
+    static let connectionLineActive = Color(hex: "#388bfd")
 }
 
 // MARK: - Font Extensions

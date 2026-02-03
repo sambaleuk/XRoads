@@ -35,6 +35,12 @@ let package = Package(
                 "Views/Components/MacTextField.swift",
                 "Views/Components/ModalPanel.swift",
                 "Views/Components/FloatingInputWindow.swift",
+                // Dashboard v3 Views
+                "Views/Dashboard/XRoadsDashboardView.swift",
+                "Views/Dashboard/TerminalSlotView.swift",
+                "Views/Dashboard/TerminalGridLayout.swift",
+                "Views/Dashboard/OrchestratorCreatureView.swift",
+                "Views/Dashboard/GitInfoPanel.swift",
                 "Resources/Theme.swift",
                 "Models/AgentType.swift",
                 "Models/AgentStatus.swift",
@@ -46,6 +52,10 @@ let package = Package(
                 "Models/LogEntry.swift",
                 "Models/Session.swift",
                 "Models/NotificationNames.swift",
+                // Dashboard v3 Models
+                "Models/TerminalSlot.swift",
+                "Models/DashboardMode.swift",
+                "Models/OrchestratorVisualState.swift",
                 "Services/GitService.swift",
                 "Services/ProcessRunner.swift",
                 "Services/MCPClient.swift",

@@ -84,6 +84,17 @@ final class AppState {
     private var agentCompletedStories: [String: Set<String>] = [:]
     private var agentErrorMessages: [String: [String]] = [:]
 
+    // MARK: - Dashboard v3 State
+
+    /// Current dashboard display mode (Single/Agentic)
+    var dashboardMode: DashboardMode = .agentic
+
+    /// Terminal slots for the hexagonal dashboard (6 slots)
+    var terminalSlots: [TerminalSlot] = (1...6).map { TerminalSlot(slotNumber: $0) }
+
+    /// Visual state of the central orchestrator creature
+    var orchestratorVisualState: OrchestratorVisualState = .sleeping
+
     // MARK: - Orchestration State
 
     /// Current orchestration session ID
@@ -184,6 +195,31 @@ final class AppState {
         return Double(completedStories) / Double(totalStories)
     }
 
+    // MARK: - Dashboard v3 Computed Properties
+
+    /// Active terminal slots (slots that are currently running)
+    var activeSlots: [TerminalSlot] {
+        terminalSlots.filter { $0.status.isActive }
+    }
+
+    /// Configured terminal slots (slots with worktree and agent assigned)
+    var configuredSlots: [TerminalSlot] {
+        terminalSlots.filter { $0.isConfigured }
+    }
+
+    /// Angles of active slots for orchestrator visualization
+    var activeSlotAngles: [Double] {
+        activeSlots.map { $0.positionAngle }
+    }
+
+    /// Global progress across all configured terminal slots
+    var terminalSlotsProgress: Double {
+        let configured = configuredSlots
+        guard !configured.isEmpty else { return 0 }
+        let totalProgress = configured.reduce(0.0) { $0 + $1.progress }
+        return totalProgress / Double(configured.count)
+    }
+
     // MARK: - Initialization
 
     init(services: ServiceContainer = DefaultServiceContainer()) {
@@ -278,6 +314,145 @@ final class AppState {
             sessions[index].worktrees.removeAll { $0 == worktree.id }
             // Update selectedSession to reflect the change
             selectedSession = sessions[index]
+        }
+    }
+
+    // MARK: - Dashboard v3 Slot Management
+
+    /// Configures a terminal slot with a worktree and agent type
+    func configureSlot(_ slotNumber: Int, worktree: Worktree, agentType: AgentType) {
+        guard let index = terminalSlots.firstIndex(where: { $0.slotNumber == slotNumber }) else { return }
+        terminalSlots[index].worktree = worktree
+        terminalSlots[index].agentType = agentType
+        terminalSlots[index].status = .ready
+        updateOrchestratorVisualState()
+    }
+
+    /// Starts the agent in a terminal slot
+    func startSlot(_ slotNumber: Int) async {
+        guard let index = terminalSlots.firstIndex(where: { $0.slotNumber == slotNumber }) else { return }
+        guard terminalSlots[index].isConfigured else { return }
+
+        terminalSlots[index].status = .starting
+        updateOrchestratorVisualState()
+
+        guard let worktree = terminalSlots[index].worktree,
+              let agentType = terminalSlots[index].agentType else { return }
+
+        let adapter = agentType.adapter()
+        guard adapter.isAvailable() else {
+            terminalSlots[index].status = .error
+            terminalSlots[index].addLog(LogEntry(
+                level: .error,
+                source: agentType.rawValue,
+                worktree: worktree.path,
+                message: "CLI not found at \(adapter.executablePath)"
+            ))
+            updateOrchestratorVisualState()
+            return
+        }
+
+        do {
+            let slotIndex = index
+            let processId = try await services.processRunner.launch(
+                executable: adapter.executablePath,
+                arguments: adapter.launchArguments(worktreePath: worktree.path),
+                workingDirectory: worktree.path,
+                environment: nil
+            ) { [weak self] output in
+                Task { @MainActor [weak self] in
+                    guard let self = self else { return }
+                    let entry = LogEntry(
+                        level: .debug,
+                        source: agentType.rawValue,
+                        worktree: worktree.path,
+                        message: output
+                    )
+                    self.terminalSlots[slotIndex].addLog(entry)
+                    self.addLog(entry)
+                }
+            }
+
+            terminalSlots[index].processId = processId
+            terminalSlots[index].status = .running
+            terminalSlots[index].addLog(LogEntry(
+                level: .info,
+                source: agentType.rawValue,
+                worktree: worktree.path,
+                message: "Agent started"
+            ))
+            updateOrchestratorVisualState()
+
+        } catch {
+            terminalSlots[index].status = .error
+            terminalSlots[index].addLog(LogEntry(
+                level: .error,
+                source: agentType.rawValue,
+                worktree: worktree.path,
+                message: "Failed to start: \(error.localizedDescription)"
+            ))
+            updateOrchestratorVisualState()
+        }
+    }
+
+    /// Stops the agent in a terminal slot
+    func stopSlot(_ slotNumber: Int) async {
+        guard let index = terminalSlots.firstIndex(where: { $0.slotNumber == slotNumber }) else { return }
+        guard let processId = terminalSlots[index].processId else {
+            terminalSlots[index].status = .ready
+            return
+        }
+
+        do {
+            try await services.processRunner.terminate(id: processId)
+        } catch {
+            // Process may already be terminated
+        }
+
+        terminalSlots[index].processId = nil
+        terminalSlots[index].status = .ready
+        terminalSlots[index].progress = 0
+        terminalSlots[index].currentTask = nil
+        terminalSlots[index].addLog(LogEntry(
+            level: .info,
+            source: terminalSlots[index].agentType?.rawValue ?? "system",
+            worktree: terminalSlots[index].worktree?.path,
+            message: "Agent stopped"
+        ))
+        updateOrchestratorVisualState()
+    }
+
+    /// Resets a terminal slot to empty state
+    func resetSlot(_ slotNumber: Int) async {
+        await stopSlot(slotNumber)
+        guard let index = terminalSlots.firstIndex(where: { $0.slotNumber == slotNumber }) else { return }
+        terminalSlots[index].reset()
+        updateOrchestratorVisualState()
+    }
+
+    /// Gets logs for a specific terminal slot
+    func logsForSlot(_ slot: TerminalSlot) -> [LogEntry] {
+        slot.logs
+    }
+
+    /// Updates the orchestrator visual state based on slot states
+    func updateOrchestratorVisualState() {
+        let activeCount = activeSlots.count
+        let configuredCount = configuredSlots.count
+        let hasErrors = terminalSlots.contains { $0.status == .error }
+        let hasNeedsInput = terminalSlots.contains { $0.status == .needsInput }
+        let allCompleted = configuredCount > 0 && configuredSlots.allSatisfy { $0.status == .completed }
+
+        if allCompleted {
+            orchestratorVisualState = .celebrating
+        } else if hasErrors || hasNeedsInput {
+            orchestratorVisualState = .concerned
+        } else if activeCount > 0 {
+            orchestratorVisualState = .monitoring
+        } else if configuredCount > 0 {
+            orchestratorVisualState = .idle
+        } else {
+            orchestratorVisualState = .sleeping
         }
     }
 
