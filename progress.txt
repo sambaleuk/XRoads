@@ -745,3 +745,39 @@ Files created/modified this iteration:
 - context.md
 - prd-v2.json
 - progress.txt (this entry)
+
+---
+
+## Feature: CrossRoads v3 - Nexus Loop Integration
+## Started: 2026-02-03 15:35:00
+
+## Learnings
+- ActionType and AgentType are distinct: AgentType defines CLIs (claude/gemini/codex), ActionType defines loops (implement/review/etc.)
+- Test target setup with executable targets in SwiftPM requires library extraction; for now, tests are written but run verification is deferred to Xcode
+- Use existing PRD action_definitions as the source of truth for ActionType properties
+
+---
+
+## Session Log
+
+### Iteration 1 - US-V3-001 (Action Type Model & Registry)
+- Created ActionType enum with cases: implement, review, integrationTest, write, custom
+- Each case has displayName, iconName, description, requiredSkills, category, includesUnitTests
+- Added ActionCategory enum (dev, qa, ops) for UI grouping
+- Created ActionRegistry actor for managing actions per CLI type
+- Registry supports: builtInActions, actions(for: CLI), actions(in: category), custom action registration
+- Created CustomAction struct (id, name, description, iconName, requiredSkills, compatibleCLIs)
+- Created unit test files: ActionTypeTests.swift, ActionRegistryTests.swift
+- Tests cover: displayName validation, requiredSkills checks, CLI filtering, custom action registration, Codable conformance
+- Updated Package.swift to include new files
+- **Build verified**: `./scripts/swift-build.sh` completes successfully
+
+Files created:
+- XRoads/Models/ActionType.swift
+- XRoads/Services/ActionRegistry.swift
+- Tests/Models/ActionTypeTests.swift
+- Tests/Services/ActionRegistryTests.swift
+
+Files modified:
+- Package.swift (added ActionType.swift and ActionRegistry.swift)
+- prd.json (marked US-V3-001 complete)

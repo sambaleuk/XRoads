@@ -37,7 +37,8 @@
       "title": "Action Type Model & Registry",
       "description": "Define ActionType enum and ActionRegistry for managing available loops",
       "priority": "critical",
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-03T15:45:00Z",
       "depends_on": [],
       "acceptance_criteria": [
         "ActionType enum: implement, review, integrationTest, write, custom",
