@@ -24,13 +24,17 @@ struct TerminalGridLayout: View {
             let radius = calculateRadius(for: geometry.size)
 
             ZStack {
-                // Background connection lines
-                ConnectionLinesCanvas(
-                    slots: slots,
-                    center: center,
-                    radius: radius,
-                    orchestratorState: orchestratorState
-                )
+                // Neon synaptic connections from brain to ALL slots
+                ForEach(Array(slots.enumerated()), id: \.element.id) { index, slot in
+                    NeonBrainConnection(
+                        center: center,
+                        angle: slot.positionAngle,
+                        radius: radius,
+                        slotStatus: slot.status,
+                        slotColor: slot.agentType?.neonColor ?? .slotBorderEmpty,
+                        isConfigured: slot.isConfigured
+                    )
+                }
 
                 // Terminal slots arranged in hexagon
                 ForEach(Array(slots.enumerated()), id: \.element.id) { index, slot in
@@ -48,10 +52,10 @@ struct TerminalGridLayout: View {
                     .position(position)
                 }
 
-                // Central orchestrator creature
+                // Central orchestrator neon brain
                 OrchestratorCreatureView(
                     state: orchestratorState,
-                    activeSlotAngles: activeSlotAngles
+                    activeSlotAngles: allSlotAngles
                 )
                 .position(center)
             }
@@ -77,6 +81,178 @@ struct TerminalGridLayout: View {
         slots
             .filter { $0.status.isActive }
             .map { $0.positionAngle }
+    }
+
+    private var allSlotAngles: [Double] {
+        slots.map { $0.positionAngle }
+    }
+}
+
+// MARK: - Neon Brain Connection
+
+/// Glowing synaptic connection from brain center to slot
+struct NeonBrainConnection: View {
+    let center: CGPoint
+    let angle: Double
+    let radius: CGFloat
+    let slotStatus: TerminalSlotStatus
+    let slotColor: Color
+    let isConfigured: Bool
+
+    @State private var pulsePhase: Double = 0
+    @State private var impulsePosition: CGFloat = 0
+    @State private var glowIntensity: Double = 0.5
+
+    // Neon colors
+    private let neonCyan = Color(red: 0.0, green: 0.9, blue: 1.0)
+    private let neonMagenta = Color(red: 1.0, green: 0.2, blue: 0.8)
+
+    private var isActive: Bool { slotStatus.isActive }
+    private var connectionColor: Color { isActive ? slotColor : neonCyan.opacity(0.4) }
+
+    var body: some View {
+        let endPoint = CGPoint(
+            x: center.x + (radius - 80) * CGFloat(cos(angle * .pi / 180)),
+            y: center.y + (radius - 80) * CGFloat(sin(angle * .pi / 180))
+        )
+
+        ZStack {
+            // Outer glow layer
+            connectionPath(to: endPoint)
+                .stroke(
+                    connectionColor.opacity(0.4 * glowIntensity),
+                    style: StrokeStyle(lineWidth: 12, lineCap: .round)
+                )
+                .blur(radius: 8)
+
+            // Middle glow layer
+            connectionPath(to: endPoint)
+                .stroke(
+                    connectionColor.opacity(0.6 * glowIntensity),
+                    style: StrokeStyle(lineWidth: 6, lineCap: .round)
+                )
+                .blur(radius: 4)
+
+            // Core connection line
+            connectionPath(to: endPoint)
+                .stroke(
+                    LinearGradient(
+                        colors: [
+                            neonCyan.opacity(isActive ? 0.9 : 0.3),
+                            connectionColor.opacity(isActive ? 0.8 : 0.2)
+                        ],
+                        startPoint: .init(x: 0.5, y: 0.5),
+                        endPoint: unitPoint(for: angle)
+                    ),
+                    style: StrokeStyle(lineWidth: isActive ? 3 : 1.5, lineCap: .round)
+                )
+
+            // Animated electricity effect (dashed)
+            if isConfigured {
+                connectionPath(to: endPoint)
+                    .stroke(
+                        connectionColor,
+                        style: StrokeStyle(
+                            lineWidth: 1,
+                            lineCap: .round,
+                            dash: [4, 8],
+                            dashPhase: CGFloat(pulsePhase * 30)
+                        )
+                    )
+                    .opacity(0.7)
+            }
+
+            // Traveling impulse for active connections
+            if isActive {
+                impulseView(to: endPoint)
+            }
+
+            // Connection endpoint glow
+            if isConfigured {
+                endpointGlow(at: endPoint)
+            }
+        }
+        .onAppear { startAnimations() }
+    }
+
+    private func connectionPath(to endPoint: CGPoint) -> Path {
+        Path { path in
+            path.move(to: center)
+            path.addLine(to: endPoint)
+        }
+    }
+
+    private func unitPoint(for angle: Double) -> UnitPoint {
+        UnitPoint(
+            x: 0.5 + 0.5 * cos(angle * .pi / 180),
+            y: 0.5 + 0.5 * sin(angle * .pi / 180)
+        )
+    }
+
+    private func impulseView(to endPoint: CGPoint) -> some View {
+        let currentX = center.x + (endPoint.x - center.x) * impulsePosition
+        let currentY = center.y + (endPoint.y - center.y) * impulsePosition
+
+        return ZStack {
+            // Outer glow
+            Circle()
+                .fill(slotColor)
+                .frame(width: 24, height: 24)
+                .blur(radius: 12)
+
+            // Inner glow
+            Circle()
+                .fill(slotColor)
+                .frame(width: 12, height: 12)
+                .blur(radius: 4)
+
+            // Core
+            Circle()
+                .fill(.white)
+                .frame(width: 6, height: 6)
+        }
+        .position(x: currentX, y: currentY)
+    }
+
+    private func endpointGlow(at point: CGPoint) -> some View {
+        ZStack {
+            // Outer glow
+            Circle()
+                .fill(connectionColor.opacity(0.5 * glowIntensity))
+                .frame(width: 20, height: 20)
+                .blur(radius: 8)
+
+            // Inner glow
+            Circle()
+                .fill(connectionColor.opacity(0.8))
+                .frame(width: 10, height: 10)
+                .blur(radius: 3)
+
+            // Core dot
+            Circle()
+                .fill(isActive ? .white : connectionColor)
+                .frame(width: 5, height: 5)
+        }
+        .position(point)
+    }
+
+    private func startAnimations() {
+        // Pulse animation for electricity
+        withAnimation(.linear(duration: 0.8).repeatForever(autoreverses: false)) {
+            pulsePhase = 1.0
+        }
+
+        // Glow pulsing
+        withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+            glowIntensity = isActive ? 1.0 : 0.6
+        }
+
+        // Impulse traveling (only for active)
+        if isActive {
+            withAnimation(.easeInOut(duration: 1.0).repeatForever(autoreverses: false)) {
+                impulsePosition = 1.0
+            }
+        }
     }
 }
 

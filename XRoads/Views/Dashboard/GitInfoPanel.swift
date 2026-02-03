@@ -3,7 +3,7 @@
 //  XRoads
 //
 //  Created by Nexus on 2026-02-03.
-//  Compact Git info panel for Dashboard v3 left sidebar
+//  Left sidebar Git panel matching the neon dashboard design
 //
 
 import SwiftUI
@@ -16,19 +16,13 @@ struct GitInfoPanel: View {
     @State private var repoPath: String = ""
     @State private var currentBranch: String = ""
     @State private var commits: [GitService.CommitInfo] = []
-    @State private var trackingInfo: GitService.TrackingInfo?
     @State private var isLoading: Bool = true
-    @State private var isFetching: Bool = false
-    @State private var detectedRepo: RepoInfo?
-    @State private var recentRepos: [RepoInfo] = []
-
-    /// Callback when a quick action is selected
-    var onQuickAction: ((ActionType, RepoInfo) -> Void)?
+    @State private var isRefreshing: Bool = false
 
     var body: some View {
         VStack(spacing: 0) {
-            // Header
-            panelHeader
+            // GIT Header
+            gitHeader
 
             Divider()
                 .background(Color.borderMuted)
@@ -37,345 +31,244 @@ struct GitInfoPanel: View {
                 loadingView
             } else {
                 ScrollView {
-                    VStack(spacing: Theme.Spacing.md) {
-                        // Quick Action Bar (if repo detected)
-                        if let repo = detectedRepo {
-                            quickActionSection(repo: repo)
-                        }
-
-                        // Branch info
+                    VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
+                        // Branch & repo info
                         branchSection
 
-                        // Tracking status
-                        if let tracking = trackingInfo {
-                            trackingSection(tracking)
-                        }
-
-                        Divider()
-                            .background(Color.borderMuted)
-
-                        // Recent commits
-                        commitsSection
-
-                        Divider()
-                            .background(Color.borderMuted)
+                        // Recent Commits
+                        recentCommitsSection
 
                         // Worktrees
                         worktreesSection
-
-                        // Recent repos (if any)
-                        if !recentRepos.isEmpty {
-                            Divider()
-                                .background(Color.borderMuted)
-
-                            recentReposSection
-                        }
                     }
-                    .padding(Theme.Spacing.sm)
+                    .padding(Theme.Spacing.md)
                 }
             }
-
-            Spacer(minLength: 0)
-
-            // Quick actions footer
-            quickActionsFooter
         }
-        .frame(width: 220)
-        .background(Color.dashboardPanelBg)
+        .frame(width: 210)
+        .background(Color.bgSurface.opacity(0.95))
         .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md))
         .overlay(
             RoundedRectangle(cornerRadius: Theme.Radius.md)
-                .stroke(Color.borderMuted, lineWidth: 1)
+                .stroke(Color.borderMuted.opacity(0.5), lineWidth: 1)
         )
         .task {
             await loadGitInfo()
-            await detectCurrentRepo()
         }
     }
 
-    // MARK: - Panel Header
+    // MARK: - Git Header
 
-    private var panelHeader: some View {
+    private var gitHeader: some View {
         HStack(spacing: Theme.Spacing.sm) {
             Image(systemName: "arrow.triangle.branch")
-                .foregroundStyle(Color.accentPrimary)
+                .font(.system(size: 12))
+                .foregroundStyle(Color.textSecondary)
 
-            Text("Git")
-                .font(.h3)
-                .foregroundStyle(Color.textPrimary)
+            Text("GIT")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundStyle(Color.textSecondary)
+                .tracking(1)
 
             Spacer()
 
             Button {
-                Task { await loadGitInfo() }
+                Task { await refreshGitInfo() }
             } label: {
-                Image(systemName: "arrow.clockwise")
+                Image(systemName: isRefreshing ? "arrow.clockwise" : "arrow.clockwise")
                     .font(.system(size: 11))
-                    .foregroundStyle(Color.textSecondary)
+                    .foregroundStyle(Color.textTertiary)
+                    .rotationEffect(.degrees(isRefreshing ? 360 : 0))
+                    .animation(isRefreshing ? .linear(duration: 1).repeatForever(autoreverses: false) : .default, value: isRefreshing)
             }
             .buttonStyle(.plain)
-            .help("Refresh")
+            .disabled(isRefreshing)
         }
-        .padding(.horizontal, Theme.Spacing.sm)
+        .padding(.horizontal, Theme.Spacing.md)
         .padding(.vertical, Theme.Spacing.sm)
-        .frame(height: 36)
+        .frame(height: 40)
     }
 
     // MARK: - Branch Section
 
     private var branchSection: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-            Text("Current Branch")
-                .font(.xs)
-                .foregroundStyle(Color.textTertiary)
-
-            HStack(spacing: Theme.Spacing.xs) {
+            // Branch name with status dot
+            HStack(spacing: Theme.Spacing.sm) {
                 Circle()
                     .fill(Color.statusSuccess)
                     .frame(width: 8, height: 8)
+                    .shadow(color: Color.statusSuccess.opacity(0.6), radius: 3)
 
-                Text(currentBranch.isEmpty ? "..." : currentBranch)
-                    .font(.code)
+                Text(currentBranch.isEmpty ? "loading..." : currentBranch)
+                    .font(.system(size: 13, weight: .medium, design: .monospaced))
                     .foregroundStyle(Color.terminalGreen)
                     .lineLimit(1)
             }
             .padding(.horizontal, Theme.Spacing.sm)
-            .padding(.vertical, Theme.Spacing.xs)
+            .padding(.vertical, Theme.Spacing.sm)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.bgElevated)
             .cornerRadius(Theme.Radius.sm)
 
+            // Repo path
             if !repoPath.isEmpty {
-                Text(repoPath)
-                    .font(.system(size: 9))
+                Text(formatRepoPath(repoPath))
+                    .font(.system(size: 10))
                     .foregroundStyle(Color.textTertiary)
                     .lineLimit(1)
-                    .truncationMode(.middle)
+                    .truncationMode(.head)
+                    .padding(.horizontal, Theme.Spacing.xs)
             }
         }
     }
 
-    // MARK: - Tracking Section
+    // MARK: - Recent Commits Section
 
-    private func trackingSection(_ tracking: GitService.TrackingInfo) -> some View {
-        HStack(spacing: Theme.Spacing.md) {
-            // Ahead
-            VStack(spacing: 2) {
-                HStack(spacing: 2) {
-                    Image(systemName: "arrow.up")
-                        .font(.system(size: 10))
-                    Text("\(tracking.ahead)")
-                        .font(.small)
-                        .fontWeight(.medium)
-                }
-                .foregroundStyle(tracking.ahead > 0 ? Color.statusWarning : Color.textTertiary)
-
-                Text("ahead")
-                    .font(.system(size: 9))
-                    .foregroundStyle(Color.textTertiary)
-            }
-
-            // Behind
-            VStack(spacing: 2) {
-                HStack(spacing: 2) {
-                    Image(systemName: "arrow.down")
-                        .font(.system(size: 10))
-                    Text("\(tracking.behind)")
-                        .font(.small)
-                        .fontWeight(.medium)
-                }
-                .foregroundStyle(tracking.behind > 0 ? Color.accentPrimary : Color.textTertiary)
-
-                Text("behind")
-                    .font(.system(size: 9))
-                    .foregroundStyle(Color.textTertiary)
-            }
-
-            Spacer()
-
-            if let remote = tracking.remoteBranch {
-                Text(remote)
-                    .font(.system(size: 9))
-                    .foregroundStyle(Color.textTertiary)
-                    .lineLimit(1)
-            }
-        }
-        .padding(Theme.Spacing.sm)
-        .background(Color.bgCanvas)
-        .cornerRadius(Theme.Radius.sm)
-    }
-
-    // MARK: - Commits Section
-
-    private var commitsSection: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+    private var recentCommitsSection: some View {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            // Section header
             HStack {
-                Text("Recent Commits")
-                    .font(.xs)
+                Text("RECENT COMMITS")
+                    .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(Color.textTertiary)
+                    .tracking(0.5)
+
                 Spacer()
-                Text("\(commits.count)")
+
+                Text("\(commits.count) total")
                     .font(.system(size: 9))
-                    .foregroundStyle(Color.textTertiary)
+                    .foregroundStyle(Color.textTertiary.opacity(0.7))
             }
 
+            // Commits list
             if commits.isEmpty {
-                Text("No commits")
-                    .font(.xs)
-                    .foregroundStyle(Color.textTertiary)
-                    .padding(.vertical, Theme.Spacing.sm)
+                emptyCommitsView
             } else {
                 VStack(spacing: 0) {
-                    ForEach(commits.prefix(5)) { commit in
-                        CompactCommitRow(commit: commit)
-                        if commit.id != commits.prefix(5).last?.id {
+                    ForEach(Array(commits.prefix(6).enumerated()), id: \.element.id) { index, commit in
+                        CommitRow(commit: commit)
+
+                        if index < min(commits.count - 1, 5) {
                             Divider()
-                                .background(Color.borderMuted)
+                                .background(Color.borderMuted.opacity(0.3))
                         }
                     }
                 }
-                .background(Color.bgCanvas)
+                .background(Color.bgCanvas.opacity(0.5))
                 .cornerRadius(Theme.Radius.sm)
             }
         }
     }
 
+    private var emptyCommitsView: some View {
+        HStack {
+            Text("No commits yet")
+                .font(.system(size: 10))
+                .foregroundStyle(Color.textTertiary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Theme.Spacing.md)
+    }
+
     // MARK: - Worktrees Section
 
     private var worktreesSection: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+            // Section header
             HStack {
-                Text("Worktrees")
-                    .font(.xs)
+                Text("WORKTREES")
+                    .font(.system(size: 10, weight: .semibold))
                     .foregroundStyle(Color.textTertiary)
+                    .tracking(0.5)
+
                 Spacer()
-                Text("\(appState.worktrees.count)")
-                    .font(.system(size: 9))
-                    .foregroundStyle(Color.textTertiary)
 
                 Button {
                     NotificationCenter.default.post(name: .showNewWorktreeSheet, object: nil)
                 } label: {
                     Image(systemName: "plus")
-                        .font(.system(size: 9))
+                        .font(.system(size: 10, weight: .medium))
                         .foregroundStyle(Color.textSecondary)
                 }
                 .buttonStyle(.plain)
             }
 
+            // Worktrees list or empty state
             if appState.worktrees.isEmpty {
-                Text("No worktrees")
-                    .font(.xs)
-                    .foregroundStyle(Color.textTertiary)
-                    .padding(.vertical, Theme.Spacing.sm)
+                emptyWorktreesView
             } else {
-                VStack(spacing: 2) {
+                VStack(spacing: 4) {
                     ForEach(appState.worktrees) { worktree in
-                        WorktreeRow(worktree: worktree)
+                        WorktreeListRow(worktree: worktree)
                     }
                 }
             }
         }
     }
 
-    // MARK: - Quick Actions Footer
+    private var emptyWorktreesView: some View {
+        VStack(spacing: Theme.Spacing.md) {
+            Image(systemName: "folder.badge.questionmark")
+                .font(.system(size: 28))
+                .foregroundStyle(Color.textTertiary.opacity(0.5))
 
-    private var quickActionsFooter: some View {
-        HStack(spacing: Theme.Spacing.sm) {
-            Button {
-                Task { await performFetch() }
-            } label: {
-                HStack(spacing: 4) {
-                    if isFetching {
-                        ProgressView()
-                            .scaleEffect(0.6)
-                    } else {
-                        Image(systemName: "arrow.triangle.2.circlepath")
-                            .font(.system(size: 10))
-                    }
-                    Text("Fetch")
-                        .font(.xs)
-                }
+            VStack(spacing: Theme.Spacing.xs) {
+                Text("No active worktrees.")
+                    .font(.system(size: 11))
+                    .foregroundStyle(Color.textTertiary)
+
+                Text("Create one to start working with agents.")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Color.textTertiary.opacity(0.7))
+                    .multilineTextAlignment(.center)
             }
-            .buttonStyle(.plain)
-            .foregroundStyle(Color.textSecondary)
-            .disabled(isFetching)
-
-            Spacer()
 
             Button {
                 NotificationCenter.default.post(name: .showNewWorktreeSheet, object: nil)
             } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 10))
-                    Text("New")
-                        .font(.xs)
-                }
+                Text("Create Worktree")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Color.textPrimary)
+                    .padding(.horizontal, Theme.Spacing.md)
+                    .padding(.vertical, Theme.Spacing.sm)
+                    .background(Color.accentPrimary.opacity(0.2))
+                    .cornerRadius(Theme.Radius.sm)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                            .stroke(Color.accentPrimary.opacity(0.5), lineWidth: 1)
+                    )
             }
             .buttonStyle(.plain)
-            .foregroundStyle(Color.accentPrimary)
         }
-        .padding(.horizontal, Theme.Spacing.sm)
-        .padding(.vertical, Theme.Spacing.xs)
-        .background(Color.bgElevated)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, Theme.Spacing.lg)
+        .background(Color.bgCanvas.opacity(0.3))
+        .cornerRadius(Theme.Radius.sm)
     }
 
     // MARK: - Loading View
 
     private var loadingView: some View {
-        VStack(spacing: Theme.Spacing.sm) {
+        VStack(spacing: Theme.Spacing.md) {
             ProgressView()
                 .scaleEffect(0.8)
-            Text("Loading...")
-                .font(.xs)
+            Text("Loading git info...")
+                .font(.system(size: 10))
                 .foregroundStyle(Color.textTertiary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    // MARK: - Quick Action Section
+    // MARK: - Helpers
 
-    @ViewBuilder
-    private func quickActionSection(repo: RepoInfo) -> some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-            Text("Quick Actions")
-                .font(.xs)
-                .foregroundStyle(Color.textTertiary)
-
-            CompactQuickActionBar(
-                repoInfo: repo,
-                onActionSelected: { action, repoInfo in
-                    handleQuickAction(action: action, repo: repoInfo)
-                }
-            )
+    private func formatRepoPath(_ path: String) -> String {
+        // Show path starting from home directory
+        if let home = ProcessInfo.processInfo.environment["HOME"],
+           path.hasPrefix(home) {
+            return path.replacingOccurrences(of: home, with: "~")
         }
-    }
-
-    // MARK: - Recent Repos Section
-
-    private var recentReposSection: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-            HStack {
-                Text("Recent Repos")
-                    .font(.xs)
-                    .foregroundStyle(Color.textTertiary)
-                Spacer()
-                Text("\(recentRepos.count)")
-                    .font(.system(size: 9))
-                    .foregroundStyle(Color.textTertiary)
-            }
-
-            VStack(spacing: 2) {
-                ForEach(recentRepos.prefix(3)) { repo in
-                    RecentRepoRow(repo: repo) {
-                        Task {
-                            await switchToRepo(repo)
-                        }
-                    }
-                }
-            }
-        }
+        return path
     }
 
     // MARK: - Data Loading
@@ -390,21 +283,11 @@ struct GitInfoPanel: View {
             repoPath = try await gitService.getRepoRoot(path: projectPath)
 
             async let branchTask = gitService.getCurrentBranch(path: repoPath)
-            async let commitsTask = gitService.getRecentCommits(path: repoPath, count: 5)
-            async let trackingTask: GitService.TrackingInfo? = {
-                do {
-                    return try await gitService.getTrackingInfo(path: repoPath)
-                } catch {
-                    return nil
-                }
-            }()
+            async let commitsTask = gitService.getRecentCommits(path: repoPath, count: 8)
 
             currentBranch = try await branchTask
             commits = try await commitsTask
-            trackingInfo = await trackingTask
-
         } catch {
-            // Use defaults on error
             currentBranch = "unknown"
             commits = []
         }
@@ -412,146 +295,92 @@ struct GitInfoPanel: View {
         isLoading = false
     }
 
-    private func detectCurrentRepo() async {
-        let detector = RepoDetector.shared
-        let result = await detector.detectCurrentDirectory()
+    private func refreshGitInfo() async {
+        isRefreshing = true
 
-        await MainActor.run {
-            if result.isGitRepo {
-                detectedRepo = result.repoInfo
-            }
-            // Filter out current repo from recent repos
-            recentRepos = result.recentRepos.filter { $0.path != result.repoInfo?.path }
-        }
-    }
-
-    private func switchToRepo(_ repo: RepoInfo) async {
-        // Update app state with the selected repo path
-        appState.projectPath = repo.path
-
-        // Reload git info
-        await loadGitInfo()
-        await detectCurrentRepo()
-    }
-
-    private func handleQuickAction(action: ActionType, repo: RepoInfo) {
-        // Call external handler if provided
-        if let handler = onQuickAction {
-            handler(action, repo)
-            return
-        }
-
-        // Default behavior: show worktree creation sheet with pre-filled values
-        appState.addLog(LogEntry(
-            level: .info,
-            source: "quick-action",
-            worktree: nil,
-            message: "Starting \(action.displayName) for \(repo.displayName)"
-        ))
-
-        // Trigger the worktree sheet
-        NotificationCenter.default.post(name: .showNewWorktreeSheet, object: nil)
-    }
-
-    private func performFetch() async {
-        isFetching = true
         let gitService = appState.services.gitService
 
+        // Try to fetch from remote first
+        if !repoPath.isEmpty {
+            try? await gitService.fetchAll(path: repoPath)
+        }
+
+        // Reload info
         do {
-            try await gitService.fetchAll(path: repoPath)
-            trackingInfo = try? await gitService.getTrackingInfo(path: repoPath)
+            async let branchTask = gitService.getCurrentBranch(path: repoPath)
+            async let commitsTask = gitService.getRecentCommits(path: repoPath, count: 8)
+
+            currentBranch = try await branchTask
+            commits = try await commitsTask
         } catch {
-            appState.addLog(LogEntry(
-                level: .error,
-                source: "git",
-                worktree: nil,
-                message: "Fetch failed: \(error.localizedDescription)"
-            ))
+            // Keep existing values on error
         }
 
-        isFetching = false
+        isRefreshing = false
     }
 }
 
-// MARK: - Recent Repo Row
+// MARK: - Commit Row
 
-private struct RecentRepoRow: View {
-    let repo: RepoInfo
-    let onTap: () -> Void
-
-    @State private var isHovered: Bool = false
-
-    var body: some View {
-        Button(action: onTap) {
-            HStack(spacing: Theme.Spacing.xs) {
-                Image(systemName: "folder")
-                    .font(.system(size: 10))
-                    .foregroundStyle(Color.textTertiary)
-
-                Text(repo.displayName)
-                    .font(.system(size: 10))
-                    .foregroundStyle(Color.textSecondary)
-                    .lineLimit(1)
-
-                Spacer()
-
-                Text(repo.branch)
-                    .font(.system(size: 9, design: .monospaced))
-                    .foregroundStyle(Color.terminalGreen)
-            }
-            .padding(.horizontal, Theme.Spacing.xs)
-            .padding(.vertical, 4)
-            .background(isHovered ? Color.bgElevated : Color.clear)
-            .cornerRadius(Theme.Radius.xs)
-        }
-        .buttonStyle(.plain)
-        .onHover { isHovered = $0 }
-    }
-}
-
-// MARK: - Compact Commit Row
-
-private struct CompactCommitRow: View {
+private struct CommitRow: View {
     let commit: GitService.CommitInfo
 
     var body: some View {
-        HStack(spacing: Theme.Spacing.xs) {
+        HStack(alignment: .top, spacing: Theme.Spacing.sm) {
+            // Commit hash
             Text(commit.shortSha)
-                .font(.system(size: 9, design: .monospaced))
+                .font(.system(size: 10, weight: .medium, design: .monospaced))
                 .foregroundStyle(Color.terminalYellow)
 
-            Text(commit.message)
+            // Commit message
+            Text(formatMessage(commit.message))
                 .font(.system(size: 10))
                 .foregroundStyle(Color.textSecondary)
-                .lineLimit(1)
+                .lineLimit(2)
+                .truncationMode(.tail)
         }
-        .padding(.horizontal, Theme.Spacing.xs)
-        .padding(.vertical, 4)
+        .padding(.horizontal, Theme.Spacing.sm)
+        .padding(.vertical, Theme.Spacing.xs)
+    }
+
+    private func formatMessage(_ message: String) -> String {
+        // Extract first line and truncate if needed
+        let firstLine = message.components(separatedBy: .newlines).first ?? message
+        return firstLine
     }
 }
 
-// MARK: - Worktree Row
+// MARK: - Worktree List Row
 
-private struct WorktreeRow: View {
+private struct WorktreeListRow: View {
     let worktree: Worktree
+    @State private var isHovered: Bool = false
 
     var body: some View {
-        HStack(spacing: Theme.Spacing.xs) {
+        HStack(spacing: Theme.Spacing.sm) {
             Image(systemName: "arrow.triangle.branch")
-                .font(.system(size: 9))
+                .font(.system(size: 10))
                 .foregroundStyle(Color.accentPrimary)
 
-            Text(worktree.branch)
-                .font(.system(size: 10))
-                .foregroundStyle(Color.textPrimary)
-                .lineLimit(1)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(worktree.branch)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundStyle(Color.textPrimary)
+                    .lineLimit(1)
+
+                Text(worktree.name)
+                    .font(.system(size: 9))
+                    .foregroundStyle(Color.textTertiary)
+                    .lineLimit(1)
+            }
 
             Spacer()
         }
-        .padding(.horizontal, Theme.Spacing.xs)
-        .padding(.vertical, 4)
-        .background(Color.bgCanvas)
-        .cornerRadius(Theme.Radius.xs)
+        .padding(.horizontal, Theme.Spacing.sm)
+        .padding(.vertical, Theme.Spacing.xs)
+        .background(isHovered ? Color.bgElevated : Color.bgCanvas.opacity(0.5))
+        .cornerRadius(Theme.Radius.sm)
+        .onHover { isHovered = $0 }
     }
 }
 
@@ -560,10 +389,13 @@ private struct WorktreeRow: View {
 #if DEBUG
 struct GitInfoPanel_Previews: PreviewProvider {
     static var previews: some View {
-        GitInfoPanel()
-            .frame(height: 500)
-            .padding()
-            .background(Color.bgApp)
+        HStack {
+            GitInfoPanel()
+            Spacer()
+        }
+        .frame(width: 400, height: 600)
+        .padding()
+        .background(Color.bgApp)
     }
 }
 #endif

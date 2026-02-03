@@ -1,4 +1,5 @@
 import Foundation
+import SwiftUI
 
 /// Supported AI CLI agent types
 enum AgentType: String, Codable, Hashable, Sendable, CaseIterable {
@@ -19,6 +20,15 @@ enum AgentType: String, Codable, Hashable, Sendable, CaseIterable {
         case .claude: return "brain.head.profile"
         case .gemini: return "sparkles"
         case .codex: return "terminal"
+        }
+    }
+
+    /// Neon color for glowing connections
+    var neonColor: Color {
+        switch self {
+        case .claude: return Color(red: 0.45, green: 0.84, blue: 1.0)   // Cyan
+        case .gemini: return Color(red: 1.0, green: 0.75, blue: 0.3)    // Gold glow
+        case .codex: return Color(red: 0.4, green: 1.0, blue: 0.5)      // Green glow
         }
     }
 }

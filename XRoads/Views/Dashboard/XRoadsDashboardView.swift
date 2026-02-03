@@ -16,7 +16,8 @@ struct XRoadsDashboardView: View {
     @Binding var terminalSlots: [TerminalSlot]
     @Binding var orchestratorState: OrchestratorVisualState
 
-    @State private var showGitPanel: Bool = true
+    /// Whether to show the internal Git panel (set to false when parent handles it)
+    var showGitPanel: Bool = true
 
     var body: some View {
         VStack(spacing: 0) {
@@ -26,7 +27,6 @@ struct XRoadsDashboardView: View {
                 progress: globalProgress,
                 activeAgents: activeAgentCount,
                 totalAgents: configuredSlotCount,
-                showGitPanel: $showGitPanel,
                 onStartAll: startAllAgents,
                 onStopAll: stopAllAgents
             )
@@ -34,20 +34,9 @@ struct XRoadsDashboardView: View {
             Divider()
                 .background(Color.borderMuted)
 
-            // Main content area
-            HStack(spacing: 0) {
-                // Left panel - Git Info
-                if showGitPanel && dashboardMode.showsSidePanels {
-                    GitInfoPanel()
-                        .padding(Theme.Spacing.sm)
-                        .transition(.move(edge: .leading).combined(with: .opacity))
-                }
-
-                // Center - Terminal Grid or Single Terminal
-                mainContent
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            }
-            .animation(.easeInOut(duration: 0.2), value: showGitPanel)
+            // Center - Terminal Grid or Single Terminal (no internal Git panel)
+            mainContent
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .background(Color.bgApp)
     }
@@ -192,7 +181,6 @@ struct DashboardTopBar: View {
     let progress: Double
     let activeAgents: Int
     let totalAgents: Int
-    @Binding var showGitPanel: Bool
     let onStartAll: () -> Void
     let onStopAll: () -> Void
 
@@ -208,20 +196,6 @@ struct DashboardTopBar: View {
             progressSection
 
             Spacer()
-
-            // Git panel toggle
-            Button {
-                withAnimation { showGitPanel.toggle() }
-            } label: {
-                Image(systemName: "sidebar.left")
-                    .font(.system(size: 14))
-                    .foregroundStyle(showGitPanel ? Color.accentPrimary : Color.textSecondary)
-            }
-            .buttonStyle(.plain)
-            .help("Toggle Git panel")
-
-            Divider()
-                .frame(height: 24)
 
             // Action buttons
             actionButtons

@@ -28,7 +28,6 @@ let package = Package(
                 "Views/CommandPaletteView.swift",
                 "Views/SettingsView.swift",
                 "Views/ConflictResolutionSheet.swift",
-                "Views/ProgressDashboardView.swift",
                 "Views/PRDLoaderSheet.swift",
                 "Views/OrchestrationHistorySheet.swift",
                 "Views/GitDashboardView.swift",

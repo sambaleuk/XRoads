@@ -90,19 +90,61 @@ struct MainWindowView: View {
 
     @ViewBuilder
     private var navigationContent: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            SidebarView(showNewWorktreeSheet: $showNewWorktreeSheet)
-                .navigationSplitViewColumnWidth(min: 200, ideal: Theme.Layout.sidebarWidth, max: 300)
-        } content: {
-            ContentColumn(isFullAgenticMode: isFullAgenticMode)
-        } detail: {
+        if isFullAgenticMode {
+            // Full agentic mode: Custom layout without NavigationSplitView
+            agenticModeLayout
+                .toolbar { toolbarContent }
+        } else {
+            // Standard mode: NavigationSplitView with sidebar
+            NavigationSplitView(columnVisibility: $columnVisibility) {
+                SidebarView(showNewWorktreeSheet: $showNewWorktreeSheet)
+                    .navigationSplitViewColumnWidth(min: 200, ideal: Theme.Layout.sidebarWidth, max: 300)
+            } content: {
+                ContentColumn(isFullAgenticMode: isFullAgenticMode)
+            } detail: {
+                if showInspector {
+                    InspectorColumn()
+                        .navigationSplitViewColumnWidth(min: 280, ideal: Theme.Layout.inspectorWidth, max: 400)
+                }
+            }
+            .navigationSplitViewStyle(.balanced)
+            .toolbar { toolbarContent }
+        }
+    }
+
+    /// Agentic mode layout: Git Panel | Dashboard | Logs
+    @ViewBuilder
+    private var agenticModeLayout: some View {
+        HStack(spacing: 0) {
+            // Left: Git Info Panel
+            GitInfoPanel()
+                .padding(Theme.Spacing.sm)
+
+            // Center: Dashboard with brain and slots
+            XRoadsDashboardView(
+                dashboardMode: Binding(
+                    get: { appState.dashboardMode },
+                    set: { appState.dashboardMode = $0 }
+                ),
+                terminalSlots: Binding(
+                    get: { appState.terminalSlots },
+                    set: { appState.terminalSlots = $0 }
+                ),
+                orchestratorState: Binding(
+                    get: { appState.orchestratorVisualState },
+                    set: { appState.orchestratorVisualState = $0 }
+                ),
+                showGitPanel: false  // Git panel is handled here, not in dashboard
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            // Right: Logs panel
             if showInspector {
                 InspectorColumn()
-                    .navigationSplitViewColumnWidth(min: 280, ideal: Theme.Layout.inspectorWidth, max: 400)
+                    .frame(width: Theme.Layout.inspectorWidth)
             }
         }
-        .navigationSplitViewStyle(.balanced)
-        .toolbar { toolbarContent }
+        .background(Color.bgApp)
     }
 
     @ViewBuilder
@@ -238,7 +280,7 @@ private struct ContentColumn: View {
     var body: some View {
         Group {
             if isFullAgenticMode {
-                // New Dashboard v3 with hexagonal layout
+                // Dashboard v3 with hexagonal layout + neon brain
                 XRoadsDashboardView(
                     dashboardMode: Binding(
                         get: { appState.dashboardMode },
