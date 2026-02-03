@@ -1170,3 +1170,66 @@ Files created:
 Files modified:
 - Package.swift (added Actions/ImplementAction.swift)
 - prd.json (marked US-V3-010 complete)
+
+### Iteration 11 - US-V3-011 (Review Loop Action)
+- Created ReviewAction actor for code review workflow
+- ReviewActionError enum with comprehensive error cases:
+  - noChangesToReview, diffFailed, analysisFailure, reviewOutputFailed
+  - gitNotAvailable, invalidWorkingDirectory, autoFixFailed
+- Review issue models:
+  - ReviewIssueSeverity enum: critical, major, minor, suggestion, style with weights and icons
+  - ReviewIssueCategory enum: correctness, security, performance, maintainability, testing, documentation, conventions, architecture
+  - ReviewIssue struct: severity, category, file, line info, description, suggested fix, auto-fixable flag
+- Diff parsing models:
+  - DiffHunk struct with addedLines/removedLines parsing
+  - FileDiff struct with status, hunks, lines added/removed calculations
+  - FileChangeStatus enum: added, modified, deleted, renamed, copied, typeChanged, unmerged, unknown
+  - ReviewSource enum: staged, committed, working, branch
+- ReviewSummary and ReviewReport:
+  - Summary with files reviewed, lines added/removed, issues by severity/category, score, verdict
+  - Report with source, branch, commit range, files, issues, auto-fixable issues grouping
+- ReviewAction actor methods:
+  - reviewStagedChanges(in:) - reviews staged changes
+  - reviewCommittedChanges(in:commitCount:) - reviews recent commits
+  - reviewBranchChanges(in:baseBranch:) - reviews branch vs base
+  - generateReviewMD(for:outputPath:) - outputs review.md file
+  - getAutoFixableIssues() - lists auto-fixable issues
+  - applyAutoFix(for:) / applyAllAutoFixes() - applies fixes
+  - getIssues(severity:) / getIssues(category:) / getIssues(forFile:) - filtered queries
+- Hunk analysis detects common issues:
+  - TODO/FIXME comments
+  - Debug print statements (auto-fixable)
+  - Force unwrapping in Swift
+  - Potential hardcoded secrets (critical security issue)
+  - Long lines (>120 chars style issue)
+- File-level analysis detects:
+  - Large file changes (>500 lines)
+  - Empty test files
+  - Missing documentation for public APIs
+- review.md generation with:
+  - Summary table (files, lines, issues, score/verdict)
+  - Issues by severity breakdown
+  - Files changed list with status icons
+  - Issues grouped by file with severity icons, locations, code snippets, suggested fixes
+- Created comprehensive unit tests:
+  - ReviewIssueSeverityTests: displayName, weight ordering, icons
+  - ReviewIssueCategoryTests: displayName, icons
+  - ReviewIssueTests: init, locationString, Hashable
+  - DiffHunkTests: addedLines, removedLines parsing
+  - FileDiffTests: init, linesAdded/Removed, fileExtension
+  - FileChangeStatusTests: from char, displayNames
+  - ReviewSourceTests: displayNames
+  - ReviewSummaryTests: totalIssues, hasCriticalIssues, hasBlockingIssues, verdict
+  - ReviewReportTests: init, issuesByFile, autoFixableIssues
+  - ReviewActionErrorTests: error descriptions
+  - ReviewActionTests: initialization, empty queries, summary
+  - ReviewMDFormatTests: report structure, issue grouping
+- **Build verified**: `./scripts/swift-build.sh` completes successfully
+
+Files created:
+- XRoads/Actions/ReviewAction.swift
+- Tests/Actions/ReviewActionTests.swift
+
+Files modified:
+- Package.swift (added Actions/ReviewAction.swift)
+- prd.json (marked US-V3-011 complete)

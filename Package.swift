@@ -87,6 +87,7 @@ let package = Package(
                 "Services/RepoDetector.swift",
                 // Actions
                 "Actions/ImplementAction.swift",
+                "Actions/ReviewAction.swift",
                 "ViewModels/AppState.swift",
                 "ViewModels/SessionViewModel.swift",
                 "ViewModels/PRDLoaderViewModel.swift",
