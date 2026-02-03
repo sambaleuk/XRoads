@@ -29,10 +29,10 @@ enum ProcessError: Error, LocalizedError, Sendable {
     }
 }
 
-// MARK: - ProcessInfo
+// MARK: - ManagedProcessInfo
 
 /// Information about a running process
-struct ProcessInfo: Sendable {
+struct ManagedProcessInfo: Sendable {
     let id: UUID
     let executable: String
     let arguments: [String]
@@ -54,7 +54,7 @@ actor ProcessRunner {
     /// Internal state for a managed process
     private struct ManagedProcess {
         let process: Process
-        let info: ProcessInfo
+        let info: ManagedProcessInfo
         let stdinPipe: Pipe
         let stdoutPipe: Pipe
         let stderrPipe: Pipe
@@ -114,7 +114,7 @@ actor ProcessRunner {
         process.standardError = stderrPipe
 
         // Create process info
-        let info = ProcessInfo(
+        let info = ManagedProcessInfo(
             id: processId,
             executable: executable,
             arguments: arguments,
@@ -155,7 +155,7 @@ actor ProcessRunner {
         }
 
         // Update with actual PID
-        let updatedInfo = ProcessInfo(
+        let updatedInfo = ManagedProcessInfo(
             id: processId,
             executable: executable,
             arguments: arguments,
@@ -235,8 +235,8 @@ actor ProcessRunner {
 
     /// Gets information about a process
     /// - Parameter id: UUID of the process
-    /// - Returns: ProcessInfo if found, nil otherwise
-    func getProcessInfo(id: UUID) -> ProcessInfo? {
+    /// - Returns: ManagedProcessInfo if found, nil otherwise
+    func getProcessInfo(id: UUID) -> ManagedProcessInfo? {
         return processes[id]?.info
     }
 

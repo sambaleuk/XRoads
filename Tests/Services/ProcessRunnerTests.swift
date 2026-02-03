@@ -46,12 +46,12 @@ final class ProcessRunnerTests: XCTestCase {
         XCTAssertEqual(error.errorDescription, "Failed to write to process \(id): Broken pipe")
     }
 
-    // MARK: - ProcessInfo Tests
+    // MARK: - ManagedProcessInfo Tests
 
-    func testProcessInfoInit() {
+    func testManagedProcessInfoInit() {
         let id = UUID()
         let now = Date()
-        let info = ProcessInfo(
+        let info = ManagedProcessInfo(
             id: id,
             executable: "/usr/bin/cat",
             arguments: ["-n"],
@@ -68,9 +68,9 @@ final class ProcessRunnerTests: XCTestCase {
         XCTAssertEqual(info.pid, 12345)
     }
 
-    func testProcessInfoSendable() {
-        // ProcessInfo should be Sendable
-        let info = ProcessInfo(
+    func testManagedProcessInfoSendable() {
+        // ManagedProcessInfo should be Sendable
+        let info = ManagedProcessInfo(
             id: UUID(),
             executable: "/usr/bin/cat",
             arguments: [],
