@@ -85,6 +85,8 @@ let package = Package(
                 "Services/SkillAdapters/GeminiSkillAdapter.swift",
                 "Services/SkillAdapters/CodexSkillAdapter.swift",
                 "Services/RepoDetector.swift",
+                // Actions
+                "Actions/ImplementAction.swift",
                 "ViewModels/AppState.swift",
                 "ViewModels/SessionViewModel.swift",
                 "ViewModels/PRDLoaderViewModel.swift",

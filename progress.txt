@@ -1092,3 +1092,81 @@ Files modified:
 - XRoads/Services/SkillRegistry.swift (JSON loading, fallback skills, resource discovery)
 - Package.swift (added resources configuration)
 - prd.json (marked US-V3-008 complete)
+
+### Iteration 9 - US-V3-009 (TerminalSlot Model Extension)
+- Extended TerminalSlot struct with action and input state tracking
+- Added actionType: ActionType? property for tracking the action/loop being executed
+- Added loadedSkills: [Skill] property for skills loaded for current action
+- Added inputHistory: [String] with max 50 entries for user input tracking
+- Added needsInput computed property reflecting status.isWaitingForInput
+- Added waitingForInput case to TerminalSlotStatus enum for UI clarity
+- Updated isConfigured to require worktree + agentType + actionType (all three)
+- Added hasMinimalConfiguration for worktree + agent only checks
+- Added helper methods:
+  - setNeedsInput(_:) for status transitions
+  - addInput(_:) with bounded history
+  - clearInputHistory()
+  - configureAction(_:skills:)
+  - clearAction()
+- Added static factory: TerminalSlot.configured(slotNumber:worktree:agentType:actionType:loadedSkills:)
+- Added computed properties: actionDescription, actionIconName, hasLoadedSkills, loadedSkillCount, loadedSkillNames
+- Updated Equatable to include actionType, loadedSkills (count + ids), inputHistory count, needsInput
+- Fixed switch statements in TerminalGridLayout and TerminalSlotView to handle .waitingForInput
+- Created comprehensive TerminalSlotTests.swift with 25+ test cases covering:
+  - Basic initialization (default and full)
+  - isConfigured and hasMinimalConfiguration
+  - needsInput and setNeedsInput behavior
+  - Input history management (add, clear, max limit)
+  - Action configuration and clearing
+  - Loaded skills tracking
+  - Reset behavior
+  - Equatable for all new fields
+  - Static factory method
+  - Action description and icon helpers
+  - TerminalSlotStatus.isWaitingForInput, isActive, canStop
+- **Build verified**: `./scripts/swift-build.sh` completes successfully
+
+Files created:
+- Tests/Models/TerminalSlotTests.swift
+
+Files modified:
+- XRoads/Models/TerminalSlot.swift (extended with action/input state)
+- XRoads/Views/Dashboard/TerminalGridLayout.swift (fixed switch for .waitingForInput)
+- XRoads/Views/Dashboard/TerminalSlotView.swift (fixed switch for .waitingForInput)
+- prd.json (marked US-V3-009 complete)
+
+### Iteration 10 - US-V3-010 (Implement Loop Action)
+- Created ImplementAction actor for PRD-to-code workflow orchestration
+- ImplementActionError enum with comprehensive error cases:
+  - prdNotFound, prdParsingFailed, noPendingStories, storyNotFound
+  - dependencyNotComplete, circularDependency, planGenerationFailed
+  - storyImplementationFailed, buildFailed, testsFailed, commitFailed
+- Extended PRD parsing with ExtendedPRDUserStory and ExtendedPRDDocument:
+  - Supports full PRD format with acceptance_criteria, unit_tests, files_to_create/modify
+  - Extracts status and completed_at for skipping completed stories
+- StoryImplementationPlan struct for tracking individual story progress:
+  - Properties: storyId, title, description, priority, dependencies
+  - Status tracking: pending → ready → inProgress → implemented → tested → committed
+  - Timestamps: startedAt, completedAt, commitSHA
+- ImplementationPlan struct with full feature tracking:
+  - Progress calculation, orderedStories (topological sort), nextReadyStory
+  - Automatic dependency status updates when stories complete
+- StoryCompletionTracker for runtime completion monitoring
+- Implementation instructions generator with markdown format
+- Commit message generator following conventional commits (feat(scope): US-XXX)
+- Dependency ordering via topological sort respecting priority (critical first)
+- Circular dependency detection with path reporting
+- Created comprehensive unit tests:
+  - ImplementActionTests: PRD loading, parsing, dependency ordering, plan generation
+  - StoryImplementationStatusTests: status flags (isComplete, canStart)
+  - ImplementationPlanTests: progress, ordering, ready story selection
+  - StoryCompletionTrackerTests: started/completed/failed tracking
+- **Build verified**: `./scripts/swift-build.sh` completes successfully
+
+Files created:
+- XRoads/Actions/ImplementAction.swift
+- Tests/Actions/ImplementActionTests.swift
+
+Files modified:
+- Package.swift (added Actions/ImplementAction.swift)
+- prd.json (marked US-V3-010 complete)
