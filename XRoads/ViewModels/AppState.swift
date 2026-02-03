@@ -9,6 +9,16 @@ import SwiftUI
 @Observable
 final class AppState {
 
+    // MARK: - Weak Reference Wrapper
+
+    private final class WeakAppStateRef: @unchecked Sendable {
+        weak var value: AppState?
+
+        init(_ value: AppState) {
+            self.value = value
+        }
+    }
+
     // MARK: - State Properties
 
     /// All sessions in the application
@@ -1490,9 +1500,10 @@ final class AppState {
             startAgentEventStream()
 
             // Setup orchestrator notification for blocked agents
-            await services.agentEventBus.setOrchestratorHandler { [weak self] event in
+            let weakSelf = WeakAppStateRef(self)
+            await services.agentEventBus.setOrchestratorHandler { event in
                 await MainActor.run {
-                    self?.handleBlockedAgent(event: event)
+                    weakSelf.value?.handleBlockedAgent(event: event)
                 }
             }
 
