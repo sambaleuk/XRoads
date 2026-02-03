@@ -65,7 +65,8 @@
       "title": "Skill Model & SkillRegistry",
       "description": "Define Skill model and registry for packaged capabilities",
       "priority": "critical",
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-03T16:00:00Z",
       "depends_on": ["US-V3-001"],
       "acceptance_criteria": [
         "Skill struct: id, name, description, promptTemplate, requiredTools",

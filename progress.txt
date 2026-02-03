@@ -781,3 +781,46 @@ Files created:
 Files modified:
 - Package.swift (added ActionType.swift and ActionRegistry.swift)
 - prd.json (marked US-V3-001 complete)
+
+### Iteration 2 - US-V3-002 (Skill Model & SkillRegistry)
+- Created Skill.swift with comprehensive Skill struct:
+  - Properties: id, name, description, promptTemplate, requiredTools, version, compatibleCLIs, category, author
+  - Methods: isCompatible(with:), hasRequiredTools(available:), missingTools(from:)
+  - Full Codable, Hashable, Sendable, Identifiable conformance
+- Added SkillCategory enum (git, code, test, docs, review, custom) with displayName and iconName
+- Added SkillFile struct for parsing ~/.xroads/skills/*.skill.json files
+- Added SkillLoadError enum for comprehensive error handling
+- Created SkillRegistry actor:
+  - Loads bundled skills on init (commit, code-writer, code-reviewer, prd, doc-generator, lint, integration-test, e2e-test, perf-test)
+  - Loads user skills from ~/.xroads/skills/ directory
+  - Skills filtering by CLI type and category
+  - Custom skill registration with duplicate detection
+  - User skills can override bundled skills
+- Created SkillLoader actor for AGENT.md generation:
+  - generateAgentMD(skills:context:worktreePath:) creates full AGENT.md
+  - injectSkills(into:skills:context:) for template-based injection
+  - loadAndRenderSkills(ids:for:context:) loads and renders by ID
+  - skills(for:cli:) gets skills for an ActionType
+  - Placeholder replacement: {{context}}, {{agent_name}}, {{branch}}, etc.
+- Added SkillContext struct with all context data for template rendering
+- Created comprehensive unit tests:
+  - SkillTests: Codable, CLI compatibility, required tools, Hashable/Equatable
+  - SkillCategoryTests: displayName, iconName, Codable
+  - SkillFileTests: JSON parsing, conversion, invalid data handling
+  - SkillLoadErrorTests: error descriptions
+  - SkillRegistryTests: bundled skills, queries, filtering, custom registration, reload
+  - SkillLoaderTests: rendering, AGENT.md generation, injection, context
+- Updated Package.swift with Skill.swift, SkillRegistry.swift, SkillLoader.swift
+- **Build verified**: `./scripts/swift-build.sh` completes successfully
+
+Files created:
+- XRoads/Models/Skill.swift
+- XRoads/Services/SkillRegistry.swift
+- XRoads/Services/SkillLoader.swift
+- Tests/Models/SkillTests.swift
+- Tests/Services/SkillRegistryTests.swift
+- Tests/Services/SkillLoaderTests.swift
+
+Files modified:
+- Package.swift (added Skill.swift, SkillRegistry.swift, SkillLoader.swift)
+- prd.json (marked US-V3-002 complete)
