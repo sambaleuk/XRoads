@@ -132,43 +132,29 @@ struct NeonBrainView: View {
 
     private var brainGyri: some View {
         ZStack {
-            // SVG-based detail folds
-            BrainDetailShape()
+            // Main gyri pattern
+            BrainGyriShape()
                 .stroke(
                     LinearGradient(
-                        colors: [neonCyan.opacity(0.6), neonMagenta.opacity(0.4)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
+                        colors: [neonCyan.opacity(0.5), neonMagenta.opacity(0.5)],
+                        startPoint: .leading,
+                        endPoint: .trailing
                     ),
-                    lineWidth: 1.5
+                    style: StrokeStyle(lineWidth: 1.5, lineCap: .round)
                 )
                 .blur(radius: 1)
 
-            // Left hemisphere folds
-            ForEach(0..<4, id: \.self) { i in
-                GyrusPath(index: i, isLeft: true)
-                    .stroke(neonCyan.opacity(0.4 + glowOpacity * 0.3), lineWidth: 1.5)
-                    .blur(radius: 1)
-            }
-
-            // Right hemisphere folds
-            ForEach(0..<4, id: \.self) { i in
-                GyrusPath(index: i, isLeft: false)
-                    .stroke(neonMagenta.opacity(0.4 + glowOpacity * 0.3), lineWidth: 1.5)
-                    .blur(radius: 1)
-            }
-
-            // Central fissure
+            // Central fissure (divides hemispheres)
             CentralFissure()
                 .stroke(
                     LinearGradient(
-                        colors: [neonCyan, .white.opacity(0.8), neonMagenta],
+                        colors: [neonCyan, .white.opacity(0.9), neonMagenta],
                         startPoint: .top,
                         endPoint: .bottom
                     ),
-                    lineWidth: 2
+                    style: StrokeStyle(lineWidth: 2.5, lineCap: .round)
                 )
-                .blur(radius: 1)
+                .blur(radius: 1.5)
         }
         .scaleEffect(pulseScale)
     }
@@ -223,7 +209,7 @@ struct NeonBrainView: View {
     }
 }
 
-// MARK: - Brain Shape (Realistic SVG-based)
+// MARK: - Brain Shape (Pure brain - no head silhouette)
 
 struct BrainShape: Shape {
     func path(in rect: CGRect) -> Path {
@@ -231,182 +217,86 @@ struct BrainShape: Shape {
         let w = rect.width
         let h = rect.height
 
-        // Scale factors from original SVG viewBox (1280x1024) to target rect
-        // The brain in the SVG is roughly centered around x:400-900, y:100-700
-        // We'll normalize to 0-1 range and scale to rect
+        // Pure brain shape - cerebrum only, stylized for neon effect
+        // Centered in rect with proper proportions
 
-        let scaleX = w / 700.0  // Approximate brain width in SVG
-        let scaleY = h / 600.0  // Approximate brain height in SVG
-        let offsetX = w * 0.05  // Small offset for centering
-        let offsetY = h * 0.05
+        // Start at top center
+        path.move(to: CGPoint(x: w * 0.5, y: h * 0.02))
 
-        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
-            CGPoint(x: (x - 200) * scaleX + offsetX, y: (y - 50) * scaleY + offsetY)
-        }
+        // === LEFT HEMISPHERE ===
 
-        // Outer brain contour - traced from SVG main path
-        // Starting from top-left frontal lobe area
-        path.move(to: p(606.528, 19.0672))
-
-        // Top curve - frontal lobe
+        // Top left curve (frontal lobe)
         path.addCurve(
-            to: p(677.602, 21.7344),
-            control1: p(628.385, 18.006),
-            control2: p(655.496, 19.721)
+            to: CGPoint(x: w * 0.12, y: h * 0.25),
+            control1: CGPoint(x: w * 0.35, y: h * 0.0),
+            control2: CGPoint(x: w * 0.18, y: h * 0.08)
         )
 
-        // Right frontal lobe bulge
+        // Left frontal bulge
         path.addCurve(
-            to: p(931.972, 108.816),
-            control1: p(763.538, 29.5617),
-            control2: p(863.562, 54.4886)
+            to: CGPoint(x: w * 0.05, y: h * 0.45),
+            control1: CGPoint(x: w * 0.06, y: h * 0.32),
+            control2: CGPoint(x: w * 0.03, y: h * 0.38)
         )
 
-        // Right parietal area
+        // Left temporal lobe (lower bulge)
         path.addCurve(
-            to: p(1022, 301.709),
-            control1: p(993.604, 157.762),
-            control2: p(1003.34, 230.477)
+            to: CGPoint(x: w * 0.15, y: h * 0.72),
+            control1: CGPoint(x: w * 0.02, y: h * 0.55),
+            control2: CGPoint(x: w * 0.05, y: h * 0.68)
+        )
+
+        // Left occipital area
+        path.addCurve(
+            to: CGPoint(x: w * 0.35, y: h * 0.88),
+            control1: CGPoint(x: w * 0.22, y: h * 0.78),
+            control2: CGPoint(x: w * 0.28, y: h * 0.85)
+        )
+
+        // === BRAIN STEM (bottom center) ===
+
+        // To brain stem
+        path.addCurve(
+            to: CGPoint(x: w * 0.5, y: h * 0.98),
+            control1: CGPoint(x: w * 0.40, y: h * 0.92),
+            control2: CGPoint(x: w * 0.45, y: h * 0.96)
+        )
+
+        // === RIGHT HEMISPHERE ===
+
+        // From brain stem to right occipital
+        path.addCurve(
+            to: CGPoint(x: w * 0.65, y: h * 0.88),
+            control1: CGPoint(x: w * 0.55, y: h * 0.96),
+            control2: CGPoint(x: w * 0.60, y: h * 0.92)
         )
 
         // Right temporal lobe
         path.addCurve(
-            to: p(1042.45, 380.991),
-            control1: p(1028.89, 328.019),
-            control2: p(1041.35, 352.536)
+            to: CGPoint(x: w * 0.85, y: h * 0.72),
+            control1: CGPoint(x: w * 0.72, y: h * 0.85),
+            control2: CGPoint(x: w * 0.78, y: h * 0.78)
         )
 
-        // Right occipital curve
+        // Right side going up
         path.addCurve(
-            to: p(1030.87, 456.961),
-            control1: p(1044.1, 409.955),
-            control2: p(1018.02, 427.569)
+            to: CGPoint(x: w * 0.95, y: h * 0.45),
+            control1: CGPoint(x: w * 0.95, y: h * 0.68),
+            control2: CGPoint(x: w * 0.98, y: h * 0.55)
         )
 
-        // Back of head curve
+        // Right frontal bulge
         path.addCurve(
-            to: p(1112.01, 552.681),
-            control1: p(1048.56, 497.418),
-            control2: p(1082.05, 522.343)
+            to: CGPoint(x: w * 0.88, y: h * 0.25),
+            control1: CGPoint(x: w * 0.97, y: h * 0.38),
+            control2: CGPoint(x: w * 0.94, y: h * 0.32)
         )
 
-        // Lower back curve
+        // Top right back to center
         path.addCurve(
-            to: p(1057.51, 621.394),
-            control1: p(1119.01, 559.773),
-            control2: p(1103.06, 602.118)
-        )
-
-        // Continuing down the back
-        path.addCurve(
-            to: p(1050.57, 698.599),
-            control1: p(1051.3, 634.887),
-            control2: p(1080.59, 665.368)
-        )
-
-        // Lower back - cerebellum area
-        path.addCurve(
-            to: p(1031.55, 763.533),
-            control1: p(1073.8, 727.339),
-            control2: p(1033.35, 738.712)
-        )
-
-        // Brain stem area
-        path.addCurve(
-            to: p(1019.02, 854.658),
-            control1: p(1030.3, 780.838),
-            control2: p(1041.33, 792.331)
-        )
-
-        // Bottom right
-        path.addCurve(
-            to: p(860.391, 862.222),
-            control1: p(971.629, 871.21),
-            control2: p(905.045, 860.573)
-        )
-
-        // Bottom center - transition to left
-        path.addCurve(
-            to: p(661.088, 756.215),
-            control1: p(781.651, 831.096),
-            control2: p(680.751, 778.811)
-        )
-
-        // Left temporal lobe
-        path.addCurve(
-            to: p(615.428, 671.395),
-            control1: p(658.461, 771.413),
-            control2: p(638.375, 696.175)
-        )
-
-        // Left side inward curve
-        path.addCurve(
-            to: p(527.743, 588.76),
-            control1: p(580.56, 656.995),
-            control2: p(552.466, 622.144)
-        )
-
-        // Left bottom
-        path.addCurve(
-            to: p(253.211, 532.517),
-            control1: p(521.777, 657.084),
-            control2: p(251.449, 574.162)
-        )
-
-        // Left lower curve
-        path.addCurve(
-            to: p(203.099, 431.635),
-            control1: p(212.431, 520.889),
-            control2: p(194.444, 470.009)
-        )
-
-        // Left mid section
-        path.addCurve(
-            to: p(241.038, 310.375),
-            control1: p(204.951, 423.424),
-            control2: p(198.082, 367.225)
-        )
-
-        // Left upper curve
-        path.addCurve(
-            to: p(290.314, 225.576),
-            control1: p(237.464, 272.435),
-            control2: p(259.161, 244.206)
-        )
-
-        // Left frontal lobe
-        path.addCurve(
-            to: p(330.156, 176.429),
-            control1: p(292.596, 197.378),
-            control2: p(306.089, 186.955)
-        )
-
-        // Upper left
-        path.addCurve(
-            to: p(394.65, 124.47),
-            control1: p(344.146, 146.769),
-            control2: p(357.795, 124.828)
-        )
-
-        // Top left frontal
-        path.addCurve(
-            to: p(465.5, 85.7151),
-            control1: p(413.177, 100.054),
-            control2: p(433.181, 83.7954)
-        )
-
-        // Back to top center
-        path.addCurve(
-            to: p(551.363, 75.4167),
-            control1: p(492.683, 67.6758),
-            control2: p(522.081, 69.5268)
-        )
-
-        // Close the top
-        path.addCurve(
-            to: p(606.528, 19.0672),
-            control1: p(575.537, 63.7993),
-            control2: p(598.496, 64.8301)
+            to: CGPoint(x: w * 0.5, y: h * 0.02),
+            control1: CGPoint(x: w * 0.82, y: h * 0.08),
+            control2: CGPoint(x: w * 0.65, y: h * 0.0)
         )
 
         path.closeSubpath()
@@ -414,91 +304,79 @@ struct BrainShape: Shape {
     }
 }
 
-// MARK: - Brain Detail Shape (Inner folds - gyri)
+// MARK: - Brain Gyri Shape (Internal folds)
 
-struct BrainDetailShape: Shape {
+struct BrainGyriShape: Shape {
     func path(in rect: CGRect) -> Path {
         var path = Path()
         let w = rect.width
         let h = rect.height
 
-        let scaleX = w / 700.0
-        let scaleY = h / 600.0
-        let offsetX = w * 0.05
-        let offsetY = h * 0.05
+        // === LEFT HEMISPHERE GYRI ===
 
-        func p(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
-            CGPoint(x: (x - 200) * scaleX + offsetX, y: (y - 50) * scaleY + offsetY)
-        }
-
-        // Inner fold 1 - left frontal gyrus
-        path.move(to: p(392.042, 258.797))
-        path.addCurve(
-            to: p(378.69, 281.048),
-            control1: p(385.328, 264.05),
-            control2: p(377.08, 270.641)
-        )
-        path.addCurve(
-            to: p(454.814, 313.672),
-            control1: p(384.134, 316.252),
-            control2: p(431.347, 301.069)
-        )
-
-        // Inner fold 2 - temporal area
-        path.move(to: p(323.989, 235.014))
-        path.addCurve(
-            to: p(357.17, 355.596),
-            control1: p(337.453, 239.391),
-            control2: p(337.894, 325.423)
-        )
-
-        // Inner fold 3 - parietal
-        path.move(to: p(540.591, 106.881))
-        path.addCurve(
-            to: p(574.387, 191.745),
-            control1: p(519.04, 159.745),
-            control2: p(541.465, 177.936)
-        )
-
-        // Inner fold 4 - occipital
-        path.move(to: p(603.457, 167.12))
-        path.addCurve(
-            to: p(653.599, 241.45),
-            control1: p(642.288, 183.708),
-            control2: p(655.753, 221.935)
-        )
-
-        return path
-    }
-}
-
-// MARK: - Gyrus Path (Brain Folds)
-
-struct GyrusPath: Shape {
-    let index: Int
-    let isLeft: Bool
-
-    func path(in rect: CGRect) -> Path {
-        var path = Path()
-        let w = rect.width
-        let h = rect.height
-
-        let yOffset = CGFloat(index) * (h * 0.15) + h * 0.2
-        let xStart = isLeft ? w * 0.15 : w * 0.55
-        let xEnd = isLeft ? w * 0.45 : w * 0.85
-        let xControl = isLeft ? w * 0.25 : w * 0.75
-
-        path.move(to: CGPoint(x: xStart, y: yOffset))
+        // Frontal gyrus 1
+        path.move(to: CGPoint(x: w * 0.15, y: h * 0.28))
         path.addQuadCurve(
-            to: CGPoint(x: xEnd, y: yOffset + h * 0.05),
-            control: CGPoint(x: xControl, y: yOffset - h * 0.08)
+            to: CGPoint(x: w * 0.38, y: h * 0.22),
+            control: CGPoint(x: w * 0.25, y: h * 0.18)
+        )
+
+        // Frontal gyrus 2
+        path.move(to: CGPoint(x: w * 0.12, y: h * 0.38))
+        path.addQuadCurve(
+            to: CGPoint(x: w * 0.40, y: h * 0.35),
+            control: CGPoint(x: w * 0.26, y: h * 0.30)
+        )
+
+        // Parietal gyrus
+        path.move(to: CGPoint(x: w * 0.10, y: h * 0.50))
+        path.addQuadCurve(
+            to: CGPoint(x: w * 0.42, y: h * 0.48),
+            control: CGPoint(x: w * 0.28, y: h * 0.42)
+        )
+
+        // Temporal gyrus
+        path.move(to: CGPoint(x: w * 0.15, y: h * 0.65))
+        path.addQuadCurve(
+            to: CGPoint(x: w * 0.40, y: h * 0.62),
+            control: CGPoint(x: w * 0.28, y: h * 0.56)
+        )
+
+        // === RIGHT HEMISPHERE GYRI ===
+
+        // Frontal gyrus 1
+        path.move(to: CGPoint(x: w * 0.85, y: h * 0.28))
+        path.addQuadCurve(
+            to: CGPoint(x: w * 0.62, y: h * 0.22),
+            control: CGPoint(x: w * 0.75, y: h * 0.18)
+        )
+
+        // Frontal gyrus 2
+        path.move(to: CGPoint(x: w * 0.88, y: h * 0.38))
+        path.addQuadCurve(
+            to: CGPoint(x: w * 0.60, y: h * 0.35),
+            control: CGPoint(x: w * 0.74, y: h * 0.30)
+        )
+
+        // Parietal gyrus
+        path.move(to: CGPoint(x: w * 0.90, y: h * 0.50))
+        path.addQuadCurve(
+            to: CGPoint(x: w * 0.58, y: h * 0.48),
+            control: CGPoint(x: w * 0.72, y: h * 0.42)
+        )
+
+        // Temporal gyrus
+        path.move(to: CGPoint(x: w * 0.85, y: h * 0.65))
+        path.addQuadCurve(
+            to: CGPoint(x: w * 0.60, y: h * 0.62),
+            control: CGPoint(x: w * 0.72, y: h * 0.56)
         )
 
         return path
     }
 }
 
-// MARK: - Central Fissure
+// MARK: - Central Fissure (Longitudinal fissure dividing hemispheres)
 
 struct CentralFissure: Shape {
     func path(in rect: CGRect) -> Path {
@@ -506,11 +384,12 @@ struct CentralFissure: Shape {
         let w = rect.width
         let h = rect.height
 
-        path.move(to: CGPoint(x: w * 0.5, y: h * 0.15))
+        // Starts from top of brain, curves down to brain stem
+        path.move(to: CGPoint(x: w * 0.5, y: h * 0.05))
         path.addCurve(
-            to: CGPoint(x: w * 0.5, y: h * 0.75),
-            control1: CGPoint(x: w * 0.48, y: h * 0.4),
-            control2: CGPoint(x: w * 0.52, y: h * 0.55)
+            to: CGPoint(x: w * 0.5, y: h * 0.85),
+            control1: CGPoint(x: w * 0.48, y: h * 0.35),
+            control2: CGPoint(x: w * 0.52, y: h * 0.60)
         )
 
         return path
@@ -554,7 +433,7 @@ struct AnimatedFilament: View {
     }
 }
 
-// MARK: - Filament Path
+// MARK: - Filament Path (Adapted to brain shape)
 
 struct FilamentPath: Shape {
     let index: Int
@@ -564,29 +443,40 @@ struct FilamentPath: Shape {
         let w = rect.width
         let h = rect.height
 
-        // Center point
+        // Center of brain (slightly above center for anatomical accuracy)
         let center = CGPoint(x: w * 0.5, y: h * 0.45)
 
-        // Calculate angle based on index (spread around the brain)
-        let baseAngle = Double(index) * 30.0 - 150.0
-        let angleRad = baseAngle * .pi / 180
+        // Pre-defined filament endpoints that follow brain contours
+        let endpoints: [(x: CGFloat, y: CGFloat, ctrlX: CGFloat, ctrlY: CGFloat)] = [
+            // Top filaments (frontal lobe)
+            (0.30, 0.12, 0.38, 0.25),  // 0 - top left
+            (0.50, 0.05, 0.50, 0.22),  // 1 - top center
+            (0.70, 0.12, 0.62, 0.25),  // 2 - top right
 
-        // Random-ish endpoint based on index
-        let radius = w * 0.35 + CGFloat(index % 3) * w * 0.05
-        let endX = center.x + radius * CGFloat(cos(angleRad))
-        let endY = center.y + radius * CGFloat(sin(angleRad)) * 0.8
+            // Left side filaments
+            (0.10, 0.30, 0.28, 0.35),  // 3 - left frontal
+            (0.08, 0.50, 0.26, 0.48),  // 4 - left parietal
+            (0.15, 0.70, 0.30, 0.58),  // 5 - left temporal
 
-        // Control point for curve
-        let ctrlAngle = angleRad + (index % 2 == 0 ? 0.3 : -0.3)
-        let ctrlRadius = radius * 0.6
-        let ctrlX = center.x + ctrlRadius * CGFloat(cos(ctrlAngle))
-        let ctrlY = center.y + ctrlRadius * CGFloat(sin(ctrlAngle)) * 0.8
+            // Right side filaments
+            (0.90, 0.30, 0.72, 0.35),  // 6 - right frontal
+            (0.92, 0.50, 0.74, 0.48),  // 7 - right parietal
+            (0.85, 0.70, 0.70, 0.58),  // 8 - right temporal
+
+            // Bottom filaments (occipital/brain stem)
+            (0.30, 0.85, 0.38, 0.65),  // 9 - bottom left
+            (0.50, 0.92, 0.50, 0.70),  // 10 - bottom center (brain stem)
+            (0.70, 0.85, 0.62, 0.65),  // 11 - bottom right
+        ]
+
+        let safeIndex = index % endpoints.count
+        let endpoint = endpoints[safeIndex]
+
+        let endPoint = CGPoint(x: w * endpoint.x, y: h * endpoint.y)
+        let controlPoint = CGPoint(x: w * endpoint.ctrlX, y: h * endpoint.ctrlY)
 
         path.move(to: center)
-        path.addQuadCurve(
-            to: CGPoint(x: endX, y: endY),
-            control: CGPoint(x: ctrlX, y: ctrlY)
-        )
+        path.addQuadCurve(to: endPoint, control: controlPoint)
 
         return path
     }
