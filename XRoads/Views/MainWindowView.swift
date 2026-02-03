@@ -11,6 +11,14 @@ import SwiftUI
 import AppKit
 #endif
 
+// MARK: - Array Safe Subscript
+
+extension Array {
+    subscript(safe index: Index) -> Element? {
+        indices.contains(index) ? self[index] : nil
+    }
+}
+
 // MARK: - MainWindowView
 
 struct MainWindowView: View {
@@ -32,9 +40,6 @@ struct MainWindowView: View {
     @State private var showPRDLoaderSheet: Bool = false
 
     @AppStorage(UserDefaults.Keys.fullAgenticMode) private var isFullAgenticMode: Bool = false
-
-    /// Sheet presenter for native macOS sheets (fixes keyboard input issues)
-    @StateObject private var sheetPresenter = WindowSheetPresenter()
 
     var body: some View {
         mainContent
@@ -71,24 +76,6 @@ struct MainWindowView: View {
                 handleAction: { appState.handleHealthAction($0) },
                 dialogTitle: healthDialogTitle
             ))
-            // Present worktree sheet using native macOS sheet API
-            .onChange(of: showNewWorktreeSheet) { _, newValue in
-                if newValue {
-                    presentWorktreeSheet()
-                }
-            }
-    }
-
-    /// Present the worktree creation sheet using native macOS APIs
-    private func presentWorktreeSheet() {
-        sheetPresenter.presentSheet(
-            content: WorktreeCreateSheet(onDismiss: {
-                sheetPresenter.dismissSheet()
-            }),
-            onDismiss: {
-                showNewWorktreeSheet = false
-            }
-        )
     }
 
     // MARK: - Main Content
@@ -483,8 +470,9 @@ private struct SheetsModifier: ViewModifier {
 
     func body(content: Content) -> some View {
         content
-            // NOTE: WorktreeCreateSheet is now shown as overlay in mainContent
-            // to avoid SwiftUI sheet keyboard focus issues when running via swift run
+            .sheet(isPresented: $showNewWorktreeSheet) {
+                WorktreeCreateSheet()
+            }
             .sheet(isPresented: conflictSheetBinding) {
                 ConflictResolutionSheet()
             }

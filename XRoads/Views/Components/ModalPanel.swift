@@ -12,26 +12,33 @@ import AppKit
 // MARK: - ModalPanelController
 
 /// Controller that manages an NSPanel for modal dialogs
+///
+/// KEYBOARD INPUT FIX:
+/// - Removed .nonactivatingPanel from styleMask (this was blocking keyboard input)
+/// - Panel is configured to properly become key and accept keyboard events
 class ModalPanelController<Content: View>: NSObject {
     private var panel: NSPanel?
     private var hostingView: NSHostingView<Content>?
 
     func show(content: Content, size: CGSize, title: String = "") {
-        // Create panel
+        // Create panel - CRITICAL FIX: Do NOT use .nonactivatingPanel
+        // .nonactivatingPanel prevents the panel from receiving keyboard events
         let panel = NSPanel(
             contentRect: NSRect(x: 0, y: 0, width: size.width, height: size.height),
-            styleMask: [.titled, .closable, .resizable, .nonactivatingPanel],
+            styleMask: [.titled, .closable, .resizable],
             backing: .buffered,
             defer: false
         )
 
         panel.title = title
-        panel.isFloatingPanel = true
+        // CRITICAL FIX: Panel must NOT be floating for keyboard input to work
+        panel.isFloatingPanel = false
         panel.becomesKeyOnlyIfNeeded = false
         panel.hidesOnDeactivate = false
         panel.isReleasedWhenClosed = false
-        panel.level = .modalPanel
-        panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary]
+        // Use .normal level instead of .modalPanel for better keyboard handling
+        panel.level = .normal
+        panel.collectionBehavior = [.moveToActiveSpace, .fullScreenAuxiliary, .managed]
 
         // Create hosting view
         let hostingView = NSHostingView(rootView: content)
@@ -45,9 +52,9 @@ class ModalPanelController<Content: View>: NSObject {
         self.panel = panel
         self.hostingView = hostingView
 
-        // Show panel as modal
-        panel.makeKeyAndOrderFront(nil)
+        // CRITICAL FIX: Proper activation sequence
         NSApp.activate(ignoringOtherApps: true)
+        panel.makeKeyAndOrderFront(nil)
 
         // Run modal session
         NSApp.runModal(for: panel)
@@ -65,6 +72,11 @@ class ModalPanelController<Content: View>: NSObject {
 
 /// Presents SwiftUI content as a native macOS sheet attached to the main window
 /// This properly handles keyboard input unlike SwiftUI's .sheet() when running via swift run
+///
+/// KEYBOARD INPUT FIX:
+/// - Sheet window is configured to accept keyboard events
+/// - Proper activation sequence ensures keyboard focus works
+/// - First responder is set after sheet presentation completes
 class WindowSheetPresenter: ObservableObject {
     private var sheetWindow: NSWindow?
     private var hostingView: NSHostingView<AnyView>?
@@ -77,19 +89,23 @@ class WindowSheetPresenter: ObservableObject {
         onDismiss: @escaping () -> Void
     ) {
         guard let parentWindow = NSApp.keyWindow ?? NSApp.mainWindow else {
-            print("WindowSheetPresenter: No parent window found")
+            print("[WindowSheetPresenter] No parent window found")
             return
         }
 
         self.onDismiss = onDismiss
 
-        // Create the sheet window
+        // Create the sheet window with proper style mask
         let sheetWindow = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: size.width, height: size.height),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
         )
+
+        // CRITICAL FIX: Configure window for keyboard input
+        sheetWindow.acceptsMouseMovedEvents = true
+        sheetWindow.ignoresMouseEvents = false
 
         // Wrap content with dismiss environment
         let wrappedContent = content
@@ -104,10 +120,56 @@ class WindowSheetPresenter: ObservableObject {
         self.sheetWindow = sheetWindow
         self.hostingView = hostingView
 
+        // CRITICAL FIX: Ensure app is active before presenting sheet
+        NSApp.activate(ignoringOtherApps: true)
+
         // Present as sheet
         parentWindow.beginSheet(sheetWindow) { [weak self] response in
             self?.onDismiss?()
             self?.cleanup()
+        }
+
+        // CRITICAL FIX: After sheet is presented, ensure it can receive keyboard input
+        // The delay allows the sheet animation to complete
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+            guard let sheetWindow = self?.sheetWindow else { return }
+
+            // Make sure the sheet window is key
+            sheetWindow.makeKey()
+
+            #if DEBUG
+            print("[WindowSheetPresenter] Sheet presented, isKeyWindow: \(sheetWindow.isKeyWindow)")
+            #endif
+
+            // Find the first NSTextField and focus it
+            self?.focusFirstTextField(in: sheetWindow)
+        }
+    }
+
+    /// Finds and focuses the first editable text field in the window
+    private func focusFirstTextField(in window: NSWindow) {
+        guard let contentView = window.contentView else { return }
+
+        func findFirstTextField(in view: NSView) -> NSTextField? {
+            // Check if this is an editable text field
+            if let textField = view as? NSTextField, textField.isEditable {
+                return textField
+            }
+            // Recursively search subviews
+            for subview in view.subviews {
+                if let found = findFirstTextField(in: subview) {
+                    return found
+                }
+            }
+            return nil
+        }
+
+        if let textField = findFirstTextField(in: contentView) {
+            // CRITICAL: Make the text field first responder to enable keyboard input
+            let success = window.makeFirstResponder(textField)
+            #if DEBUG
+            print("[WindowSheetPresenter] Focused first text field: \(success)")
+            #endif
         }
     }
 
@@ -192,7 +254,11 @@ class ModalPresenter: ObservableObject {
 // MARK: - SimpleTextField
 
 /// NSTextField wrapper that properly handles keyboard input in sheets
-/// Key fix: Ensures the window becomes key and the field becomes first responder
+///
+/// KEYBOARD INPUT FIX:
+/// - Ensures window is properly activated before focusing
+/// - Starts field editor explicitly for keyboard input
+/// - Handles the activation sequence correctly for sheet windows
 struct SimpleTextField: NSViewRepresentable {
     let placeholder: String
     @Binding var text: String
@@ -211,6 +277,11 @@ struct SimpleTextField: NSViewRepresentable {
         field.focusRingType = .exterior
         field.cell?.sendsActionOnEndEditing = true
 
+        // Ensure editing is enabled
+        field.isEditable = true
+        field.isSelectable = true
+        field.refusesFirstResponder = false
+
         // Store coordinator reference for focus handling
         field.coordinator = context.coordinator
 
@@ -218,6 +289,9 @@ struct SimpleTextField: NSViewRepresentable {
     }
 
     func updateNSView(_ nsView: NSTextField, context: Context) {
+        // Update coordinator parent reference
+        context.coordinator.parent = self
+
         // Only update if the values differ and we're not currently editing
         // This prevents the cursor from jumping during typing
         if let field = nsView as? FocusableNSTextField {
@@ -231,13 +305,9 @@ struct SimpleTextField: NSViewRepresentable {
         // Handle auto-focus on first update
         if autoFocus, let field = nsView as? FocusableNSTextField, !field.hasFocusedOnce {
             field.hasFocusedOnce = true
-            DispatchQueue.main.async {
-                // Ensure the window is key before making field first responder
-                if let window = nsView.window {
-                    window.makeKey()
-                    NSApp.activate(ignoringOtherApps: true)
-                    window.makeFirstResponder(nsView)
-                }
+            // Use delay to allow sheet animation to complete
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                field.activateForKeyboardInput()
             }
         }
     }
@@ -286,7 +356,12 @@ struct SimpleTextField: NSViewRepresentable {
     }
 }
 
-/// Custom NSTextField that properly accepts first responder
+/// Custom NSTextField that properly accepts first responder in sheet windows
+///
+/// KEYBOARD INPUT FIX:
+/// The key insight is that in AppKit, NSTextField uses a shared "field editor"
+/// (an NSTextView) for text input. In sheet windows, this field editor must be
+/// explicitly activated AND the window must be made key for keyboard events to work.
 class FocusableNSTextField: NSTextField {
     weak var coordinator: SimpleTextField.Coordinator?
     var hasFocusedOnce: Bool = false
@@ -295,23 +370,91 @@ class FocusableNSTextField: NSTextField {
     override var acceptsFirstResponder: Bool { true }
 
     override func becomeFirstResponder() -> Bool {
+        // CRITICAL: Ensure app and window are active before becoming first responder
+        if !NSApp.isActive {
+            NSApp.activate(ignoringOtherApps: true)
+        }
+
         let result = super.becomeFirstResponder()
         if result {
             // Ensure window is key when we become first responder
             window?.makeKey()
 
-            // Select all text for easy replacement
-            if let editor = currentEditor() {
-                editor.selectAll(nil)
+            // CRITICAL FIX: Start field editor for keyboard input
+            DispatchQueue.main.async { [weak self] in
+                self?.startFieldEditorForKeyboard()
             }
+
+            #if DEBUG
+            print("[FocusableNSTextField] becomeFirstResponder succeeded")
+            #endif
         }
         return result
     }
 
     override func mouseDown(with event: NSEvent) {
+        // CRITICAL: Activate before handling mouse
+        activateForKeyboardInput()
         super.mouseDown(with: event)
-        // Ensure we have focus when clicked
-        window?.makeFirstResponder(self)
+    }
+
+    /// Activates the text field for keyboard input in a sheet context
+    func activateForKeyboardInput() {
+        guard let window = self.window else { return }
+
+        #if DEBUG
+        print("[FocusableNSTextField] activateForKeyboardInput called")
+        print("[FocusableNSTextField] Window isSheet: \(window.sheetParent != nil)")
+        #endif
+
+        // CRITICAL FIX: Proper activation sequence
+        // 1. Activate the application
+        if !NSApp.isActive {
+            NSApp.activate(ignoringOtherApps: true)
+        }
+
+        // 2. For sheets, ensure parent is main window
+        if let sheetParent = window.sheetParent {
+            sheetParent.makeMain()
+        }
+
+        // 3. Make sheet window key (receives keyboard)
+        window.makeKey()
+
+        // 4. Make this field first responder
+        window.makeFirstResponder(self)
+
+        // 5. Start field editor
+        startFieldEditorForKeyboard()
+    }
+
+    /// Starts the field editor to enable keyboard input
+    private func startFieldEditorForKeyboard() {
+        guard let window = self.window else { return }
+
+        // Get the field editor
+        guard let fieldEditor = window.fieldEditor(true, for: self) as? NSTextView else {
+            #if DEBUG
+            print("[FocusableNSTextField] Could not get field editor")
+            #endif
+            return
+        }
+
+        // Configure field editor
+        fieldEditor.isEditable = true
+        fieldEditor.isSelectable = true
+        fieldEditor.isFieldEditor = true
+
+        // Make field editor first responder (this is what actually receives keyboard)
+        window.makeFirstResponder(fieldEditor)
+
+        // Select all for easy replacement
+        fieldEditor.selectAll(nil)
+
+        #if DEBUG
+        print("[FocusableNSTextField] Field editor activated")
+        print("[FocusableNSTextField] Field editor isFirstResponder: \(fieldEditor === window.firstResponder)")
+        #endif
     }
 }
 

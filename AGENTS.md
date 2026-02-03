@@ -4,11 +4,11 @@ This file contains reusable patterns for AI agents working on this codebase.
 
 ## Architecture
 
-- **SwiftUI App Lifecycle**: Use `@main` on the App struct (`CrossRoadsApp.swift`)
+- **SwiftUI App Lifecycle**: Use `@main` on the App struct (`XRoadsApp.swift`)
 - **Folder Structure**: App/, Models/, Services/, Views/, ViewModels/, Resources/
 - **Deployment Target**: macOS 14.0+ (required for @Observable)
 - **Strict Concurrency**: SWIFT_STRICT_CONCURRENCY=complete enabled
-- **MCP Dependency**: `crossroads-mcp/` TypeScript server must run (launched via `MCPClient`) for log streaming/status tools.
+- **MCP Dependency**: `xroads-mcp/` TypeScript server must run (launched via `MCPClient`) for log streaming/status tools.
 - **Skills**: Load internal Swift skills per `ios-swift-skills/INTERNAL_USAGE.md` when coding (swift-language, swift-concurrency, memory-management, swiftui, process-management, mvvm-architecture, file-operations).
 
 ## Code Style
@@ -19,15 +19,43 @@ This file contains reusable patterns for AI agents working on this codebase.
 
 ## macOS SwiftUI Known Issues & Solutions
 
-### TextField in Sheets (CRITICAL)
-SwiftUI's `TextField` has a known bug on macOS where it doesn't receive keyboard input in sheets/modals. **Solution**: Use `MacTextField` (NSViewRepresentable wrapper) from `Views/Components/MacTextField.swift`:
-```swift
-// Instead of:
-TextField("placeholder", text: $text)
+### App Activation Policy (CRITICAL - ROOT CAUSE OF KEYBOARD ISSUES)
 
-// Use:
+**Problem**: When running a SwiftUI macOS app via `swift run` (not as a bundled .app), TextField and NSTextField in any window (sheets, modals, floating windows) don't receive keyboard input. User hears system "bonk" sound.
+
+**Root Cause**: Apps run via `swift run` don't have proper activation policy set by default. Without `.regular` policy, the app cannot properly receive keyboard events.
+
+**Solution**: Add this to your `AppDelegate.applicationDidFinishLaunching`:
+```swift
+func applicationDidFinishLaunching(_ notification: Notification) {
+    // CRITICAL: Set activation policy for keyboard input
+    NSApp.setActivationPolicy(.regular)
+    NSApp.activate(ignoringOtherApps: true)
+}
+```
+
+**Why it works**: `.regular` activation policy allows the app to:
+- Appear in the Dock
+- Receive keyboard events in ALL windows (main, sheets, modals, floating)
+- Properly manage window focus and first responder chain
+
+### TextField in Sheets (Additional Best Practices)
+Even with proper activation policy, for most reliable text input:
+
+1. **Use pure AppKit floating windows** for forms (see `FloatingInputWindow.swift`)
+2. **Or use `MacTextField`** (NSViewRepresentable) from `Views/Components/MacTextField.swift`:
+```swift
 MacTextField(placeholder: "placeholder", text: $text, isFirstResponder: true)
     .frame(height: 24)
+```
+
+3. **Always activate before showing windows**:
+```swift
+NSApp.activate(ignoringOtherApps: true)
+window.makeKeyAndOrderFront(nil)
+DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+    window.makeFirstResponder(textField)
+}
 ```
 
 ### TextFieldStyle Custom Styles
@@ -58,15 +86,15 @@ There's a local `ProcessInfo` struct in `ProcessRunner.swift`. Always use `Found
 swift build
 
 # Run (from project root so MCP server is found)
-swift run CrossRoads
+swift run XRoads
 
 # Kill running instance
-pkill -f CrossRoads
+pkill -f XRoads
 ```
 
 ## MCP Integration
 
-The CrossRoads MCP server (`crossroads-mcp/`) provides 3 tools:
+The XRoads MCP server (`xroads-mcp/`) provides 3 tools:
 - `emit_log`: Emit structured log entries from agents
 - `update_status`: Update agent status (idle/running/planning/complete/error)
 - `get_state`: Get current state (agents, logs, worktrees)
@@ -74,9 +102,9 @@ The CrossRoads MCP server (`crossroads-mcp/`) provides 3 tools:
 **MCPClient** (Swift actor) spawns and manages the MCP server as a subprocess via stdio. JSON-RPC 2.0 protocol with separate request types for `initialize` and `tools/call`.
 
 Key files:
-- `CrossRoads/Services/MCPClient.swift` - Swift MCP client
-- `crossroads-mcp/src/index.ts` - TypeScript MCP server
-- `crossroads-mcp/dist/index.js` - Compiled server (run `npm run build`)
+- `XRoads/Services/MCPClient.swift` - Swift MCP client
+- `xroads-mcp/src/index.ts` - TypeScript MCP server
+- `xroads-mcp/dist/index.js` - Compiled server (run `npm run build`)
 
 ## Testing
 

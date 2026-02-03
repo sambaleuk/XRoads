@@ -45,9 +45,25 @@ struct XRoadsApp: App {
 /// App delegate to handle lifecycle events and cleanup
 @MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
-    
+
     var appState: AppState?
-    
+
+    func applicationDidFinishLaunching(_ notification: Notification) {
+        // CRITICAL: Set activation policy to regular for proper keyboard handling
+        // This is essential when running via `swift run` (not as a bundled .app)
+        NSApp.setActivationPolicy(.regular)
+        NSApp.activate(ignoringOtherApps: true)
+
+        // Ensure the app appears in the Dock and can receive keyboard focus
+        if let window = NSApp.windows.first {
+            window.makeKeyAndOrderFront(nil)
+        }
+
+        #if DEBUG
+        print("[AppDelegate] App launched with activation policy: regular")
+        #endif
+    }
+
     func applicationWillTerminate(_ notification: Notification) {
         // Force cleanup of all resources before termination
         if let appState = appState {
@@ -142,27 +158,5 @@ final class ObservableAppStateWrapper: ObservableObject {
     init(appState: AppState) {
         self.appState = appState
     }
-}
-
-// MARK: - Notification Names
-
-extension Notification.Name {
-    /// Notification to show the new worktree sheet
-    static let showNewWorktreeSheet = Notification.Name("showNewWorktreeSheet")
-
-    /// Notification to close the selected worktree
-    static let closeSelectedWorktree = Notification.Name("closeSelectedWorktree")
-
-    /// Notification to stop the agent of the selected worktree
-    static let stopSelectedAgent = Notification.Name("stopSelectedAgent")
-
-    /// Notification to clear logs
-    static let clearLogs = Notification.Name("clearLogs")
-
-    /// Notification to show command palette
-    static let showCommandPalette = Notification.Name("showCommandPalette")
-    
-    /// Notification to request app quit with cleanup
-    static let requestAppQuit = Notification.Name("requestAppQuit")
 }
 

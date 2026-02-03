@@ -5,6 +5,11 @@
 //  NSViewRepresentable wrapper for NSTextField that works reliably in sheets on macOS.
 //  SwiftUI's TextField has known issues with keyboard input in modal sheets.
 //
+//  FIX FOR KEYBOARD INPUT BUG:
+//  The root cause is that sheet windows need explicit key window activation
+//  AND the field editor must be manually started when the window is a sheet.
+//  We must also ensure the window accepts key events via proper configuration.
+//
 
 import SwiftUI
 import AppKit
@@ -12,115 +17,193 @@ import AppKit
 // MARK: - FocusableTextField
 
 /// Custom NSTextField subclass that properly handles focus in sheets
+/// Key fix: Explicitly starts field editor and ensures sheet window accepts keyboard
 class FocusableTextField: NSTextField {
     var needsFocus: Bool = false
     var onSubmit: (() -> Void)? = nil
-    
+    private var hasStartedEditing: Bool = false
+
     override var acceptsFirstResponder: Bool {
         return true
     }
-    
+
     override var canBecomeKeyView: Bool {
         return true
     }
 
     override func becomeFirstResponder() -> Bool {
-        // Force app activation when becoming first responder
-        NSApp.activate(ignoringOtherApps: true)
-        
         let result = super.becomeFirstResponder()
         if result {
+            // CRITICAL FIX: Ensure the window can receive key events
+            ensureWindowAcceptsKeyboardInput()
+
             // Ensure cursor is visible
             NSCursor.unhide()
             NSCursor.setHiddenUntilMouseMoves(false)
-            
-            // Select all text when becoming first responder
-            currentEditor()?.selectAll(nil)
-            
+
+            // Start editing immediately to activate field editor
+            if !hasStartedEditing {
+                hasStartedEditing = true
+                DispatchQueue.main.async { [weak self] in
+                    self?.startFieldEditing()
+                }
+            }
+
             #if DEBUG
-            print("✅ FocusableTextField became first responder")
+            print("[MacTextField] FocusableTextField became first responder")
             #endif
         } else {
             #if DEBUG
-            print("❌ FocusableTextField FAILED to become first responder")
+            print("[MacTextField] FocusableTextField FAILED to become first responder")
             #endif
         }
         return result
     }
-    
+
+    override func resignFirstResponder() -> Bool {
+        hasStartedEditing = false
+        return super.resignFirstResponder()
+    }
+
     override func mouseDown(with event: NSEvent) {
         #if DEBUG
-        print("🖱️ FocusableTextField clicked")
+        print("[MacTextField] FocusableTextField clicked")
         #endif
-        
-        // Force activation when clicked
-        NSApp.activate(ignoringOtherApps: true)
-        window?.makeKeyAndOrderFront(nil)
-        window?.makeFirstResponder(self)
-        
+
+        // CRITICAL: Ensure window accepts keyboard before handling click
+        ensureWindowAcceptsKeyboardInput()
+
         super.mouseDown(with: event)
+
+        // After super call, explicitly focus and start editing
+        window?.makeFirstResponder(self)
+        startFieldEditing()
     }
-    
+
     override func keyDown(with event: NSEvent) {
         #if DEBUG
-        print("⌨️ FocusableTextField keyDown: \(event.characters ?? "")")
+        print("[MacTextField] FocusableTextField keyDown: \(event.characters ?? "")")
         #endif
         super.keyDown(with: event)
     }
 
     override func viewDidMoveToWindow() {
         super.viewDidMoveToWindow()
-        if needsFocus && window != nil {
-            // Delay focus slightly to ensure window is ready
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
+
+        guard let window = window else { return }
+
+        // Configure window for keyboard input when view is added
+        configureWindowForKeyboardInput(window)
+
+        if needsFocus {
+            // Use longer delay to ensure sheet animation is complete
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
                 self?.attemptFocus()
             }
         }
     }
 
+    /// Configures the window to properly accept keyboard input (critical for sheets)
+    private func configureWindowForKeyboardInput(_ window: NSWindow) {
+        // CRITICAL FIX: Sheet windows need these flags to accept keyboard input
+        // when the app is launched via swift run (not Xcode)
+
+        // If this is a sheet, we need to ensure its parent knows about key status
+        if let sheetParent = window.sheetParent {
+            // The sheet parent should be active
+            sheetParent.makeKey()
+        }
+
+        // Ensure this window accepts mouse events for clicking into fields
+        window.acceptsMouseMovedEvents = true
+        window.ignoresMouseEvents = false
+    }
+
+    /// Ensures the containing window can accept keyboard input
+    private func ensureWindowAcceptsKeyboardInput() {
+        guard let window = self.window else { return }
+
+        // CRITICAL FIX: Activate app and make window key
+        // This is the key fix for the "bonk" sound issue
+        if !NSApp.isActive {
+            NSApp.activate(ignoringOtherApps: true)
+        }
+
+        // For sheet windows, we need to make the SHEET window key, not the parent
+        // But we also need to ensure the parent is the main window
+        if let sheetParent = window.sheetParent {
+            sheetParent.makeMain()
+        }
+
+        // Make this window key (this accepts keyboard events)
+        if !window.isKeyWindow {
+            window.makeKey()
+        }
+    }
+
+    /// Starts the field editor to ensure keyboard input is received
+    private func startFieldEditing() {
+        guard let window = self.window else { return }
+
+        // CRITICAL FIX: Get or create the field editor and configure it
+        // The field editor is an NSTextView that handles actual text input
+        guard let fieldEditor = window.fieldEditor(true, for: self) as? NSTextView else {
+            #if DEBUG
+            print("[MacTextField] Could not get field editor")
+            #endif
+            return
+        }
+
+        // Ensure field editor is properly configured
+        fieldEditor.isEditable = true
+        fieldEditor.isSelectable = true
+        fieldEditor.isFieldEditor = true
+
+        // CRITICAL: Set the field editor as first responder's next responder
+        // This ensures keyboard events flow correctly
+        fieldEditor.window?.makeFirstResponder(fieldEditor)
+
+        // Select all text for easy replacement
+        fieldEditor.selectAll(nil)
+
+        #if DEBUG
+        print("[MacTextField] Field editor started, isEditable: \(fieldEditor.isEditable)")
+        print("[MacTextField] Field editor isFirstResponder: \(fieldEditor === window.firstResponder)")
+        #endif
+    }
+
     func attemptFocus() {
         guard let window = self.window else { return }
+
+        #if DEBUG
+        print("[MacTextField] attemptFocus called, window: \(window)")
+        print("[MacTextField] Window isSheet: \(window.sheetParent != nil)")
+        print("[MacTextField] Window isKeyWindow: \(window.isKeyWindow)")
+        #endif
 
         // Ensure cursor is always visible
         NSCursor.unhide()
         NSCursor.setHiddenUntilMouseMoves(false)
 
-        // CRITICAL: Force the window to become key and main
-        NSApp.activate(ignoringOtherApps: true)
-        window.makeKeyAndOrderFront(nil)
+        // CRITICAL FIX: Proper activation sequence for sheets
+        ensureWindowAcceptsKeyboardInput()
 
-        // Make sure the window level is correct
-        window.level = .normal
+        // Make sure the window level allows keyboard input
+        // Don't use .modalPanel for sheets - it can interfere with keyboard routing
+        if window.sheetParent != nil {
+            window.level = .normal
+        }
 
         // Force the field to become first responder
         let success = window.makeFirstResponder(self)
 
         #if DEBUG
-        print("MacTextField attemptFocus: makeFirstResponder returned \(success)")
+        print("[MacTextField] attemptFocus: makeFirstResponder returned \(success)")
         #endif
 
-        // CRITICAL: Manually start editing to activate the field editor
-        if success {
-            // Select all and start editing
-            self.selectText(nil)
-
-            // Ensure the field editor is properly set up
-            if let fieldEditor = window.fieldEditor(true, for: self) as? NSTextView {
-                fieldEditor.isEditable = true
-                fieldEditor.isSelectable = true
-                #if DEBUG
-                print("MacTextField: Field editor activated")
-                #endif
-            }
-        } else {
-            // If that failed, try again after a short delay
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
-                guard let self = self, let window = self.window else { return }
-                NSApp.activate(ignoringOtherApps: true)
-                window.makeFirstResponder(self)
-                self.selectText(nil)
-            }
-        }
+        // Start field editing regardless of makeFirstResponder result
+        // because the field editor is what actually receives keyboard input
+        startFieldEditing()
 
         needsFocus = false
     }
@@ -130,6 +213,11 @@ class FocusableTextField: NSTextField {
 
 /// A reliable text field for macOS using AppKit's NSTextField
 /// Use this instead of SwiftUI TextField when in sheets or modals
+///
+/// KEY FIX: This version properly handles keyboard input in sheet windows by:
+/// 1. Ensuring the window accepts keyboard events via proper activation
+/// 2. Explicitly starting the field editor when focused
+/// 3. Handling the SwiftUI/AppKit coordination properly
 struct MacTextField: NSViewRepresentable {
     typealias NSViewType = FocusableTextField
     let placeholder: String
@@ -149,24 +237,27 @@ struct MacTextField: NSViewRepresentable {
         textField.drawsBackground = true
         textField.backgroundColor = NSColor(Color.bgElevated)
         textField.textColor = NSColor(Color.textPrimary)
-        
+
         // CRITICAL: Enable editing and text input
         textField.isEditable = true
         textField.isSelectable = true
         textField.allowsEditingTextAttributes = false
         textField.importsGraphics = false
-        
+
         // Ensure it can become first responder
         textField.refusesFirstResponder = false
-        
+
         // Set onSubmit callback
         textField.onSubmit = onSubmit
-        
-        // Enable continuous updates
+
+        // Enable continuous updates for responsive typing
         textField.isContinuous = true
 
+        // Store coordinator for later access
+        context.coordinator.textField = textField
+
         #if DEBUG
-        print("MacTextField: Created text field with placeholder '\(placeholder)'")
+        print("[MacTextField] Created text field with placeholder '\(placeholder)'")
         #endif
 
         return textField
@@ -175,28 +266,31 @@ struct MacTextField: NSViewRepresentable {
     func updateNSView(_ nsView: FocusableTextField, context: Context) {
         // IMPORTANT: Update coordinator's parent reference to get latest binding
         context.coordinator.parent = self
-        
+
         // Re-attach delegate to ensure it's connected
         if nsView.delegate !== context.coordinator {
             nsView.delegate = context.coordinator
             #if DEBUG
-            print("MacTextField: Re-attached delegate")
+            print("[MacTextField] Re-attached delegate")
             #endif
         }
-        
-        // Only update text if it's different to avoid cursor jumping
-        if nsView.stringValue != text {
+
+        // Only update text if it's different AND we're not currently editing
+        // This prevents cursor jumping during typing
+        let isCurrentlyEditing = nsView.currentEditor() != nil
+        if nsView.stringValue != text && !isCurrentlyEditing {
             #if DEBUG
-            print("MacTextField: Updating view from '\(nsView.stringValue)' to '\(text)'")
+            print("[MacTextField] Updating view from '\(nsView.stringValue)' to '\(text)'")
             #endif
             nsView.stringValue = text
         }
 
-        // Handle first responder
-        if isFirstResponder {
+        // Handle first responder - use a flag to prevent repeated focus attempts
+        if isFirstResponder && !context.coordinator.hasFocused {
+            context.coordinator.hasFocused = true
             nsView.needsFocus = true
-            // Trigger focus on next run loop
-            DispatchQueue.main.async {
+            // Trigger focus on next run loop with delay for sheet animation
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 nsView.attemptFocus()
             }
         }
@@ -208,6 +302,8 @@ struct MacTextField: NSViewRepresentable {
 
     class Coordinator: NSObject, NSTextFieldDelegate {
         var parent: MacTextField
+        weak var textField: FocusableTextField?
+        var hasFocused: Bool = false
 
         init(_ parent: MacTextField) {
             self.parent = parent
@@ -216,14 +312,29 @@ struct MacTextField: NSViewRepresentable {
         func controlTextDidChange(_ notification: Notification) {
             guard let textField = notification.object as? NSTextField else { return }
             let newValue = textField.stringValue
-            
+
             #if DEBUG
             if parent.text != newValue {
-                print("MacTextField: Text changed from '\(parent.text)' to '\(newValue)'")
+                print("[MacTextField] Text changed from '\(parent.text)' to '\(newValue)'")
             }
             #endif
-            
-            parent.text = newValue
+
+            // Update binding immediately on main thread
+            DispatchQueue.main.async { [weak self] in
+                self?.parent.text = newValue
+            }
+        }
+
+        func controlTextDidBeginEditing(_ notification: Notification) {
+            #if DEBUG
+            print("[MacTextField] Begin editing")
+            #endif
+        }
+
+        func controlTextDidEndEditing(_ notification: Notification) {
+            #if DEBUG
+            print("[MacTextField] End editing")
+            #endif
         }
 
         func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {
