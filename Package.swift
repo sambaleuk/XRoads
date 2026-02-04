@@ -35,6 +35,8 @@ let package = Package(
                 "Views/Settings/CLISettingsView.swift",
                 // US-V4-021: MCP Settings View
                 "Views/Settings/MCPSettingsView.swift",
+                // US-V4-022: API Keys Settings View
+                "Views/Settings/APIKeysSettingsView.swift",
                 "Views/ConflictResolutionSheet.swift",
                 "Views/PRDLoaderSheet.swift",
                 "Views/OrchestrationHistorySheet.swift",
@@ -162,7 +164,9 @@ let package = Package(
                 // US-V4-020: CLI Settings Tests
                 "Settings/CLISettingsTests.swift",
                 // US-V4-021: MCP Settings Tests
-                "Settings/MCPSettingsTests.swift"
+                "Settings/MCPSettingsTests.swift",
+                // US-V4-022: API Keys Tests
+                "Settings/APIKeysTests.swift"
             ]
         )
     ]

@@ -35,8 +35,20 @@ public struct SettingsView: View {
                     Label("CLI Paths", systemImage: "terminal")
                 }
                 .tag(SettingsTab.cli)
+
+            MCPSettingsView()
+                .tabItem {
+                    Label("MCP", systemImage: "server.rack")
+                }
+                .tag(SettingsTab.mcp)
+
+            APIKeysSettingsView()
+                .tabItem {
+                    Label("API Keys", systemImage: "key.fill")
+                }
+                .tag(SettingsTab.apiKeys)
         }
-        .frame(width: 550, height: 500)
+        .frame(width: 550, height: 600)
         .background(Color.bgApp)
         .preferredColorScheme(.dark)
     }

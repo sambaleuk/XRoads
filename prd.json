@@ -388,7 +388,8 @@
       "description": "Gestion des API keys (Anthropic, OpenAI, Google)",
       "priority": "high",
       "depends_on": ["US-V4-019", "US-V4-021"],
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-04T14:28:00Z",
       "acceptance_criteria": [
         "Input securise pour API keys (masked)",
         "Storage dans Keychain",
@@ -408,7 +409,7 @@
           "Key stored securely",
           "Validation rejects invalid format"
         ],
-        "status": "pending"
+        "status": "passing"
       },
       "estimated_complexity": 4
     },
@@ -713,6 +714,6 @@
   ],
 
   "total_stories": 28,
-  "completed_stories": 21,
-  "pending_stories": 7
+  "completed_stories": 22,
+  "pending_stories": 6
 }
