@@ -2248,3 +2248,8 @@ Acceptance Criteria Met:
 - Delta: Added PRD Assistant wizard UI with live preview + copilot chat, wired PRD assistant sheet + notifications, resolved PRD model conflicts, and updated PRD export to snake_case JSON with new tests and Package.swift sources.
 - Checks: ./scripts/swift-build.sh, swift test --disable-sandbox
 - Learnings: Codex /exec helper unavailable here; ran commands directly via shell.
+
+### Iteration 1 - US-V4-024
+- Delta: Added ArtBible model + ArtBiblePreviewView with visual token previews, introduced art-direction PRD template with reference inputs, and integrated art-director skill into bundled skills/resources with tests.
+- Checks: ./scripts/swift-build.sh, swift test --disable-sandbox
+- Learnings: Codex /exec helper unavailable here; ran commands directly via shell.

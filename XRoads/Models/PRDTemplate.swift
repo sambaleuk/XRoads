@@ -15,6 +15,7 @@ enum PRDTemplateType: String, Codable, CaseIterable, Identifiable, Sendable {
     case feature
     case refactor
     case test
+    case artDirection = "art-direction"
     case assets
     case custom
 
@@ -25,6 +26,7 @@ enum PRDTemplateType: String, Codable, CaseIterable, Identifiable, Sendable {
         case .feature: return "New Feature"
         case .refactor: return "Refactoring"
         case .test: return "Test Suite"
+        case .artDirection: return "Art Direction"
         case .assets: return "Design Assets"
         case .custom: return "Custom PRD"
         }
@@ -35,6 +37,7 @@ enum PRDTemplateType: String, Codable, CaseIterable, Identifiable, Sendable {
         case .feature: return "Create a PRD for implementing a new feature with user stories"
         case .refactor: return "Plan a refactoring effort with code cleanup tasks"
         case .test: return "Generate a test suite PRD with comprehensive test cases"
+        case .artDirection: return "Generate an art direction bible and design tokens from references"
         case .assets: return "Create design assets from an Art Bible specification"
         case .custom: return "Build a custom PRD from scratch with full control"
         }
@@ -45,6 +48,7 @@ enum PRDTemplateType: String, Codable, CaseIterable, Identifiable, Sendable {
         case .feature: return "sparkles"
         case .refactor: return "arrow.triangle.2.circlepath"
         case .test: return "testtube.2"
+        case .artDirection: return "paintbrush.pointed"
         case .assets: return "paintpalette"
         case .custom: return "doc.badge.gearshape"
         }
@@ -55,6 +59,7 @@ enum PRDTemplateType: String, Codable, CaseIterable, Identifiable, Sendable {
         case .feature: return "US"
         case .refactor: return "RF"
         case .test: return "TS"
+        case .artDirection: return "AD"
         case .assets: return "AS"
         case .custom: return "CS"
         }
@@ -471,6 +476,8 @@ final class PRDWizardState: ObservableObject {
     @Published var visionSummary: String = ""
     @Published var keyConcepts: [String] = []
     @Published var successMetrics: [String] = []
+    @Published var referenceURLs: [String] = []
+    @Published var imageReferences: [String] = []
 
     // Generated content
     @Published var generatedStories: [PRDUserStory] = []
@@ -559,6 +566,30 @@ final class PRDWizardState: ObservableObject {
     func removeKeyConcept(at index: Int) {
         guard index >= 0 && index < keyConcepts.count else { return }
         keyConcepts.remove(at: index)
+    }
+
+    // MARK: - Reference Management (Art Direction)
+
+    func addReferenceURL(_ url: String) {
+        let trimmed = url.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        referenceURLs.append(trimmed)
+    }
+
+    func removeReferenceURL(at index: Int) {
+        guard index >= 0 && index < referenceURLs.count else { return }
+        referenceURLs.remove(at: index)
+    }
+
+    func addImageReference(_ path: String) {
+        let trimmed = path.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        imageReferences.append(trimmed)
+    }
+
+    func removeImageReference(at index: Int) {
+        guard index >= 0 && index < imageReferences.count else { return }
+        imageReferences.remove(at: index)
     }
 
     func addSuccessMetric(_ metric: String) {

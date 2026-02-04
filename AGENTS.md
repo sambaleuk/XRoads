@@ -153,9 +153,66 @@ Refer to `prd-v2.json`, `context.md`, and `progress.txt` before starting any tas
 
 
 
+
+
+
 ## XRoads Skills (Auto-Injected)
-<!-- Skills loaded by codex-loop at 2026-02-04 12:01:50 -->
-<!-- CLI: codex | Branch: feat/crossroads-v1 -->
+<!-- Skills loaded by codex-loop at 2026-02-04 15:14:56 -->
+<!-- CLI: codex | Branch: main -->
+
+# ===== SKILL: art-director =====
+
+## Art Director Ritual
+
+### Mission
+Extract Visual DNA from references and generate production-ready design system.
+
+### Context
+- Project: {{project_name}}
+- Activity: {{activity_description}}
+- Target: {{target_audience}}
+- Keywords: {{emotional_keywords}}
+- References: {{reference_urls}}
+- Style: {{style_preference}} / {{mode_preference}}
+- Platform: {{platform}}
+
+### Ritual Steps
+
+1. **Absorb Context**
+   - codex files read any provided reference images/URLs
+   - Extract visual patterns, colors, typography hints
+
+2. **Analyze Visual DNA**
+   - Chromatic signature (colors, temperature)
+   - Typographic personality
+   - Photographic style
+   - Graphic language
+   - Brand energy level
+
+3. **Generate art-bible.json**
+   ```
+   codex exec "cat > art-bible.json << 'EOF'
+   {
+     "project": "...",
+     "color_system": {...},
+     "typography_system": {...},
+     "ui_components": [...],
+     "photography_direction": {...},
+     "page_architecture": [...]
+   }
+   EOF"
+   ```
+
+4. **Validate Output**
+   - codex exec "jq . art-bible.json" to verify valid JSON
+   - Check all HEX codes present
+   - Verify WCAG compliance for text/background pairs
+
+### Quality Gates
+- No generic colors - derived from Visual DNA
+- All prompts Midjourney/DALL-E ready
+- Google Fonts or platform-native only
+- Valid parseable JSON
 
 # ===== SKILL: prd =====
 
@@ -178,7 +235,7 @@ Refer to `prd-v2.json`, `context.md`, and `progress.txt` before starting any tas
 - No commit, no status change
 - Log to progress.txt
 
-Context: XRoads Multi-CLI Loop System
+Context: XRoads Complete UI & Orchestrator System
 
 # ===== SKILL: commit =====
 
@@ -196,7 +253,7 @@ Context: XRoads Multi-CLI Loop System
 - No `--no-verify`
 - Check for .env/credentials before staging
 
-Context: XRoads Multi-CLI Loop System
+Context: XRoads Complete UI & Orchestrator System
 
 # ===== SKILL: review-pr =====
 
@@ -219,7 +276,7 @@ Context: XRoads Multi-CLI Loop System
 - Issues: severity|file:line|description|fix
 - Verdict: approve|request-changes|comment
 
-Context: XRoads Multi-CLI Loop System
+Context: XRoads Complete UI & Orchestrator System
 
 # ===== SKILL: xroads-log =====
 
@@ -245,7 +302,7 @@ The xroads-mcp server streams logs to XRoads UI.
 3. Success: emit_log(info, "Completed") + update_status(complete)
 4. Failure: emit_log(error, "Reason") + update_status(error)
 
-Context: XRoads Multi-CLI Loop System
+Context: XRoads Complete UI & Orchestrator System
 
 # ===== SKILL: test-writer =====
 
@@ -274,7 +331,7 @@ describe('[X]', () => {
 });
 ```
 
-Context: XRoads Multi-CLI Loop System
+Context: XRoads Complete UI & Orchestrator System
 
 # ===== SKILL: code-reviewer =====
 
@@ -298,6 +355,6 @@ Context: XRoads Multi-CLI Loop System
 - Issues by severity
 - Summary assessment
 
-Context: XRoads Multi-CLI Loop System
+Context: XRoads Complete UI & Orchestrator System
 
 ## End XRoads Skills

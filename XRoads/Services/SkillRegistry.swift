@@ -155,6 +155,7 @@ actor SkillRegistry {
         "commit",
         "review-pr",
         "prd",
+        "art-director",
         "integration-test",
         "code-reviewer"
     ]
@@ -576,6 +577,41 @@ actor SkillRegistry {
                 version: "1.0.0",
                 compatibleCLIs: Set(AgentType.allCases),
                 category: .test,
+                author: "XRoads"
+            ),
+            Skill(
+                id: "art-director",
+                name: "Art Director",
+                description: "Extract visual DNA and generate art-bible.json with design tokens",
+                promptTemplate: """
+                    You are a world-class digital art director. Use the provided context to generate art-bible.json.
+
+                    ## Context
+                    Project: {{project_name}}
+                    Activity: {{activity_description}}
+                    Target Audience: {{target_audience}}
+                    Emotional Keywords: {{emotional_keywords}}
+                    References: {{reference_urls}}
+                    Input Images: {{input_images}}
+                    Style: {{style_preference}}
+                    Mode: {{mode_preference}}
+                    Platform: {{platform}}
+
+                    ## Output Requirements
+                    1. Output valid JSON only.
+                    2. Include design_tokens (colors, typography, spacing, radius).
+                    3. Include color_system and typography_system summaries.
+                    4. Include UI components with token references.
+                    5. Ensure all colors are HEX and WCAG AA compliant.
+
+                    Write art-bible.json to the project root.
+
+                    {{context}}
+                    """,
+                requiredTools: ["file-read", "file-edit"],
+                version: "1.0.0",
+                compatibleCLIs: Set(AgentType.allCases),
+                category: .custom,
                 author: "XRoads"
             )
         ]

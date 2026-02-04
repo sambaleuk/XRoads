@@ -43,6 +43,8 @@ let package = Package(
                 "Views/PRD/PRDAssistantView.swift",
                 "Views/PRD/PRDWizardSteps.swift",
                 "Views/PRD/PRDPreviewView.swift",
+                // US-V4-024: Art Direction Preview View
+                "Views/ArtDirection/ArtBiblePreviewView.swift",
                 "Views/OrchestrationHistorySheet.swift",
                 "Views/GitDashboardView.swift",
                 "Views/Components/MacTextField.swift",
@@ -95,6 +97,8 @@ let package = Package(
                 "Models/APIConfig.swift",
                 // US-V4-023: PRD Template Models
                 "Models/PRDTemplate.swift",
+                // US-V4-024: Art Bible Model
+                "Models/ArtBible.swift",
                 // US-V4-019: App Settings Model
                 "Models/AppSettings.swift",
                 "Services/GitService.swift",
@@ -174,7 +178,9 @@ let package = Package(
                 // US-V4-022: API Keys Tests
                 "Settings/APIKeysTests.swift",
                 // US-V4-023: PRD Assistant Tests
-                "PRD/PRDAssistantTests.swift"
+                "PRD/PRDAssistantTests.swift",
+                // US-V4-024: Art Director Skill Tests
+                "ArtDirection/ArtDirectorSkillTests.swift"
             ]
         )
     ]

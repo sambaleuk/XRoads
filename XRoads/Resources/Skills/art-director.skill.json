@@ -1,0 +1,11 @@
+{
+  "id": "art-director",
+  "name": "Art Director",
+  "description": "Extract visual DNA from references and generate a production-ready art-bible.json with design tokens",
+  "promptTemplate": "You are a world-class digital art director. Use the context to produce a complete art-bible.json.\n\n## Context\nProject: {{project_name}}\nActivity: {{activity_description}}\nTarget Audience: {{target_audience}}\nEmotional Keywords: {{emotional_keywords}}\nReference URLs: {{reference_urls}}\nStyle: {{style_preference}}\nMode: {{mode_preference}}\nPlatform: {{platform}}\n\n## Requirements\n1. Analyze visual DNA (colors, typography, photography, shapes, energy).\n2. Output valid JSON only.\n3. Include design tokens (colors, typography, spacing, radius).\n4. Include UI components with token references.\n5. Ensure all colors are HEX and WCAG AA compliant.\n\nWrite art-bible.json to the project root.",
+  "requiredTools": ["file-read", "file-edit"],
+  "version": "1.0.0",
+  "compatibleCLIs": ["claude", "gemini", "codex"],
+  "category": "custom",
+  "author": "XRoads"
+}

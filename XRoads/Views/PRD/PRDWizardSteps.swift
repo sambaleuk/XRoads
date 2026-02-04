@@ -103,6 +103,8 @@ struct PRDFeatureDefinitionStep: View {
     @ObservedObject var state: PRDWizardState
     @State private var newConcept: String = ""
     @State private var newMetric: String = ""
+    @State private var newReferenceURL: String = ""
+    @State private var newImageReference: String = ""
 
     var body: some View {
         ScrollView {
@@ -275,6 +277,96 @@ struct PRDFeatureDefinitionStep: View {
                         RoundedRectangle(cornerRadius: Theme.Radius.sm)
                             .stroke(Color.borderDefault, lineWidth: 1)
                     )
+                }
+
+                if state.selectedTemplate == .artDirection {
+                    // Reference URLs
+                    VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                        Text("Reference URLs")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color.textSecondary)
+
+                        PRDFlowLayout(spacing: 6) {
+                            ForEach(state.referenceURLs.indices, id: \.self) { index in
+                                ConceptChip(
+                                    text: state.referenceURLs[index],
+                                    onRemove: { state.removeReferenceURL(at: index) }
+                                )
+                            }
+                        }
+
+                        HStack {
+                            TextField("Add reference URL...", text: $newReferenceURL)
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 12))
+                                .foregroundStyle(Color.textPrimary)
+                                .onSubmit {
+                                    state.addReferenceURL(newReferenceURL)
+                                    newReferenceURL = ""
+                                }
+
+                            Button {
+                                state.addReferenceURL(newReferenceURL)
+                                newReferenceURL = ""
+                            } label: {
+                                Image(systemName: "plus.circle.fill")
+                                    .foregroundStyle(Color.accentPrimary)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(newReferenceURL.trimmingCharacters(in: .whitespaces).isEmpty)
+                        }
+                        .padding(Theme.Spacing.sm)
+                        .background(Color.bgElevated)
+                        .cornerRadius(Theme.Radius.sm)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                                .stroke(Color.borderDefault, lineWidth: 1)
+                        )
+                    }
+
+                    // Image references
+                    VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                        Text("Image References")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundStyle(Color.textSecondary)
+
+                        PRDFlowLayout(spacing: 6) {
+                            ForEach(state.imageReferences.indices, id: \.self) { index in
+                                ConceptChip(
+                                    text: state.imageReferences[index],
+                                    onRemove: { state.removeImageReference(at: index) }
+                                )
+                            }
+                        }
+
+                        HStack {
+                            TextField("Add image URL or path...", text: $newImageReference)
+                                .textFieldStyle(.plain)
+                                .font(.system(size: 12))
+                                .foregroundStyle(Color.textPrimary)
+                                .onSubmit {
+                                    state.addImageReference(newImageReference)
+                                    newImageReference = ""
+                                }
+
+                            Button {
+                                state.addImageReference(newImageReference)
+                                newImageReference = ""
+                            } label: {
+                                Image(systemName: "plus.circle.fill")
+                                    .foregroundStyle(Color.accentPrimary)
+                            }
+                            .buttonStyle(.plain)
+                            .disabled(newImageReference.trimmingCharacters(in: .whitespaces).isEmpty)
+                        }
+                        .padding(Theme.Spacing.sm)
+                        .background(Color.bgElevated)
+                        .cornerRadius(Theme.Radius.sm)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                                .stroke(Color.borderDefault, lineWidth: 1)
+                        )
+                    }
                 }
 
                 Spacer()

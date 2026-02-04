@@ -453,7 +453,8 @@
       "description": "Integrer le skill Art Director pour generer des bibles de design",
       "priority": "high",
       "depends_on": ["US-V4-023"],
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-04T14:33:47Z",
       "acceptance_criteria": [
         "art-director.skill.yaml dans skills/core/",
         "PRD template type 'art-direction'",
@@ -475,7 +476,7 @@
           "Art bible JSON valid",
           "Design tokens extractable"
         ],
-        "status": "pending"
+        "status": "passing"
       },
       "estimated_complexity": 6
     },
@@ -715,6 +716,6 @@
   ],
 
   "total_stories": 28,
-  "completed_stories": 23,
-  "pending_stories": 5
+  "completed_stories": 24,
+  "pending_stories": 4
 }

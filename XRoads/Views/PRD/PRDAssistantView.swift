@@ -514,7 +514,7 @@ final class PRDAssistantViewModel: ObservableObject {
         let vision = state.visionSummary.isEmpty ? "N/A" : state.visionSummary
         let concepts = state.keyConcepts.isEmpty ? "N/A" : state.keyConcepts.joined(separator: ", ")
 
-        return """
+        var prompt = """
         You are generating a PRD for XRoads. Provide 4-6 user stories in JSON.
 
         Template: \(template)
@@ -522,6 +522,22 @@ final class PRDAssistantViewModel: ObservableObject {
         Description: \(description)
         Vision: \(vision)
         Key Concepts: \(concepts)
+        """
+
+        if state.selectedTemplate == .artDirection {
+            let references = state.referenceURLs.isEmpty ? "N/A" : state.referenceURLs.joined(separator: ", ")
+            let images = state.imageReferences.isEmpty ? "N/A" : state.imageReferences.joined(separator: ", ")
+
+            prompt += """
+
+            Reference URLs: \(references)
+            Image References: \(images)
+
+            Focus on art direction bible creation, design tokens, and visual review tasks.
+            """
+        }
+
+        prompt += """
 
         Return JSON only. Example format:
         {
@@ -536,6 +552,7 @@ final class PRDAssistantViewModel: ObservableObject {
           ]
         }
         """
+        return prompt
     }
 
     private func buildRefinementPrompt(for story: PRDUserStory, prompt: String) -> String {
@@ -691,6 +708,12 @@ final class PRDAssistantViewModel: ObservableObject {
                     ("Define test strategy", "Outline coverage goals and tooling.", .high, ["Coverage targets set", "Tooling selected"]),
                     ("Implement unit tests", "Create unit tests for core modules.", .medium, ["Critical paths covered", "Mocks added"]),
                     ("Add integration tests", "Verify workflows end-to-end.", .medium, ["Key flows covered", "Regression suite added"])
+                ]
+            case .artDirection:
+                return [
+                    ("Collect visual references", "Gather inspiration and constraints for art direction.", .high, ["References documented", "Brand tone clarified"]),
+                    ("Generate art bible", "Create design tokens and component specs.", .high, ["Art bible JSON created", "Design tokens validated"]),
+                    ("Review visual outputs", "Validate tokens and prompts with stakeholders.", .medium, ["Tokens approved", "Prompts refined"])
                 ]
             case .assets:
                 return [
