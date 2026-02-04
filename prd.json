@@ -215,7 +215,8 @@
       "description": "Systeme de chargement dynamique des MCPs selon contexte",
       "priority": "high",
       "depends_on": ["US-V4-001"],
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-04T13:20:00Z",
       "acceptance_criteria": [
         "~/.xroads/mcp/ contient les configs MCP templates",
         "agent-browser.json config avec instructions de chargement",
@@ -238,7 +239,7 @@
           "mcp-loader.sh --mcp supabase --project-url URL injects URL",
           "mcp-loader.sh detects .supabase/ and suggests supabase MCP"
         ],
-        "status": "pending"
+        "status": "passing"
       },
       "estimated_complexity": 5
     },

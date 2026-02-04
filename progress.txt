@@ -1412,3 +1412,73 @@ Files modified:
 Learnings:
 - Ruby YAML parser (ruby -ryaml) is available by default on macOS and works well for YAML validation
 - Use Ruby instead of yq/PyYAML when those aren't installed
+
+### Iteration 3 - US-V4-003 (Skill Template Engine)
+- Created skill-converter.sh (~250 lines) in ~/.xroads/lib/:
+  - Extracts templates from skill YAML files for specific CLI (claude/gemini/codex)
+  - Uses Ruby YAML parser (macOS built-in) with awk fallback
+  - Supports placeholder replacement: {{context}}, {{files}}, {{branch}}
+  - --raw mode preserves placeholders for inspection
+  - Fallback to Claude template with warning if target CLI missing
+- Created skill-loader.sh (~280 lines) in ~/.xroads/lib/:
+  - Loads and combines multiple skills for a CLI session
+  - Default loads all core skills if none specified
+  - Output formats: combined (default), sections, json
+  - --list-available shows all installed skills by category
+  - --output option to write to file instead of stdout
+- Created comprehensive unit test with 30 test cases:
+  - skill-converter.sh: existence, help, template extraction for all CLIs, placeholder replacement, raw mode, error handling
+  - skill-loader.sh: existence, help, list, single/multiple skills, default core skills, output formats, placeholder replacement, error handling
+- Fixed pipefail issue: `set +o pipefail` needed when testing error cases that pipe to grep
+- **Unit test: Tests/skills/test_template_engine.sh - PASS (30/30 tests)**
+
+Files created:
+- ~/.xroads/lib/skill-converter.sh
+- ~/.xroads/lib/skill-loader.sh
+- Tests/skills/test_template_engine.sh
+
+Files modified:
+- prd.json (marked US-V4-003 complete, unit_test.status = "passing")
+
+Learnings:
+- When using `set -o pipefail` and testing error cases, disable pipefail temporarily before running commands that are expected to fail
+- Use `$()` with `|| true` and capture output to variable, then grep the variable
+- Ruby YAML parser is more reliable than awk for complex YAML structures with multiline strings
+
+### Iteration 4 - US-V4-004 (Dynamic MCP Configuration)
+- Created ~/.xroads/mcp/ directory with 3 MCP config files:
+  - agent-browser.json: AgentBrowser MCP for E2E testing and web automation
+  - supabase.template.json: Supabase MCP template with env var placeholders
+  - xroads.json: XRoads MCP for logging and status (always_loaded=true)
+- Created mcp-loader.sh (~350 lines) in ~/.xroads/lib/:
+  - --mcp <id>: Get MCP config by ID
+  - --inject: Replace placeholders with env vars from .env files
+  - --detect: Detect MCPs needed for current project (checks .supabase/, e2e/ dirs)
+  - --list: List all available MCP configs (text and JSON output)
+  - --json: Output in JSON format for programmatic use
+  - Environment loading from: .env, .env.local, ~/.xroads/.env, .xroads/project.json
+  - Command-line overrides: --project-url, --service-key, --anon-key
+- Created comprehensive unit test with 26 test cases covering:
+  - Script existence, executability, help
+  - JSON validity of all config files
+  - MCP listing and retrieval
+  - Environment injection from files and command line
+  - Project detection for supabase and agent-browser
+  - Config content validation (required fields, capabilities)
+- Fixed bash compatibility: replaced `declare -gA` associative arrays with temp file storage
+- **Unit test: tests/mcp/test_mcp_loader.sh - PASS (26/26 tests)**
+
+Files created:
+- ~/.xroads/mcp/agent-browser.json
+- ~/.xroads/mcp/supabase.template.json
+- ~/.xroads/mcp/xroads.json
+- ~/.xroads/lib/mcp-loader.sh
+- tests/mcp/test_mcp_loader.sh
+
+Files modified:
+- prd.json (marked US-V4-004 complete, unit_test.status = "passing")
+
+Learnings:
+- Bash `declare -gA` for associative arrays is not available in all bash versions; use temp files for portability
+- Ruby JSON parser is available by default on macOS for JSON validation and manipulation
+- MCP configs should include always_loaded flag for MCPs that should always be available (like xroads)
