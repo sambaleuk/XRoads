@@ -409,7 +409,8 @@
       "description": "Integrer xroads-mcp dans toutes les loops pour logging unifie",
       "priority": "high",
       "depends_on": ["US-V4-004", "US-V4-007"],
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-04T19:30:00Z",
       "acceptance_criteria": [
         "xroads-mcp toujours charge dans toutes les loops",
         "Loops emettent logs via emit_log tool",
@@ -434,7 +435,7 @@
           "emit_log is called during loop execution",
           "update_status is called on story completion"
         ],
-        "status": "pending"
+        "status": "passing"
       },
       "estimated_complexity": 5
     },
