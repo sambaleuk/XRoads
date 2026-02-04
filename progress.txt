@@ -1335,3 +1335,51 @@ Files modified:
 - XRoads/ViewModels/AppState.swift (added executeActionInSlot, startAllSlotsForMode, stopAllSlots, actionRunner)
 - XRoads/Views/Dashboard/XRoadsDashboardView.swift (updated startSlot/stopSlot to use AppState unified methods)
 - prd.json (marked US-V3-014 complete, added unit_test object with passing status)
+
+---
+
+## Feature: CrossRoads v4 - Multi-CLI Loop System
+## Started: 2026-02-04 10:45:00
+
+## Learnings
+- Bash scripts need careful handling of $HOME in nested bash calls - use local variable expansion first
+- The `${var^^}` uppercase syntax is not portable - use `tr '[:lower:]' '[:upper:]'` instead
+- Use `find ... -print0` with `while read -r -d ''` for safe file iteration instead of glob in for loops
+- Arithmetic `((count++))` can fail with set -e if count starts at 0; use `count=$((count + 1))` instead
+
+---
+
+## Session Log
+
+### Iteration 1 - US-V4-001 (Skills Repository Structure)
+- Created ~/.xroads/skills/ directory with subdirectories: core/, automation/, project/
+- Created comprehensive SCHEMA.md (205 lines) documenting:
+  - Full YAML schema with all fields (id, name, version, category, templates, required_tools, mcp_dependencies, env_vars)
+  - Template placeholders ({{context}}, {{files}}, {{branch}}, etc.)
+  - Example skill (commit.skill.yaml)
+  - Validation instructions with yq
+  - Loading priority rules
+- Created xroads-skills-init script in ~/bin/ with features:
+  - --help: shows usage information
+  - --list: lists all installed skills by category
+  - --validate: validates YAML files using yq or python fallback
+  - Default action: initializes directory structure with .gitkeep files
+- Created .gitkeep files in all subdirectories for git tracking
+- Created unit test at tests/skills/test_repository_structure.sh with 12 test cases:
+  - Directory existence tests (skills root, core, automation, project)
+  - SCHEMA.md existence and content validation
+  - Script existence, executability, and functionality tests
+  - .gitkeep files test
+- **Unit test: tests/skills/test_repository_structure.sh - PASS (12/12 tests)**
+- **Build**: N/A (shell scripts only)
+
+Files created:
+- ~/.xroads/skills/SCHEMA.md
+- ~/.xroads/skills/core/.gitkeep
+- ~/.xroads/skills/automation/.gitkeep
+- ~/.xroads/skills/project/.gitkeep
+- ~/bin/xroads-skills-init
+- tests/skills/test_repository_structure.sh
+
+Files modified:
+- prd.json (marked US-V4-001 complete, unit_test.status = "passing")

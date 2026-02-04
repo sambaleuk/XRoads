@@ -1,548 +1,577 @@
 {
-  "version": "3.0",
-  "feature_name": "XRoads Nexus Loop Integration",
-  "description": "Système d'actions (loops) avec skills packagés, input interactif, et conformité multi-CLI (Claude, Gemini, Codex)",
-  "created_at": "2026-02-03",
+  "version": "4.0",
+  "feature_name": "XRoads Multi-CLI Loop System",
+  "description": "Systeme de loops multi-CLI (Claude, Gemini, Codex) avec repository de skills, template engine pour conversion cross-CLI, et MCPs dynamiques",
+  "created_at": "2026-02-04",
   "author": "Nexus",
 
-  "conventions": {
-    "unit_tests": {
-      "rule": "MANDATORY - Chaque story DOIT inclure ses tests unitaires",
-      "location": "Tests/ directory, mirroring source structure",
-      "naming": "{ClassName}Tests.swift",
-      "coverage_target": "80% minimum pour le code nouveau"
-    },
-    "test_action_scope": {
-      "rule": "L'action .integrationTest ne couvre PAS les TUs",
-      "scope": ["integration_tests", "e2e_tests", "performance_tests", "snapshot_tests"],
-      "rationale": "TUs sont écrits avec le code (implement), integrationTest = QA avancée"
-    }
+  "vision": {
+    "summary": "Unifier les loops Nexus pour tous les CLIs avec skills convertibles et MCPs contextuels",
+    "key_concepts": [
+      "Skills Repository = Source de verite unique pour toutes les capacites",
+      "Template Engine = Conversion automatique Claude → Gemini → Codex",
+      "gemini-loop = Loop basee sur Ralph avec patterns Nexus",
+      "Dynamic MCPs = AgentBrowser (tests), Supabase (projet), XRoads (logging)",
+      "Injection Startup = Skills charges au demarrage de session"
+    ]
   },
 
-  "vision": {
-    "summary": "Transformer XRoads en orchestrateur de loops spécialisées avec skills contextuels",
-    "key_concepts": [
-      "Actions = Loops spécialisées (implement, review, integrationTest, write)",
-      "Skills = Packages de capacités chargés selon contexte",
-      "Conformité = Même interface pour Claude/Gemini/Codex",
-      "Frictionless = Auto-détection repo, pas de config manuelle",
-      "Interactive = Terminal reçoit input utilisateur (AskClaudeCode)",
-      "TDD = Tests unitaires obligatoires avec chaque implémentation"
-    ]
+  "architecture": {
+    "skills_repository": {
+      "location": "~/.xroads/skills/",
+      "structure": {
+        "core/": "Skills essentiels (commit, review-pr, prd, test-writer)",
+        "automation/": "Skills d'automatisation (agent-browser, supabase-query)",
+        "project/": "Skills specifiques au projet (charges via .xroads/skills.json)"
+      },
+      "format": {
+        "extension": ".skill.yaml",
+        "schema": {
+          "id": "string - identifiant unique",
+          "name": "string - nom affichable",
+          "version": "string - semver",
+          "description": "string - description",
+          "category": "string - core|automation|project",
+          "templates": {
+            "claude": "string - format Claude Code (slash commands)",
+            "gemini": "string - format Gemini CLI (hooks/extensions)",
+            "codex": "string - format Codex (playbook entries)"
+          },
+          "required_tools": ["string - outils MCP requis"],
+          "mcp_dependencies": ["string - MCPs a charger"],
+          "env_vars": ["string - variables d'environnement requises"]
+        }
+      }
+    },
+
+    "template_engine": {
+      "purpose": "Convertir skills entre formats CLI",
+      "location": "~/.xroads/lib/skill-converter.sh",
+      "conversions": {
+        "claude_to_gemini": {
+          "slash_command": "gemini_hook",
+          "mcp_tool_use": "gemini_extension_call",
+          "prompt_format": "gemini_system_instruction"
+        },
+        "claude_to_codex": {
+          "slash_command": "playbook_ritual",
+          "mcp_tool_use": "codex_exec_mcp",
+          "prompt_format": "playbook_section"
+        }
+      }
+    },
+
+    "mcp_configuration": {
+      "static_mcps": {
+        "xroads-mcp": {
+          "purpose": "Logging et status vers XRoads UI",
+          "always_loaded": true,
+          "path": "~/Projets/CrossRoads/xroads-mcp/build/index.js"
+        }
+      },
+      "dynamic_mcps": {
+        "agent-browser": {
+          "purpose": "E2E testing et web automation",
+          "auto_load_when": "skill requires browser automation",
+          "config": "~/.xroads/mcp/agent-browser.json"
+        },
+        "supabase": {
+          "purpose": "Database operations pour projet Supabase",
+          "auto_load_when": ".supabase/ exists in project",
+          "config_template": "~/.xroads/mcp/supabase.template.json",
+          "env_injection": {
+            "SUPABASE_PROJECT_URL": "from .env or .xroads/project.json",
+            "SUPABASE_ANON_KEY": "from .env"
+          }
+        }
+      }
+    },
+
+    "loop_variants": {
+      "nexus-loop": {
+        "cli": "claude",
+        "existing": true,
+        "path": "~/bin/nexus-loop"
+      },
+      "codex-loop": {
+        "cli": "codex",
+        "existing": true,
+        "path": "~/bin/codex-loop"
+      },
+      "gemini-loop": {
+        "cli": "gemini",
+        "existing": false,
+        "base": "Ralph extension",
+        "to_create": true
+      }
+    }
   },
 
   "user_stories": [
     {
-      "id": "US-V3-001",
-      "title": "Action Type Model & Registry",
-      "description": "Define ActionType enum and ActionRegistry for managing available loops",
+      "id": "US-V4-001",
+      "title": "Skills Repository Structure",
+      "description": "Creer la structure du repository de skills XRoads avec format YAML",
       "priority": "critical",
-      "status": "complete",
-      "completed_at": "2026-02-03T15:45:00Z",
       "depends_on": [],
+      "status": "complete",
+      "completed_at": "2026-02-04T10:55:00Z",
       "acceptance_criteria": [
-        "ActionType enum: implement, review, integrationTest, write, custom",
-        "Each ActionType has: displayName, iconName, description, requiredSkills",
-        "ActionRegistry lists available actions per CLI",
-        "Actions are Codable for persistence"
-      ],
-      "unit_tests": [
-        "ActionTypeTests: test all enum cases have valid displayName",
-        "ActionTypeTests: test requiredSkills returns non-empty for known actions",
-        "ActionRegistryTests: test actions filtered by CLI compatibility",
-        "ActionRegistryTests: test custom action registration"
+        "Dossier ~/.xroads/skills/ cree avec sous-dossiers core/, automation/, project/",
+        "Schema skill.yaml documente dans ~/.xroads/skills/SCHEMA.md",
+        "Script d'initialisation xroads-skills-init cree",
+        "Validation YAML avec yq ou equivalent"
       ],
       "files_to_create": [
-        "XRoads/Models/ActionType.swift",
-        "XRoads/Services/ActionRegistry.swift",
-        "Tests/Models/ActionTypeTests.swift",
-        "Tests/Services/ActionRegistryTests.swift"
-      ],
-      "estimated_complexity": 3
-    },
-    {
-      "id": "US-V3-002",
-      "title": "Skill Model & SkillRegistry",
-      "description": "Define Skill model and registry for packaged capabilities",
-      "priority": "critical",
-      "status": "complete",
-      "completed_at": "2026-02-03T16:00:00Z",
-      "depends_on": ["US-V3-001"],
-      "acceptance_criteria": [
-        "Skill struct: id, name, description, promptTemplate, requiredTools",
-        "SkillRegistry loads from ~/.xroads/skills/ or bundled",
-        "Skills have CLI compatibility flags (claude, gemini, codex)",
-        "SkillLoader injects skills into AGENT.md"
-      ],
-      "unit_tests": [
-        "SkillTests: test Codable encoding/decoding",
-        "SkillTests: test compatibility check for each CLI",
-        "SkillRegistryTests: test bundled skills loaded on init",
-        "SkillRegistryTests: test custom skill directory loading",
-        "SkillLoaderTests: test skill injection into AGENT.md template"
-      ],
-      "files_to_create": [
-        "XRoads/Models/Skill.swift",
-        "XRoads/Services/SkillRegistry.swift",
-        "XRoads/Services/SkillLoader.swift",
-        "Tests/Models/SkillTests.swift",
-        "Tests/Services/SkillRegistryTests.swift",
-        "Tests/Services/SkillLoaderTests.swift"
-      ],
-      "estimated_complexity": 5
-    },
-    {
-      "id": "US-V3-003",
-      "title": "ActionRunner Service",
-      "description": "Central service to execute actions with skill loading",
-      "priority": "critical",
-      "status": "complete",
-      "completed_at": "2026-02-03T16:30:00Z",
-      "depends_on": ["US-V3-001", "US-V3-002"],
-      "acceptance_criteria": [
-        "ActionRunner.run(action:, agent:, worktree:, skills:)",
-        "Loads required skills for action",
-        "Generates enriched AGENT.md with skills",
-        "Launches CLI via AgentLauncher",
-        "Works for both Single and Agentic mode"
-      ],
-      "unit_tests": [
-        "ActionRunnerTests: test skill loading for each action type",
-        "ActionRunnerTests: test AGENT.md generation includes skills",
-        "ActionRunnerTests: test error handling for missing skills",
-        "ActionRunnerTests: test CLI launch delegation to AgentLauncher"
-      ],
-      "files_to_create": [
-        "XRoads/Services/ActionRunner.swift",
-        "Tests/Services/ActionRunnerTests.swift"
-      ],
-      "files_to_modify": [
-        "XRoads/Services/AgentLauncher.swift"
-      ],
-      "estimated_complexity": 8
-    },
-    {
-      "id": "US-V3-004",
-      "title": "Interactive Terminal Input",
-      "description": "Add input bar to terminal slots for stdin interaction",
-      "priority": "critical",
-      "status": "complete",
-      "completed_at": "2026-02-03T17:00:00Z",
-      "depends_on": [],
-      "acceptance_criteria": [
-        "TerminalSlotView has InputBar at bottom",
-        "InputBar sends text to ProcessRunner.sendInput()",
-        "Supports multi-line input (shift+enter)",
-        "Shows 'Agent waiting for input' indicator when needed",
-        "Works in both Single and Agentic mode terminals"
-      ],
-      "unit_tests": [
-        "TerminalInputBarTests: test text submission callback",
-        "TerminalInputBarTests: test multi-line input detection",
-        "TerminalInputBarTests: test disabled state when no process",
-        "TerminalSlotViewTests: test input bar visibility toggle"
-      ],
-      "files_to_create": [
-        "XRoads/Views/Components/TerminalInputBar.swift",
-        "Tests/Views/TerminalInputBarTests.swift"
-      ],
-      "files_to_modify": [
-        "XRoads/Views/Dashboard/TerminalSlotView.swift",
-        "XRoads/Views/Dashboard/TerminalGridLayout.swift"
-      ],
-      "estimated_complexity": 5
-    },
-    {
-      "id": "US-V3-005",
-      "title": "Action Picker UI Component",
-      "description": "UI for selecting action type when configuring a slot",
-      "priority": "high",
-      "status": "complete",
-      "completed_at": "2026-02-03T17:30:00Z",
-      "depends_on": ["US-V3-001"],
-      "acceptance_criteria": [
-        "ActionPickerMenu shows available actions",
-        "Actions grouped by category (dev, qa, ops)",
-        "Shows required skills per action",
-        "Disabled if CLI doesn't support required skills",
-        "Integrates into TerminalSlotView configuration flow"
-      ],
-      "unit_tests": [
-        "ActionPickerMenuTests: test action filtering by category",
-        "ActionPickerMenuTests: test disabled state for incompatible CLI",
-        "ActionPickerMenuTests: test selection callback"
-      ],
-      "files_to_create": [
-        "XRoads/Views/Components/ActionPickerMenu.swift",
-        "Tests/Views/ActionPickerMenuTests.swift"
-      ],
-      "files_to_modify": [
-        "XRoads/Views/Dashboard/TerminalSlotView.swift"
-      ],
-      "estimated_complexity": 4
-    },
-    {
-      "id": "US-V3-006",
-      "title": "Cross-CLI Skill Adapters",
-      "description": "Adapt skill prompts for each CLI's format",
-      "priority": "high",
-      "status": "complete",
-      "completed_at": "2026-02-03T18:00:00Z",
-      "depends_on": ["US-V3-002"],
-      "acceptance_criteria": [
-        "SkillAdapter protocol with adaptSkill(for: AgentType)",
-        "ClaudeSkillAdapter handles Claude Code format",
-        "GeminiSkillAdapter handles Gemini CLI format",
-        "CodexSkillAdapter handles Codex format",
-        "Skill templates use {{placeholders}} for adaptation"
-      ],
-      "unit_tests": [
-        "SkillAdapterTests: test placeholder replacement",
-        "ClaudeSkillAdapterTests: test Claude-specific formatting",
-        "GeminiSkillAdapterTests: test Gemini-specific formatting",
-        "CodexSkillAdapterTests: test Codex-specific formatting",
-        "SkillAdapterTests: test same skill produces valid output for all CLIs"
-      ],
-      "files_to_create": [
-        "XRoads/Services/SkillAdapters/SkillAdapter.swift",
-        "XRoads/Services/SkillAdapters/ClaudeSkillAdapter.swift",
-        "XRoads/Services/SkillAdapters/GeminiSkillAdapter.swift",
-        "XRoads/Services/SkillAdapters/CodexSkillAdapter.swift",
-        "Tests/Services/SkillAdapters/SkillAdapterTests.swift",
-        "Tests/Services/SkillAdapters/ClaudeSkillAdapterTests.swift",
-        "Tests/Services/SkillAdapters/GeminiSkillAdapterTests.swift",
-        "Tests/Services/SkillAdapters/CodexSkillAdapterTests.swift"
-      ],
-      "estimated_complexity": 6
-    },
-    {
-      "id": "US-V3-007",
-      "title": "Frictionless Repo Detection",
-      "description": "Auto-detect git repo and offer quick actions",
-      "priority": "medium",
-      "status": "complete",
-      "completed_at": "2026-02-03T18:30:00Z",
-      "depends_on": ["US-V3-001"],
-      "acceptance_criteria": [
-        "On app launch, detect if CWD is git repo",
-        "Show QuickStartView with repo info + action buttons",
-        "One-click to start action (no worktree sheet)",
-        "Auto-create worktree if needed (branch naming convention)",
-        "Remember last used repo"
-      ],
-      "unit_tests": [
-        "RepoDetectorTests: test git repo detection",
-        "RepoDetectorTests: test non-repo directory handling",
-        "QuickActionBarTests: test action button callbacks",
-        "QuickActionBarTests: test last repo persistence"
-      ],
-      "files_to_create": [
-        "XRoads/Views/Components/QuickActionBar.swift",
-        "XRoads/Services/RepoDetector.swift",
-        "Tests/Services/RepoDetectorTests.swift",
-        "Tests/Views/QuickActionBarTests.swift"
-      ],
-      "files_to_modify": [
-        "XRoads/Views/Dashboard/GitInfoPanel.swift",
-        "XRoads/Views/MainWindowView.swift"
-      ],
-      "estimated_complexity": 4
-    },
-    {
-      "id": "US-V3-008",
-      "title": "Built-in Skill Definitions",
-      "description": "Package core skills (commit, review-pr, prd, integration-test, etc.)",
-      "priority": "high",
-      "status": "complete",
-      "completed_at": "2026-02-03T19:00:00Z",
-      "depends_on": ["US-V3-002", "US-V3-006"],
-      "acceptance_criteria": [
-        "Bundled skills: commit, review-pr, prd, integration-test, code-reviewer",
-        "Each skill has prompt template + tool requirements",
-        "Skills versioned and updatable",
-        "User can add custom skills to ~/.xroads/skills/",
-        "Skills documented in SKILLS.md"
-      ],
-      "unit_tests": [
-        "BundledSkillsTests: test all bundled skills parse correctly",
-        "BundledSkillsTests: test skill version format",
-        "BundledSkillsTests: test required tools are valid"
-      ],
-      "files_to_create": [
-        "XRoads/Resources/Skills/commit.skill.json",
-        "XRoads/Resources/Skills/review-pr.skill.json",
-        "XRoads/Resources/Skills/prd.skill.json",
-        "XRoads/Resources/Skills/integration-test.skill.json",
-        "XRoads/Resources/Skills/code-reviewer.skill.json",
-        "Tests/Resources/BundledSkillsTests.swift"
-      ],
-      "estimated_complexity": 5
-    },
-    {
-      "id": "US-V3-009",
-      "title": "TerminalSlot Model Extension",
-      "description": "Extend TerminalSlot to track action and input state",
-      "priority": "high",
-      "status": "complete",
-      "completed_at": "2026-02-03T19:45:00Z",
-      "depends_on": ["US-V3-001", "US-V3-004"],
-      "acceptance_criteria": [
-        "TerminalSlot has actionType: ActionType?",
-        "TerminalSlot has loadedSkills: [Skill]",
-        "TerminalSlot has needsInput: Bool",
-        "TerminalSlot has inputHistory: [String]",
-        "Slot status reflects input-waiting state"
-      ],
-      "unit_tests": [
-        "TerminalSlotTests: test isConfigured includes actionType",
-        "TerminalSlotTests: test Equatable includes new fields",
-        "TerminalSlotTests: test needsInput status transition"
-      ],
-      "files_to_modify": [
-        "XRoads/Models/TerminalSlot.swift"
-      ],
-      "files_to_create": [
-        "Tests/Models/TerminalSlotTests.swift"
-      ],
-      "estimated_complexity": 3
-    },
-    {
-      "id": "US-V3-010",
-      "title": "Implement Loop Action",
-      "description": "Create the 'implement' action (PRD → US → code + TUs)",
-      "priority": "critical",
-      "status": "complete",
-      "completed_at": "2026-02-03T20:15:00Z",
-      "depends_on": ["US-V3-003", "US-V3-008"],
-      "acceptance_criteria": [
-        "ImplementAction loads prd.json from repo",
-        "Parses user stories and dependencies",
-        "Generates implementation plan",
-        "Executes code generation WITH unit tests per story",
-        "Commits changes per story (code + tests together)"
-      ],
-      "unit_tests": [
-        "ImplementActionTests: test PRD loading and parsing",
-        "ImplementActionTests: test dependency ordering",
-        "ImplementActionTests: test plan generation format",
-        "ImplementActionTests: test story completion tracking"
-      ],
-      "files_to_create": [
-        "XRoads/Actions/ImplementAction.swift",
-        "Tests/Actions/ImplementActionTests.swift"
-      ],
-      "estimated_complexity": 8
-    },
-    {
-      "id": "US-V3-011",
-      "title": "Review Loop Action",
-      "description": "Create the 'review' action (code reviewer)",
-      "priority": "high",
-      "status": "complete",
-      "completed_at": "2026-02-03T20:45:00Z",
-      "depends_on": ["US-V3-003", "US-V3-008"],
-      "acceptance_criteria": [
-        "ReviewAction analyzes staged/committed changes",
-        "Generates review report with issues",
-        "Suggests fixes with diff preview",
-        "Can auto-fix minor issues",
-        "Outputs review.md"
-      ],
-      "unit_tests": [
-        "ReviewActionTests: test diff analysis",
-        "ReviewActionTests: test issue categorization",
-        "ReviewActionTests: test review.md generation format"
-      ],
-      "files_to_create": [
-        "XRoads/Actions/ReviewAction.swift",
-        "Tests/Actions/ReviewActionTests.swift"
-      ],
-      "estimated_complexity": 6
-    },
-    {
-      "id": "US-V3-012",
-      "title": "Integration Test Loop Action",
-      "description": "Create the 'integrationTest' action (NOT unit tests - those are in implement)",
-      "priority": "high",
-      "status": "complete",
-      "completed_at": "2026-02-03T21:15:00Z",
-      "depends_on": ["US-V3-003", "US-V3-008"],
-      "acceptance_criteria": [
-        "IntegrationTestAction identifies integration points",
-        "Generates integration tests for service boundaries",
-        "Generates e2e tests for critical user flows",
-        "Can generate performance tests",
-        "Does NOT duplicate unit tests (TUs are in implement action)"
-      ],
-      "unit_tests": [
-        "IntegrationTestActionTests: test integration point detection",
-        "IntegrationTestActionTests: test e2e flow identification",
-        "IntegrationTestActionTests: test no overlap with unit test files"
-      ],
-      "files_to_create": [
-        "XRoads/Actions/IntegrationTestAction.swift",
-        "Tests/Actions/IntegrationTestActionTests.swift"
-      ],
-      "estimated_complexity": 6
-    },
-    {
-      "id": "US-V3-013",
-      "title": "ProcessRunner Input Bridge",
-      "description": "Expose stdin writing to terminal UI",
-      "priority": "critical",
-      "status": "complete",
-      "completed_at": "2026-02-03T22:00:00Z",
-      "depends_on": [],
-      "acceptance_criteria": [
-        "ProcessRunner exposes sendInput(id:, text:) publicly",
-        "AppState tracks processId per slot",
-        "TerminalSlotView can call sendInput via binding",
-        "Input echoed in terminal output",
-        "Handles process not running gracefully"
+        "~/.xroads/skills/SCHEMA.md",
+        "~/.xroads/skills/core/.gitkeep",
+        "~/.xroads/skills/automation/.gitkeep",
+        "~/.xroads/skills/project/.gitkeep",
+        "~/bin/xroads-skills-init"
       ],
       "unit_test": {
-        "file": "Tests/Services/ProcessRunnerTests.swift",
-        "name": "ProcessRunnerTests",
-        "description": "Verifies ProcessRunner sendInput functionality, error handling, and integration with AppState",
+        "file": "tests/skills/test_repository_structure.sh",
+        "name": "test_skills_repository_exists",
+        "description": "Verifie que la structure du repository est correcte",
         "assertions": [
-          "sendInput writes to stdin correctly",
-          "sendInput error for invalid processId",
-          "sendInput error for terminated process",
-          "input echo in output stream (via AppState)",
-          "graceful handling when no process running"
+          "~/.xroads/skills/ exists",
+          "~/.xroads/skills/core/ exists",
+          "~/.xroads/skills/SCHEMA.md exists"
         ],
         "status": "passing"
       },
-      "files_to_modify": [
-        "XRoads/Services/ProcessRunner.swift",
-        "XRoads/ViewModels/AppState.swift",
-        "XRoads/Views/Dashboard/TerminalGridLayout.swift",
-        "XRoads/Views/Dashboard/XRoadsDashboardView.swift"
+      "estimated_complexity": 3
+    },
+    {
+      "id": "US-V4-002",
+      "title": "Core Skills Definition",
+      "description": "Definir les skills essentiels en format YAML avec templates multi-CLI",
+      "priority": "critical",
+      "depends_on": ["US-V4-001"],
+      "status": "pending",
+      "acceptance_criteria": [
+        "commit.skill.yaml avec templates Claude/Gemini/Codex",
+        "review-pr.skill.yaml avec templates Claude/Gemini/Codex",
+        "prd.skill.yaml avec templates Claude/Gemini/Codex",
+        "test-writer.skill.yaml avec templates Claude/Gemini/Codex",
+        "code-reviewer.skill.yaml avec templates Claude/Gemini/Codex",
+        "Chaque skill a les 3 templates (claude, gemini, codex)"
       ],
       "files_to_create": [
-        "Tests/Services/ProcessRunnerTests.swift"
+        "~/.xroads/skills/core/commit.skill.yaml",
+        "~/.xroads/skills/core/review-pr.skill.yaml",
+        "~/.xroads/skills/core/prd.skill.yaml",
+        "~/.xroads/skills/core/test-writer.skill.yaml",
+        "~/.xroads/skills/core/code-reviewer.skill.yaml"
       ],
+      "unit_test": {
+        "file": "tests/skills/test_core_skills.sh",
+        "name": "test_core_skills_valid_yaml",
+        "description": "Verifie que tous les skills core sont valides",
+        "assertions": [
+          "commit.skill.yaml is valid YAML",
+          "All skills have claude/gemini/codex templates",
+          "All skills have required_tools defined"
+        ],
+        "status": "pending"
+      },
+      "estimated_complexity": 5
+    },
+    {
+      "id": "US-V4-003",
+      "title": "Skill Template Engine",
+      "description": "Implementer le moteur de conversion de templates entre formats CLI",
+      "priority": "critical",
+      "depends_on": ["US-V4-002"],
+      "status": "pending",
+      "acceptance_criteria": [
+        "skill-converter.sh lit un skill.yaml et extrait le template pour un CLI donne",
+        "Supporte placeholders {{context}}, {{files}}, {{branch}}",
+        "Valide que le template existe pour le CLI cible",
+        "Fallback: utilise template Claude si autre manquant (avec warning)"
+      ],
+      "files_to_create": [
+        "~/.xroads/lib/skill-converter.sh",
+        "~/.xroads/lib/skill-loader.sh"
+      ],
+      "unit_test": {
+        "file": "tests/skills/test_template_engine.sh",
+        "name": "test_skill_conversion",
+        "description": "Verifie la conversion entre formats CLI",
+        "assertions": [
+          "skill-converter.sh --skill commit --cli claude returns Claude template",
+          "skill-converter.sh --skill commit --cli gemini returns Gemini template",
+          "skill-converter.sh --skill commit --cli codex returns Codex template"
+        ],
+        "status": "pending"
+      },
+      "estimated_complexity": 6
+    },
+    {
+      "id": "US-V4-004",
+      "title": "Dynamic MCP Configuration",
+      "description": "Systeme de chargement dynamique des MCPs selon contexte",
+      "priority": "high",
+      "depends_on": ["US-V4-001"],
+      "status": "pending",
+      "acceptance_criteria": [
+        "~/.xroads/mcp/ contient les configs MCP templates",
+        "agent-browser.json config avec instructions de chargement",
+        "supabase.template.json avec placeholders pour injection",
+        "Script mcp-loader.sh detecte le contexte et charge les MCPs",
+        "Support injection .env pour credentials"
+      ],
+      "files_to_create": [
+        "~/.xroads/mcp/agent-browser.json",
+        "~/.xroads/mcp/supabase.template.json",
+        "~/.xroads/mcp/xroads.json",
+        "~/.xroads/lib/mcp-loader.sh"
+      ],
+      "unit_test": {
+        "file": "tests/mcp/test_mcp_loader.sh",
+        "name": "test_mcp_dynamic_loading",
+        "description": "Verifie le chargement dynamique des MCPs",
+        "assertions": [
+          "mcp-loader.sh --mcp xroads returns xroads config",
+          "mcp-loader.sh --mcp supabase --project-url URL injects URL",
+          "mcp-loader.sh detects .supabase/ and suggests supabase MCP"
+        ],
+        "status": "pending"
+      },
+      "estimated_complexity": 5
+    },
+    {
+      "id": "US-V4-005",
+      "title": "Secure Env Management",
+      "description": "Gestion securisee des credentials pour MCPs dynamiques",
+      "priority": "high",
+      "depends_on": ["US-V4-004"],
+      "status": "pending",
+      "acceptance_criteria": [
+        "~/.xroads/.env.template avec variables requises documentees",
+        "Script env-loader.sh lit .env projet puis ~/.xroads/.env comme fallback",
+        "Ne jamais logger les credentials",
+        "Validation que les variables requises sont presentes",
+        "Support fichiers .env.local pour overrides"
+      ],
+      "files_to_create": [
+        "~/.xroads/.env.template",
+        "~/.xroads/lib/env-loader.sh"
+      ],
+      "unit_test": {
+        "file": "tests/env/test_env_loader.sh",
+        "name": "test_env_secure_loading",
+        "description": "Verifie le chargement securise des variables",
+        "assertions": [
+          "env-loader.sh reads project .env first",
+          "env-loader.sh falls back to ~/.xroads/.env",
+          "env-loader.sh validates required vars exist"
+        ],
+        "status": "pending"
+      },
       "estimated_complexity": 4
     },
     {
-      "id": "US-V3-014",
-      "title": "Unified Action Flow (Single & Agentic)",
-      "description": "Same action execution path for both modes",
-      "priority": "medium",
-      "status": "complete",
-      "completed_at": "2026-02-03T23:00:00Z",
-      "depends_on": ["US-V3-003", "US-V3-009"],
+      "id": "US-V4-006",
+      "title": "Gemini Loop Base Implementation",
+      "description": "Creer gemini-loop base sur Ralph avec patterns Nexus",
+      "priority": "critical",
+      "depends_on": ["US-V4-003", "US-V4-004"],
+      "status": "pending",
       "acceptance_criteria": [
-        "ActionRunner works identically in both modes",
-        "Single mode: action on slot[0]",
-        "Agentic mode: action per configured slot",
-        "Progress/status unified",
-        "Logs stream to correct terminal"
+        "gemini-loop script cree dans ~/bin/",
+        "Utilise gemini CLI avec extensions Ralph",
+        "Lit PRD_FILE, PROGRESS_FILE, AGENTS_FILE comme nexus-loop",
+        "Charge skills via skill-loader.sh avec format Gemini",
+        "Charge MCPs dynamiques via mcp-loader.sh",
+        "Emet logs vers xroads-mcp"
       ],
-      "unit_test": {
-        "file": "Tests/Integration/UnifiedFlowTests.swift",
-        "name": "UnifiedFlowTests",
-        "description": "Verifies unified action execution flow works identically in Single and Agentic modes",
-        "assertions": [
-          "Single mode uses slot[0] for action execution",
-          "Agentic mode iterates all configured slots",
-          "Log routing correctly targets slot-specific logs",
-          "Progress and status updates are unified across modes",
-          "ActionRunner works identically in both modes"
-        ],
-        "status": "passing"
-      },
       "files_to_create": [
-        "Tests/Integration/UnifiedFlowTests.swift"
+        "~/bin/gemini-loop"
+      ],
+      "files_to_modify": [],
+      "unit_test": {
+        "file": "tests/loops/test_gemini_loop.sh",
+        "name": "test_gemini_loop_init",
+        "description": "Verifie l'initialisation de gemini-loop",
+        "assertions": [
+          "gemini-loop --help shows usage",
+          "gemini-loop checks for gemini CLI",
+          "gemini-loop loads skills in Gemini format"
+        ],
+        "status": "pending"
+      },
+      "estimated_complexity": 8
+    },
+    {
+      "id": "US-V4-007",
+      "title": "Loop Skill Injection",
+      "description": "Injecter les skills au demarrage de chaque loop",
+      "priority": "high",
+      "depends_on": ["US-V4-003", "US-V4-006"],
+      "status": "pending",
+      "acceptance_criteria": [
+        "nexus-loop charge skills au startup via skill-loader.sh",
+        "codex-loop charge skills au startup via skill-loader.sh",
+        "gemini-loop charge skills au startup via skill-loader.sh",
+        "Skills injectes dans AGENT.md ou equivalent par CLI",
+        "Support --skills flag pour specifier skills additionnels"
       ],
       "files_to_modify": [
-        "XRoads/Views/Dashboard/XRoadsDashboardView.swift",
-        "XRoads/Services/ActionRunner.swift"
+        "~/bin/nexus-loop",
+        "~/bin/codex-loop",
+        "~/bin/gemini-loop"
       ],
+      "files_to_create": [],
+      "unit_test": {
+        "file": "tests/loops/test_skill_injection.sh",
+        "name": "test_loops_inject_skills",
+        "description": "Verifie l'injection des skills dans les loops",
+        "assertions": [
+          "nexus-loop --skills commit,prd loads specified skills",
+          "AGENT.md contains skill instructions after init",
+          "Skills are CLI-format specific"
+        ],
+        "status": "pending"
+      },
       "estimated_complexity": 5
+    },
+    {
+      "id": "US-V4-008",
+      "title": "AgentBrowser Skill",
+      "description": "Skill automation pour browser avec AgentBrowser MCP",
+      "priority": "medium",
+      "depends_on": ["US-V4-002", "US-V4-004"],
+      "status": "pending",
+      "acceptance_criteria": [
+        "agent-browser.skill.yaml cree avec templates multi-CLI",
+        "Depend de agent-browser MCP",
+        "Instructions pour E2E testing, screenshots, form filling",
+        "Auto-charge MCP agent-browser quand skill utilise"
+      ],
+      "files_to_create": [
+        "~/.xroads/skills/automation/agent-browser.skill.yaml"
+      ],
+      "unit_test": {
+        "file": "tests/skills/test_agent_browser_skill.sh",
+        "name": "test_agent_browser_skill",
+        "description": "Verifie le skill agent-browser",
+        "assertions": [
+          "agent-browser.skill.yaml is valid",
+          "mcp_dependencies includes agent-browser",
+          "All CLI templates present"
+        ],
+        "status": "pending"
+      },
+      "estimated_complexity": 4
+    },
+    {
+      "id": "US-V4-009",
+      "title": "Supabase Skill",
+      "description": "Skill automation pour Supabase avec injection URL projet",
+      "priority": "medium",
+      "depends_on": ["US-V4-002", "US-V4-004", "US-V4-005"],
+      "status": "pending",
+      "acceptance_criteria": [
+        "supabase-query.skill.yaml cree avec templates multi-CLI",
+        "Depend de supabase MCP",
+        "env_vars specifie SUPABASE_PROJECT_URL et SUPABASE_ANON_KEY",
+        "Auto-detection projet Supabase via .supabase/",
+        "Injection URL depuis .xroads/project.json ou .env"
+      ],
+      "files_to_create": [
+        "~/.xroads/skills/automation/supabase-query.skill.yaml"
+      ],
+      "unit_test": {
+        "file": "tests/skills/test_supabase_skill.sh",
+        "name": "test_supabase_skill",
+        "description": "Verifie le skill supabase",
+        "assertions": [
+          "supabase-query.skill.yaml is valid",
+          "env_vars includes SUPABASE_PROJECT_URL",
+          "mcp_dependencies includes supabase"
+        ],
+        "status": "pending"
+      },
+      "estimated_complexity": 4
+    },
+    {
+      "id": "US-V4-010",
+      "title": "XRoads MCP Integration",
+      "description": "Integrer xroads-mcp dans toutes les loops pour logging unifie",
+      "priority": "high",
+      "depends_on": ["US-V4-004", "US-V4-007"],
+      "status": "pending",
+      "acceptance_criteria": [
+        "xroads-mcp toujours charge dans toutes les loops",
+        "Loops emettent logs via emit_log tool",
+        "Loops emettent status via update_status tool",
+        "XRoads UI recoit les logs en temps reel",
+        "Skill xroads-log.skill.yaml pour instructions de logging"
+      ],
+      "files_to_create": [
+        "~/.xroads/skills/core/xroads-log.skill.yaml"
+      ],
+      "files_to_modify": [
+        "~/bin/nexus-loop",
+        "~/bin/codex-loop",
+        "~/bin/gemini-loop"
+      ],
+      "unit_test": {
+        "file": "tests/mcp/test_xroads_mcp_integration.sh",
+        "name": "test_xroads_logging",
+        "description": "Verifie l'integration xroads-mcp",
+        "assertions": [
+          "xroads-mcp is always loaded by loops",
+          "emit_log is called during loop execution",
+          "update_status is called on story completion"
+        ],
+        "status": "pending"
+      },
+      "estimated_complexity": 5
+    },
+    {
+      "id": "US-V4-011",
+      "title": "Project Skills Configuration",
+      "description": "Support skills specifiques au projet via .xroads/skills.json",
+      "priority": "medium",
+      "depends_on": ["US-V4-003"],
+      "status": "pending",
+      "acceptance_criteria": [
+        ".xroads/skills.json schema documente",
+        "skill-loader.sh lit skills projet en plus des skills globaux",
+        "Skills projet overrident skills globaux du meme ID",
+        "Support skills inline dans skills.json ou reference fichiers .skill.yaml"
+      ],
+      "files_to_create": [
+        "~/.xroads/skills/project/PROJECT_SKILLS.md"
+      ],
+      "files_to_modify": [
+        "~/.xroads/lib/skill-loader.sh"
+      ],
+      "unit_test": {
+        "file": "tests/skills/test_project_skills.sh",
+        "name": "test_project_skill_override",
+        "description": "Verifie le chargement des skills projet",
+        "assertions": [
+          ".xroads/skills.json is loaded if exists",
+          "Project skills override global skills",
+          "skill-loader.sh merges both sources"
+        ],
+        "status": "pending"
+      },
+      "estimated_complexity": 4
+    },
+    {
+      "id": "US-V4-012",
+      "title": "CLI Auto-Detection",
+      "description": "Detection automatique du CLI disponible pour loop generique",
+      "priority": "low",
+      "depends_on": ["US-V4-006", "US-V4-007"],
+      "status": "pending",
+      "acceptance_criteria": [
+        "xroads-loop script generique cree",
+        "Detecte CLI disponible: claude > gemini > codex (ordre preference)",
+        "Permet override via --cli flag",
+        "Charge skills dans format du CLI detecte"
+      ],
+      "files_to_create": [
+        "~/bin/xroads-loop"
+      ],
+      "unit_test": {
+        "file": "tests/loops/test_cli_detection.sh",
+        "name": "test_auto_cli_detection",
+        "description": "Verifie la detection automatique du CLI",
+        "assertions": [
+          "xroads-loop detects available CLI",
+          "xroads-loop --cli gemini forces Gemini",
+          "Error if no CLI available"
+        ],
+        "status": "pending"
+      },
+      "estimated_complexity": 3
     }
   ],
-
-  "action_definitions": {
-    "implement": {
-      "id": "implement",
-      "displayName": "Implement",
-      "icon": "hammer.fill",
-      "description": "PRD → User Stories → Code + Unit Tests",
-      "includes_unit_tests": true,
-      "skills": ["prd", "code-writer", "commit"]
-    },
-    "review": {
-      "id": "review",
-      "displayName": "Review",
-      "icon": "eye.fill",
-      "description": "Analyze code for issues, suggest fixes",
-      "includes_unit_tests": false,
-      "skills": ["code-reviewer", "lint"]
-    },
-    "integrationTest": {
-      "id": "integrationTest",
-      "displayName": "Integration Test",
-      "icon": "testtube.2",
-      "description": "Generate integration, e2e, and performance tests (NOT unit tests)",
-      "includes_unit_tests": false,
-      "skills": ["integration-test", "e2e-test", "perf-test"]
-    },
-    "write": {
-      "id": "write",
-      "displayName": "Write Docs",
-      "icon": "doc.text.fill",
-      "description": "Generate documentation, README, API docs",
-      "includes_unit_tests": false,
-      "skills": ["doc-generator"]
-    }
-  },
 
   "implementation_phases": [
     {
       "phase": 1,
-      "name": "Core Models & Registry",
-      "stories": ["US-V3-001", "US-V3-002", "US-V3-009"],
-      "goal": "Define action and skill data structures"
+      "name": "Foundation - Skills Repository",
+      "stories": ["US-V4-001", "US-V4-002"],
+      "goal": "Structure de base et skills core definis"
     },
     {
       "phase": 2,
-      "name": "Interactive Terminal",
-      "stories": ["US-V3-004", "US-V3-013"],
-      "goal": "Enable user input in terminal slots"
+      "name": "Template Engine & MCP",
+      "stories": ["US-V4-003", "US-V4-004", "US-V4-005"],
+      "goal": "Conversion skills et chargement MCPs dynamique"
     },
     {
       "phase": 3,
-      "name": "Action Execution",
-      "stories": ["US-V3-003", "US-V3-005", "US-V3-014"],
-      "goal": "ActionRunner with UI integration"
+      "name": "Gemini Loop",
+      "stories": ["US-V4-006"],
+      "goal": "gemini-loop fonctionnel avec patterns Nexus"
     },
     {
       "phase": 4,
-      "name": "Skill Adapters",
-      "stories": ["US-V3-006", "US-V3-008"],
-      "goal": "Cross-CLI skill conformity"
+      "name": "Loop Integration",
+      "stories": ["US-V4-007", "US-V4-010"],
+      "goal": "Injection skills et logging xroads-mcp"
     },
     {
       "phase": 5,
-      "name": "Built-in Actions",
-      "stories": ["US-V3-010", "US-V3-011", "US-V3-012"],
-      "goal": "Implement (with TUs), Review, IntegrationTest loops"
+      "name": "Automation Skills",
+      "stories": ["US-V4-008", "US-V4-009"],
+      "goal": "Skills AgentBrowser et Supabase"
     },
     {
       "phase": 6,
-      "name": "Frictionless UX",
-      "stories": ["US-V3-007"],
-      "goal": "Auto-detect and quick-start"
+      "name": "Polish",
+      "stories": ["US-V4-011", "US-V4-012"],
+      "goal": "Skills projet et loop generique"
     }
   ],
 
+  "skill_yaml_example": {
+    "file": "commit.skill.yaml",
+    "content": "id: commit\nname: Git Commit\nversion: 1.0.0\ndescription: Create a conventional commit from staged changes\ncategory: core\n\ntemplates:\n  claude: |\n    # /commit Skill\n    Analyze staged changes with `git diff --cached` and create a commit.\n    Follow Conventional Commits: type(scope): description\n    Types: feat, fix, docs, style, refactor, test, chore\n    Co-Authored-By: Claude <noreply@anthropic.com>\n\n  gemini: |\n    @commit Extension\n    1. Run: git diff --cached\n    2. Analyze changes and determine type/scope\n    3. Generate commit message following Conventional Commits\n    4. Execute: git commit -m \"<message>\"\n    Include: Co-Authored-By: Gemini <noreply@google.com>\n\n  codex: |\n    ## Commit Ritual\n    - codex exec \"git diff --cached\" → analyze changes\n    - Determine commit type: feat|fix|docs|style|refactor|test|chore\n    - codex exec \"git commit -m 'type(scope): description\\n\\nCo-Authored-By: Codex'\"\n\nrequired_tools:\n  - git\n  - read\n  - write\n\nmcp_dependencies: []\n\nenv_vars: []"
+  },
+
+  "gemini_loop_design": {
+    "base": "Ralph extension patterns",
+    "key_features": [
+      "Hook-based command system (vs Claude slash commands)",
+      "Extension loading via gemini CLI --load-extension",
+      "System instruction injection for context",
+      "Streaming output parsing for completion detection"
+    ],
+    "command_mapping": {
+      "nexus_loop_prompt": "gemini_system_instruction",
+      "claude_slash_command": "gemini_hook_trigger",
+      "mcp_tool_call": "gemini_extension_function"
+    }
+  },
+
   "success_metrics": [
-    "User can start an action in < 3 clicks",
-    "User can respond to agent questions in terminal",
-    "Same skill works on Claude, Gemini, and Codex",
-    "Actions available in both Single and Agentic modes",
-    "Every story implementation includes its unit tests",
-    "Integration tests are separate from unit tests"
-  ]
+    "gemini-loop fonctionne avec memes patterns que nexus-loop",
+    "Skills convertis automatiquement entre 3 CLIs",
+    "MCPs charges dynamiquement selon contexte projet",
+    "Logs unifies dans XRoads UI via xroads-mcp",
+    "Credentials jamais exposes dans logs ou commits"
+  ],
+
+  "dependencies": {
+    "tools": {
+      "yq": "YAML parser (brew install yq)",
+      "jq": "JSON parser (deja installe)",
+      "gemini": "Gemini CLI",
+      "claude": "Claude Code CLI",
+      "codex": "Codex CLI (patched)"
+    },
+    "mcps": {
+      "xroads-mcp": "~/Projets/CrossRoads/xroads-mcp/",
+      "agent-browser": "npm i -g @anthropic/agent-browser-mcp",
+      "supabase": "Supabase MCP server"
+    }
+  }
 }
