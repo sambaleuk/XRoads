@@ -86,7 +86,8 @@
       "description": "Panel de chat pour interagir avec l'orchestrateur AI",
       "priority": "critical",
       "depends_on": [],
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-04T15:30:00Z",
       "acceptance_criteria": [
         "OrchestratorChatView avec messages user/assistant",
         "Toggle API/Terminal mode",
@@ -109,7 +110,7 @@
           "Messages display correctly",
           "Input bar accepts text"
         ],
-        "status": "pending"
+        "status": "passing"
       },
       "estimated_complexity": 8
     },
@@ -704,6 +705,6 @@
   ],
 
   "total_stories": 28,
-  "completed_stories": 12,
-  "pending_stories": 16
+  "completed_stories": 13,
+  "pending_stories": 15
 }

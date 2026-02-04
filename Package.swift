@@ -44,6 +44,10 @@ let package = Package(
                 "Views/Dashboard/OrchestratorCreatureView.swift",
                 "Views/Dashboard/NeonBrainView.swift",
                 "Views/Dashboard/GitInfoPanel.swift",
+                // US-V4-013: Orchestrator Chat Views
+                "Views/Orchestrator/OrchestratorChatView.swift",
+                "Views/Orchestrator/ChatMessageView.swift",
+                "Views/Orchestrator/ChatInputBar.swift",
                 "Resources/Theme.swift",
                 "Models/AgentType.swift",
                 "Models/ActionType.swift",
@@ -61,6 +65,8 @@ let package = Package(
                 "Models/TerminalSlot.swift",
                 "Models/DashboardMode.swift",
                 "Models/OrchestratorVisualState.swift",
+                // US-V4-013: Chat Model
+                "Models/ChatMessage.swift",
                 "Services/GitService.swift",
                 "Services/ProcessRunner.swift",
                 "Services/MCPClient.swift",
@@ -85,6 +91,8 @@ let package = Package(
                 "Services/SkillAdapters/GeminiSkillAdapter.swift",
                 "Services/SkillAdapters/CodexSkillAdapter.swift",
                 "Services/RepoDetector.swift",
+                // US-V4-013: Orchestrator Service
+                "Services/OrchestratorService.swift",
                 // Actions
                 "Actions/ImplementAction.swift",
                 "Actions/ReviewAction.swift",

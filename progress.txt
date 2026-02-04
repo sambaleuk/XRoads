@@ -1733,3 +1733,64 @@ Learnings:
 - When testing CLI wrapper scripts, avoid running full delegated loops
 - Use static analysis (grep) to verify script structure when CLI is available
 - macOS doesn't have `timeout` command by default
+### Iteration 14 - US-V4-013 (Orchestrator Chat View)
+- Created complete Orchestrator Chat system with 5 new files:
+
+**Models:**
+- ChatMessage.swift: Chat message model with ChatRole (user/assistant/system), ChatMessageStatus (pending/streaming/complete/error), ChatAction for triggering app actions, ChatContext for project awareness
+
+**Services:**
+- OrchestratorService.swift: Actor-based service supporting:
+  - API mode (Anthropic API with streaming)
+  - Terminal mode (Claude CLI execution)
+  - Conversation management
+  - Context injection (project, worktrees, skills)
+
+**Views:**
+- OrchestratorChatView.swift: Main chat view with messages area, empty state, quick prompts
+- ChatMessageView.swift: Individual message display with role avatars, timestamps, action buttons
+- ChatInputBar.swift: Input bar with mode toggle (API/Terminal), text input, send/stop button
+
+**Features implemented:**
+- Messages display with user/assistant/system roles
+- API/Terminal mode toggle with dropdown
+- Streaming response display with typing indicator
+- Context aware: project path, current branch, worktrees, skills, MCPs
+- Action triggers: create PRD, launch loop, open file, create worktree, run command, view art bible, view skills
+- FlowLayout helper for action button wrapping
+- Empty state with quick prompt suggestions
+
+**Unit test file created:**
+- XRoadsTests/Orchestrator/OrchestratorChatViewTests.swift with 27+ tests covering:
+  - ChatMessage creation (user, assistant, system, streaming)
+  - ChatMessageStatus states
+  - ChatRole display names and icons
+  - OrchestratorMode display names, icons, descriptions
+  - ChatContext system prompt generation
+  - ChatAction creation
+  - OrchestratorService mode management
+  - OrchestratorService message management
+  - OrchestratorChatError descriptions
+
+**Build verification:**
+- `swift build` completed successfully
+- All new files compiled without errors
+- Only warnings (non-blocking): nil coalescing on non-optional, sendable closure captures
+
+Files created:
+- XRoads/Models/ChatMessage.swift
+- XRoads/Services/OrchestratorService.swift
+- XRoads/Views/Orchestrator/OrchestratorChatView.swift
+- XRoads/Views/Orchestrator/ChatMessageView.swift
+- XRoads/Views/Orchestrator/ChatInputBar.swift
+- XRoadsTests/Orchestrator/OrchestratorChatViewTests.swift
+
+Files modified:
+- Package.swift (added new source files)
+- prd.json (marked US-V4-013 complete with timestamp)
+
+Learnings:
+- OrchestratorError was already defined in ClaudeOrchestrator.swift, renamed to OrchestratorChatError to avoid conflict
+- ProcessRunner.terminate() is throwing but not async, need try? when calling
+- Creating a testable library target from a SwiftUI macOS app requires careful handling of @main entry point
+
