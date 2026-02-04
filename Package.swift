@@ -52,6 +52,9 @@ let package = Package(
                 "Views/Orchestrator/OrchestratorChatView.swift",
                 "Views/Orchestrator/ChatMessageView.swift",
                 "Views/Orchestrator/ChatInputBar.swift",
+                // US-V4-016: Skills Browser Views
+                "Views/Skills/SkillsBrowserView.swift",
+                "Views/Skills/SkillRowView.swift",
                 "Resources/Theme.swift",
                 "Models/AgentType.swift",
                 "Models/ActionType.swift",
@@ -108,6 +111,8 @@ let package = Package(
                 "ViewModels/AppState.swift",
                 "ViewModels/SessionViewModel.swift",
                 "ViewModels/PRDLoaderViewModel.swift",
+                // US-V4-016: Skills ViewModel
+                "ViewModels/SkillsViewModel.swift",
                 "Services/OrchestrationHistoryService.swift",
                 "Models/OrchestrationRecord.swift"
             ],
@@ -130,7 +135,9 @@ let package = Package(
             sources: [
                 "Services/AnthropicClientTests.swift",
                 // US-V4-015: Dashboard Layout Tests
-                "Dashboard/DashboardLayoutTests.swift"
+                "Dashboard/DashboardLayoutTests.swift",
+                // US-V4-016: Skills Browser Tests
+                "Skills/SkillsBrowserViewTests.swift"
             ]
         )
     ]

@@ -187,7 +187,8 @@
       "description": "Interface pour parcourir et gerer les skills disponibles",
       "priority": "high",
       "depends_on": [],
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-04T13:45:00Z",
       "acceptance_criteria": [
         "Liste skills groupes par categorie (core, automation, project)",
         "Filtre par CLI compatible (Claude, Gemini, Codex)",
@@ -209,7 +210,7 @@
           "Filter by CLI works",
           "Search filters results"
         ],
-        "status": "pending"
+        "status": "passing"
       },
       "estimated_complexity": 5
     },
@@ -707,6 +708,6 @@
   ],
 
   "total_stories": 28,
-  "completed_stories": 15,
-  "pending_stories": 13
+  "completed_stories": 16,
+  "pending_stories": 12
 }

@@ -1834,3 +1834,100 @@ Learnings:
 - SwiftPM test targets require public types for @testable import to work
 - Result type is useful for capturing throwing operations before crossing actor boundaries
 
+
+### Iteration - US-V4-015 (Dashboard Layout with Chat Panel)
+- Created CollapsiblePanel.swift component with:
+  - Resizable panel with drag handle
+  - Configurable min/max/default width (280-500px)
+  - Expand/collapse animation
+  - NSCursor feedback for resize handle
+  - CollapsiblePanelState class for state management with persistence
+- Modified MainWindowView.swift to integrate chat panel:
+  - OrchestratorChatView on the left side of agentic mode layout
+  - Chat panel uses CollapsiblePanel with resize handle
+  - @AppStorage for persistence of expanded state and width
+  - Keyboard shortcut Cmd+Shift+O to toggle panel
+  - Toolbar button for panel toggle
+- Extended UserDefaults.Keys with chatPanelExpanded and chatPanelWidth
+- Created comprehensive unit tests (14 tests):
+  - Panel shows/hides on toggle
+  - State persists across sessions
+  - Width persists across sessions
+  - Expand/collapse methods work
+  - Width reset functionality
+  - UserDefaults key validation
+- **Build verified**: `swift build` completes successfully
+- **Unit tests**: All 14 DashboardLayoutTests PASS
+
+Files created:
+- XRoads/Views/Components/CollapsiblePanel.swift
+- XRoadsTests/Dashboard/DashboardLayoutTests.swift
+
+Files modified:
+- XRoads/Views/MainWindowView.swift (chat panel integration, keyboard shortcut)
+- XRoads/Views/SettingsView.swift (added chatPanelExpanded/Width keys)
+- Package.swift (added CollapsiblePanel.swift, DashboardLayoutTests.swift)
+- prd.json (marked US-V4-015 complete)
+
+Learnings:
+- SwiftUI @AppStorage works well for persisting panel state
+- NSCursor.resizeLeftRight provides good UX feedback for resize handles
+- CollapsiblePanelState allows reusable state management with persistence
+- Modified MainWindowView instead of XRoadsDashboardView for cleaner architecture
+
+### Iteration - US-V4-016 (Skills Browser View)
+- Created SkillsViewModel.swift (@Observable) for skills management:
+  - Skills loading from SkillRegistry
+  - Filtering by category, CLI, and search query
+  - Skills grouped by category
+  - Enable/disable skills per project
+  - Missing tools detection
+  - Category counts and statistics
+- Created SkillsBrowserView.swift with:
+  - Header with title, count, search bar
+  - Category and CLI filter chips with dropdown menus
+  - Clear filters button
+  - Skills list grouped by category with section headers
+  - Loading and empty states
+  - Detail sheet for individual skills
+- Created SkillRowView.swift with:
+  - Category icon with color coding
+  - Skill name, version badge, user skill badge
+  - Description truncated to 2 lines
+  - CLI compatibility badges (Claude, Gemini, Codex)
+  - Missing tools warning indicator
+  - Enable/disable toggle
+  - Hover and selection states
+  - CompactSkillRowView for list contexts
+- Created CLICompatibilityBadge component for visual CLI compatibility
+- Created SkillsFlowLayout for tag/tool display
+- Created comprehensive unit tests (29 tests):
+  - Skills grouped by category correctly
+  - Filter by CLI works for all agent types
+  - Search filters by name/description (case insensitive)
+  - Category filter and combined filters
+  - Clear filters resets all state
+  - Enable/disable/toggle skills
+  - Required tools and missing tools detection
+  - Category counts match actual counts
+  - Available categories only includes used categories
+  - SkillCategory displayName and iconName
+  - Skill isCompatible with specific and all CLIs
+- **Build verified**: `swift build` completes successfully  
+- **Unit tests**: All 29 SkillsBrowserViewTests PASS
+
+Files created:
+- XRoads/ViewModels/SkillsViewModel.swift
+- XRoads/Views/Skills/SkillsBrowserView.swift
+- XRoads/Views/Skills/SkillRowView.swift
+- XRoadsTests/Skills/SkillsBrowserViewTests.swift
+
+Files modified:
+- Package.swift (added new source files and test file)
+- prd.json (marked US-V4-016 complete with timestamp, unit_test.status = passing)
+
+Learnings:
+- SkillRegistry already provides comprehensive skill querying capabilities
+- Existing Skill.swift model has category, compatibleCLIs, requiredTools - reuse these
+- FlowLayout was already defined in ChatMessageView.swift - renamed to SkillsFlowLayout to avoid conflict
+- SwiftUI @Observable works well for ViewModel pattern with computed filtered views
