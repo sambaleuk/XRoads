@@ -1604,3 +1604,26 @@ Learnings:
 - MCP tools should be listed in required_tools for the skill to specify what it needs
 - Templates should include practical examples for each CLI format
 
+
+### Iteration 9 - US-V4-009 (Supabase Skill)
+- Created supabase-query.skill.yaml in ~/.xroads/skills/automation/
+- Skill provides database operations for Supabase projects with automatic credential injection
+- Includes comprehensive templates for all 3 CLIs:
+  - Claude: Detailed workflow with MCP tool documentation, auto-detection, best practices, example queries
+  - Gemini: Extension format with numbered workflow steps and example analytics query
+  - Codex: Ritual format with MCP tool commands and example flow
+- mcp_dependencies includes 'supabase' for auto-loading
+- env_vars specifies SUPABASE_PROJECT_URL and SUPABASE_SERVICE_KEY (required credentials)
+- required_tools lists supabase MCP tools: supabase_query, supabase_list_tables, supabase_describe_table, supabase_rpc, supabase_storage_list
+- Auto-detection via .supabase/ directory, .env, .env.local, or .xroads/project.json
+- Templates document security best practices (parameterized queries, never log credentials)
+- **Unit test: Tests/skills/test_supabase_skill.sh - PASS (23/23 tests)**
+
+Files created:
+- ~/.xroads/skills/automation/supabase-query.skill.yaml
+- Tests/skills/test_supabase_skill.sh
+
+Learnings:
+- env_vars field is important for skills requiring external credentials
+- Auto-detection patterns should be documented in templates for user awareness
+- Supabase MCP template in ~/.xroads/mcp/ provides the available tools reference
