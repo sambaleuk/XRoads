@@ -60,6 +60,10 @@ public enum SettingsKey: String, CaseIterable {
     // Chat Panel
     case chatPanelExpanded = "chatPanelExpanded"
     case chatPanelWidth = "chatPanelWidth"
+
+    // MCP Configuration (US-V4-021)
+    case mcpConfigurations = "mcpConfigurations"
+    case mcpAutoLoadRules = "mcpAutoLoadRules"
 }
 
 // MARK: - AppearanceMode
@@ -212,6 +216,133 @@ public struct KeyboardShortcutConfig: Codable, Sendable, Equatable {
     public static let defaultCommandPalette = KeyboardShortcutConfig(key: "k", modifiers: ["command"])
     public static let defaultClearLogs = KeyboardShortcutConfig(key: "l", modifiers: ["command"])
     public static let defaultToggleChatPanel = KeyboardShortcutConfig(key: "o", modifiers: ["command", "shift"])
+}
+
+// MARK: - MCP Configuration Model (US-V4-021)
+
+/// Configuration for a single MCP server
+public struct MCPConfiguration: Codable, Sendable, Equatable, Identifiable, Hashable {
+    public let id: String
+    public var name: String
+    public var path: String
+    public var arguments: [String]
+    public var isEnabled: Bool
+    public var hasCredentials: Bool
+    public var environmentVariables: [String: String]
+
+    public init(
+        id: String = UUID().uuidString,
+        name: String,
+        path: String,
+        arguments: [String] = [],
+        isEnabled: Bool = true,
+        hasCredentials: Bool = false,
+        environmentVariables: [String: String] = [:]
+    ) {
+        self.id = id
+        self.name = name
+        self.path = path
+        self.arguments = arguments
+        self.isEnabled = isEnabled
+        self.hasCredentials = hasCredentials
+        self.environmentVariables = environmentVariables
+    }
+
+    /// Predefined MCP configurations
+    public static let xroadsMCP = MCPConfiguration(
+        id: "xroads-mcp",
+        name: "XRoads MCP",
+        path: "xroads-mcp/dist/index.js",
+        arguments: [],
+        isEnabled: true,
+        hasCredentials: false
+    )
+
+    public static let fileSystemMCP = MCPConfiguration(
+        id: "filesystem-mcp",
+        name: "Filesystem MCP",
+        path: "@modelcontextprotocol/server-filesystem",
+        arguments: [],
+        isEnabled: false,
+        hasCredentials: false
+    )
+
+    public static let gitMCP = MCPConfiguration(
+        id: "git-mcp",
+        name: "Git MCP",
+        path: "@modelcontextprotocol/server-git",
+        arguments: [],
+        isEnabled: false,
+        hasCredentials: false
+    )
+}
+
+/// Auto-load rule for MCPs based on project conditions
+public struct MCPAutoLoadRule: Codable, Sendable, Equatable, Identifiable, Hashable {
+    public let id: String
+    public var mcpId: String
+    public var condition: AutoLoadCondition
+    public var isEnabled: Bool
+
+    public init(
+        id: String = UUID().uuidString,
+        mcpId: String,
+        condition: AutoLoadCondition,
+        isEnabled: Bool = true
+    ) {
+        self.id = id
+        self.mcpId = mcpId
+        self.condition = condition
+        self.isEnabled = isEnabled
+    }
+}
+
+/// Conditions for auto-loading MCPs
+public enum AutoLoadCondition: String, Codable, Sendable, CaseIterable {
+    case always
+    case hasPackageJson
+    case hasCargoToml
+    case hasPackageSwift
+    case hasGitRepo
+    case custom
+
+    public var displayName: String {
+        switch self {
+        case .always: return "Always"
+        case .hasPackageJson: return "Has package.json"
+        case .hasCargoToml: return "Has Cargo.toml"
+        case .hasPackageSwift: return "Has Package.swift"
+        case .hasGitRepo: return "Is Git repository"
+        case .custom: return "Custom"
+        }
+    }
+
+    public var description: String {
+        switch self {
+        case .always: return "Load for all projects"
+        case .hasPackageJson: return "Load when project has package.json (Node.js)"
+        case .hasCargoToml: return "Load when project has Cargo.toml (Rust)"
+        case .hasPackageSwift: return "Load when project has Package.swift (Swift)"
+        case .hasGitRepo: return "Load when project is a Git repository"
+        case .custom: return "Custom condition based on file patterns"
+        }
+    }
+}
+
+/// Result of MCP connection test
+public struct MCPValidationResult: Sendable, Equatable {
+    public let isValid: Bool
+    public let version: String?
+    public let errorMessage: String?
+    public let connectionTestPassed: Bool
+
+    public static func valid(version: String?, connectionTestPassed: Bool = false) -> MCPValidationResult {
+        MCPValidationResult(isValid: true, version: version, errorMessage: nil, connectionTestPassed: connectionTestPassed)
+    }
+
+    public static func invalid(error: String) -> MCPValidationResult {
+        MCPValidationResult(isValid: false, version: nil, errorMessage: error, connectionTestPassed: false)
+    }
 }
 
 // MARK: - AppSettings
@@ -447,6 +578,71 @@ public final class AppSettings {
         didSet { save(chatPanelWidth, forKey: .chatPanelWidth) }
     }
 
+    // MARK: - MCP Configuration (US-V4-021)
+
+    /// Configured MCP servers
+    public var mcpConfigurations: [MCPConfiguration] = [.xroadsMCP] {
+        didSet { saveMCPConfigurations() }
+    }
+
+    /// Auto-load rules for MCPs
+    public var mcpAutoLoadRules: [MCPAutoLoadRule] = [] {
+        didSet { saveMCPAutoLoadRules() }
+    }
+
+    // MARK: - MCP Configuration Helpers
+
+    /// Get MCP configuration by ID
+    public func mcpConfiguration(forId id: String) -> MCPConfiguration? {
+        mcpConfigurations.first { $0.id == id }
+    }
+
+    /// Update an MCP configuration
+    public func updateMCPConfiguration(_ config: MCPConfiguration) {
+        if let index = mcpConfigurations.firstIndex(where: { $0.id == config.id }) {
+            mcpConfigurations[index] = config
+        }
+    }
+
+    /// Add a new MCP configuration
+    public func addMCPConfiguration(_ config: MCPConfiguration) {
+        mcpConfigurations.append(config)
+    }
+
+    /// Remove an MCP configuration
+    public func removeMCPConfiguration(id: String) {
+        mcpConfigurations.removeAll { $0.id == id }
+        // Also remove any auto-load rules for this MCP
+        mcpAutoLoadRules.removeAll { $0.mcpId == id }
+    }
+
+    /// Get enabled MCPs
+    public var enabledMCPs: [MCPConfiguration] {
+        mcpConfigurations.filter { $0.isEnabled }
+    }
+
+    /// Toggle MCP enabled state
+    public func toggleMCPEnabled(id: String) {
+        if let index = mcpConfigurations.firstIndex(where: { $0.id == id }) {
+            mcpConfigurations[index].isEnabled.toggle()
+        }
+    }
+
+    /// Add an auto-load rule
+    public func addAutoLoadRule(_ rule: MCPAutoLoadRule) {
+        mcpAutoLoadRules.append(rule)
+    }
+
+    /// Remove an auto-load rule
+    public func removeAutoLoadRule(id: String) {
+        mcpAutoLoadRules.removeAll { $0.id == id }
+    }
+
+    /// Get auto-load rules for an MCP
+    public func autoLoadRules(forMCPId mcpId: String) -> [MCPAutoLoadRule] {
+        mcpAutoLoadRules.filter { $0.mcpId == mcpId }
+    }
+
     // MARK: - Reset to Defaults
 
     /// Reset all general settings to defaults
@@ -506,11 +702,18 @@ public final class AppSettings {
         resetCLIPreferenceOrderToDefaults()
     }
 
+    /// Reset MCP settings to defaults
+    public func resetMCPToDefaults() {
+        mcpConfigurations = [.xroadsMCP]
+        mcpAutoLoadRules = []
+    }
+
     /// Reset all settings to defaults
     public func resetAllToDefaults() {
         resetGeneralToDefaults()
         resetShortcutsToDefaults()
         resetCLIPathsToDefaults()
+        resetMCPToDefaults()
         fullAgenticMode = false
         chatPanelExpanded = true
         chatPanelWidth = 320
@@ -584,6 +787,10 @@ public final class AppSettings {
         chatPanelExpanded = defaults.object(forKey: SettingsKey.chatPanelExpanded.rawValue) as? Bool ?? true
         let width = defaults.double(forKey: SettingsKey.chatPanelWidth.rawValue)
         chatPanelWidth = width > 0 ? width : 320
+
+        // MCP Configuration (US-V4-021)
+        mcpConfigurations = loadMCPConfigurations() ?? [.xroadsMCP]
+        mcpAutoLoadRules = loadMCPAutoLoadRules() ?? []
     }
 
     /// Save a value to UserDefaults
@@ -621,6 +828,38 @@ public final class AppSettings {
             return nil
         }
         return array
+    }
+
+    /// Save MCP configurations to UserDefaults
+    private func saveMCPConfigurations() {
+        if let data = try? JSONEncoder().encode(mcpConfigurations) {
+            defaults.set(data, forKey: SettingsKey.mcpConfigurations.rawValue)
+        }
+    }
+
+    /// Load MCP configurations from UserDefaults
+    private func loadMCPConfigurations() -> [MCPConfiguration]? {
+        guard let data = defaults.data(forKey: SettingsKey.mcpConfigurations.rawValue),
+              let configs = try? JSONDecoder().decode([MCPConfiguration].self, from: data) else {
+            return nil
+        }
+        return configs
+    }
+
+    /// Save MCP auto-load rules to UserDefaults
+    private func saveMCPAutoLoadRules() {
+        if let data = try? JSONEncoder().encode(mcpAutoLoadRules) {
+            defaults.set(data, forKey: SettingsKey.mcpAutoLoadRules.rawValue)
+        }
+    }
+
+    /// Load MCP auto-load rules from UserDefaults
+    private func loadMCPAutoLoadRules() -> [MCPAutoLoadRule]? {
+        guard let data = defaults.data(forKey: SettingsKey.mcpAutoLoadRules.rawValue),
+              let rules = try? JSONDecoder().decode([MCPAutoLoadRule].self, from: data) else {
+            return nil
+        }
+        return rules
     }
 }
 

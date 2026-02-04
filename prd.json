@@ -353,7 +353,8 @@
       "description": "Configuration des MCPs (liste, credentials, auto-load rules)",
       "priority": "high",
       "depends_on": ["US-V4-019"],
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-04T14:21:00Z",
       "acceptance_criteria": [
         "Liste MCPs disponibles avec toggle enable/disable",
         "Config par MCP (path, arguments)",
@@ -377,7 +378,7 @@
           "Credentials retrieved correctly",
           "No plaintext storage"
         ],
-        "status": "pending"
+        "status": "passing"
       },
       "estimated_complexity": 5
     },
@@ -712,6 +713,6 @@
   ],
 
   "total_stories": 28,
-  "completed_stories": 20,
-  "pending_stories": 8
+  "completed_stories": 21,
+  "pending_stories": 7
 }

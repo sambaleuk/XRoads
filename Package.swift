@@ -33,6 +33,8 @@ let package = Package(
                 "Views/Settings/GeneralSettingsView.swift",
                 // US-V4-020: CLI Settings View
                 "Views/Settings/CLISettingsView.swift",
+                // US-V4-021: MCP Settings View
+                "Views/Settings/MCPSettingsView.swift",
                 "Views/ConflictResolutionSheet.swift",
                 "Views/PRDLoaderSheet.swift",
                 "Views/OrchestrationHistorySheet.swift",
@@ -115,6 +117,8 @@ let package = Package(
                 "Services/OrchestratorService.swift",
                 // US-V4-014: Anthropic API Client
                 "Services/AnthropicClient.swift",
+                // US-V4-021: Keychain Service
+                "Services/KeychainService.swift",
                 // Actions
                 "Actions/ImplementAction.swift",
                 "Actions/ReviewAction.swift",
@@ -156,7 +160,9 @@ let package = Package(
                 // US-V4-019: General Settings Tests
                 "Settings/GeneralSettingsTests.swift",
                 // US-V4-020: CLI Settings Tests
-                "Settings/CLISettingsTests.swift"
+                "Settings/CLISettingsTests.swift",
+                // US-V4-021: MCP Settings Tests
+                "Settings/MCPSettingsTests.swift"
             ]
         )
     ]
