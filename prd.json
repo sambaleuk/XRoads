@@ -249,7 +249,8 @@
       "description": "Gestion securisee des credentials pour MCPs dynamiques",
       "priority": "high",
       "depends_on": ["US-V4-004"],
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-04T14:30:00Z",
       "acceptance_criteria": [
         "~/.xroads/.env.template avec variables requises documentees",
         "Script env-loader.sh lit .env projet puis ~/.xroads/.env comme fallback",
@@ -270,7 +271,7 @@
           "env-loader.sh falls back to ~/.xroads/.env",
           "env-loader.sh validates required vars exist"
         ],
-        "status": "pending"
+        "status": "passing"
       },
       "estimated_complexity": 4
     },
