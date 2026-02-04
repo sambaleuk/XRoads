@@ -300,8 +300,8 @@ final class OrchestratorChatViewModel: ObservableObject {
         await orchestratorService.setContext(context!)
         await orchestratorService.updateSystemPrompt()
 
-        // Load API key from settings if available
-        if let apiKey = UserDefaults.standard.string(forKey: "anthropicAPIKey") {
+        // Load API key from Keychain (secure storage)
+        if let apiKey = await KeychainService.shared.getAPIKey(provider: "anthropic") {
             await orchestratorService.setAPIKey(apiKey)
         }
     }

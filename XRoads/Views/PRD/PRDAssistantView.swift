@@ -411,7 +411,8 @@ final class PRDAssistantViewModel: ObservableObject {
             await orchestratorService.updateSystemPrompt()
         }
 
-        if let apiKey = UserDefaults.standard.string(forKey: "anthropicAPIKey") {
+        // Load API key from Keychain (secure storage)
+        if let apiKey = await KeychainService.shared.getAPIKey(provider: "anthropic") {
             await orchestratorService.setAPIKey(apiKey)
         }
     }

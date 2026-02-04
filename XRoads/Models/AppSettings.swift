@@ -141,24 +141,65 @@ public struct CLIConfiguration: Codable, Sendable, Equatable {
 
     /// Default configuration for Claude CLI
     public static let defaultClaude = CLIConfiguration(
-        path: "/usr/local/bin/claude",
+        path: CLIConfiguration.autoDetectPath(for: "claude") ?? "/usr/local/bin/claude",
         defaultArguments: ["--dangerously-skip-permissions"],
         isEnabled: true
     )
 
     /// Default configuration for Gemini CLI
     public static let defaultGemini = CLIConfiguration(
-        path: "/usr/local/bin/gemini",
+        path: CLIConfiguration.autoDetectPath(for: "gemini") ?? "/opt/homebrew/bin/gemini",
         defaultArguments: ["--sandbox=false"],
         isEnabled: true
     )
 
     /// Default configuration for Codex CLI
     public static let defaultCodex = CLIConfiguration(
-        path: "/usr/local/bin/codex",
+        path: CLIConfiguration.autoDetectPath(for: "codex") ?? "/usr/local/bin/codex",
         defaultArguments: ["--approval-mode", "full-auto"],
         isEnabled: true
     )
+
+    /// Auto-detect the path for a CLI executable
+    public static func autoDetectPath(for cli: String) -> String? {
+        let home = FileManager.default.homeDirectoryForCurrentUser.path
+
+        // Common paths to check (in order of preference)
+        var searchPaths: [String] = [
+            "/usr/local/bin/\(cli)",
+            "/opt/homebrew/bin/\(cli)",
+            "\(home)/.local/bin/\(cli)",
+            "\(home)/bin/\(cli)",
+            "\(home)/.npm-global/bin/\(cli)",
+            "\(home)/.volta/bin/\(cli)"
+        ]
+
+        // Check nvm directories for node-installed CLIs
+        let nvmDir = "\(home)/.nvm/versions/node"
+        if let nodeVersions = try? FileManager.default.contentsOfDirectory(atPath: nvmDir) {
+            // Sort to get newest version first
+            for version in nodeVersions.sorted().reversed() {
+                searchPaths.append("\(nvmDir)/\(version)/bin/\(cli)")
+            }
+        }
+
+        // Check fnm directories (another node version manager)
+        let fnmDir = "\(home)/.fnm/node-versions"
+        if let nodeVersions = try? FileManager.default.contentsOfDirectory(atPath: fnmDir) {
+            for version in nodeVersions.sorted().reversed() {
+                searchPaths.append("\(fnmDir)/\(version)/installation/bin/\(cli)")
+            }
+        }
+
+        // Find first valid executable
+        for path in searchPaths {
+            if FileManager.default.isExecutableFile(atPath: path) {
+                return path
+            }
+        }
+
+        return nil
+    }
 }
 
 // MARK: - CLI Validation Result
@@ -365,6 +406,8 @@ public final class AppSettings {
     private init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         loadAllSettings()
+        // Auto-detect CLI paths on startup if not configured
+        autoDetectCLIPaths()
     }
 
     // MARK: - General - Repository Settings
@@ -668,11 +711,37 @@ public final class AppSettings {
         shortcutToggleChatPanel = .defaultToggleChatPanel
     }
 
-    /// Reset CLI paths to defaults
+    /// Reset CLI paths to defaults (auto-detect)
     public func resetCLIPathsToDefaults() {
-        claudeCliPath = "/usr/local/bin/claude"
-        geminiCliPath = "/usr/local/bin/gemini"
-        codexCliPath = "/usr/local/bin/codex"
+        claudeCliPath = CLIConfiguration.autoDetectPath(for: "claude") ?? "/usr/local/bin/claude"
+        geminiCliPath = CLIConfiguration.autoDetectPath(for: "gemini") ?? "/opt/homebrew/bin/gemini"
+        codexCliPath = CLIConfiguration.autoDetectPath(for: "codex") ?? "/usr/local/bin/codex"
+    }
+
+    /// Auto-detect and update CLI paths if they are empty or invalid
+    public func autoDetectCLIPaths() {
+        let fm = FileManager.default
+
+        // Auto-detect Claude path if empty or invalid
+        if claudeCliPath.isEmpty || !fm.isExecutableFile(atPath: claudeCliPath) {
+            if let detected = CLIConfiguration.autoDetectPath(for: "claude") {
+                claudeCliPath = detected
+            }
+        }
+
+        // Auto-detect Gemini path if empty or invalid
+        if geminiCliPath.isEmpty || !fm.isExecutableFile(atPath: geminiCliPath) {
+            if let detected = CLIConfiguration.autoDetectPath(for: "gemini") {
+                geminiCliPath = detected
+            }
+        }
+
+        // Auto-detect Codex path if empty or invalid
+        if codexCliPath.isEmpty || !fm.isExecutableFile(atPath: codexCliPath) {
+            if let detected = CLIConfiguration.autoDetectPath(for: "codex") {
+                codexCliPath = detected
+            }
+        }
     }
 
     /// Reset CLI arguments to defaults
@@ -754,10 +823,16 @@ public final class AppSettings {
         shortcutClearLogs = loadShortcut(forKey: .shortcutClearLogs) ?? .defaultClearLogs
         shortcutToggleChatPanel = loadShortcut(forKey: .shortcutToggleChatPanel) ?? .defaultToggleChatPanel
 
-        // CLI Paths
-        claudeCliPath = defaults.string(forKey: SettingsKey.claudeCliPath.rawValue) ?? "/usr/local/bin/claude"
-        geminiCliPath = defaults.string(forKey: SettingsKey.geminiCliPath.rawValue) ?? "/usr/local/bin/gemini"
-        codexCliPath = defaults.string(forKey: SettingsKey.codexCliPath.rawValue) ?? "/usr/local/bin/codex"
+        // CLI Paths (with auto-detection fallback)
+        claudeCliPath = defaults.string(forKey: SettingsKey.claudeCliPath.rawValue)
+            ?? CLIConfiguration.autoDetectPath(for: "claude")
+            ?? "/usr/local/bin/claude"
+        geminiCliPath = defaults.string(forKey: SettingsKey.geminiCliPath.rawValue)
+            ?? CLIConfiguration.autoDetectPath(for: "gemini")
+            ?? "/opt/homebrew/bin/gemini"
+        codexCliPath = defaults.string(forKey: SettingsKey.codexCliPath.rawValue)
+            ?? CLIConfiguration.autoDetectPath(for: "codex")
+            ?? "/usr/local/bin/codex"
 
         // CLI Default Arguments
         claudeDefaultArgs = loadStringArray(forKey: .claudeDefaultArgs) ?? ["--dangerously-skip-permissions"]

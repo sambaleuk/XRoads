@@ -385,12 +385,25 @@ actor OrchestratorService {
     // MARK: - Helpers
 
     private func findClaudeCLI() -> String? {
-        let possiblePaths = [
+        let home = NSHomeDirectory()
+        var possiblePaths = [
             "/usr/local/bin/claude",
             "/opt/homebrew/bin/claude",
-            "\(NSHomeDirectory())/.local/bin/claude",
-            "\(NSHomeDirectory())/.npm-global/bin/claude"
+            "\(home)/.local/bin/claude",
+            "\(home)/.npm-global/bin/claude"
         ]
+
+        // Check nvm directories for node-installed CLI
+        let nvmDir = "\(home)/.nvm/versions/node"
+        if let nodeVersions = try? FileManager.default.contentsOfDirectory(atPath: nvmDir) {
+            for version in nodeVersions {
+                possiblePaths.append("\(nvmDir)/\(version)/bin/claude")
+            }
+        }
+
+        // Also check volta if installed
+        let voltaDir = "\(home)/.volta/bin"
+        possiblePaths.append("\(voltaDir)/claude")
 
         for path in possiblePaths {
             if FileManager.default.isExecutableFile(atPath: path) {
