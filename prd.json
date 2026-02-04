@@ -586,7 +586,8 @@
       "description": "Actions rapides pour demarrer sans friction",
       "priority": "medium",
       "depends_on": ["US-V4-023"],
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-04T16:30:00Z",
       "acceptance_criteria": [
         "Bouton 'New Feature' → PRD Assistant",
         "Bouton 'Art Direction' → Art Direction View",
@@ -606,7 +607,7 @@
           "Quick Loop starts on current branch",
           "Recent PRDs listed"
         ],
-        "status": "pending"
+        "status": "passing"
       },
       "estimated_complexity": 4
     }
@@ -719,6 +720,6 @@
   ],
 
   "total_stories": 28,
-  "completed_stories": 26,
-  "pending_stories": 2
+  "completed_stories": 27,
+  "pending_stories": 1
 }

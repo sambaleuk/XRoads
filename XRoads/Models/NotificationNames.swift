@@ -39,4 +39,10 @@ extension Notification.Name {
 
     /// Notification to open Skills Browser
     static let openSkillsBrowser = Notification.Name("openSkillsBrowser")
+
+    /// Notification to launch quick loop on current branch
+    static let launchQuickLoop = Notification.Name("launchQuickLoop")
+
+    /// Notification to load a PRD file from path
+    static let loadPRDFromPath = Notification.Name("loadPRDFromPath")
 }

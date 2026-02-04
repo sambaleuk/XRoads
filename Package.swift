@@ -197,7 +197,9 @@ let package = Package(
                 // US-V4-026: Component Context Tests
                 "ArtDirection/ComponentContextTests.swift",
                 // US-V4-027: Art Direction View Tests
-                "ArtDirection/ArtDirectionViewTests.swift"
+                "ArtDirection/ArtDirectionViewTests.swift",
+                // US-V4-028: Git Info Panel Quick Actions Tests
+                "Dashboard/GitInfoPanelTests.swift"
             ]
         )
     ]
