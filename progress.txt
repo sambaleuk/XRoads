@@ -2283,3 +2283,21 @@ Acceptance Criteria Met:
   - Step 3: Run Asset Loop ✓
   - Step 4: View Generated Components ✓
   - Progress tracking per step ✓
+
+### Iteration 1 - US-V4-028
+- Delta: Added Quick Actions section to GitInfoPanel with New Feature/Art Direction/Quick Loop buttons, Recent PRDs dropdown from orchestration history, and context menu on branch (start loop, create PRD, create worktree, copy branch name).
+- Files created:
+  - XRoadsTests/Dashboard/GitInfoPanelTests.swift (16 tests)
+- Files modified:
+  - XRoads/Views/Dashboard/GitInfoPanel.swift (added quickActionsSection, recentPRDsSection, branchContextMenuItems, QuickActionButton, RecentPRDRow components)
+  - XRoads/Models/NotificationNames.swift (added launchQuickLoop, loadPRDFromPath notifications)
+  - Package.swift (added GitInfoPanelTests.swift to test sources)
+  - prd.json (marked US-V4-028 complete with passing tests)
+- Unit test: XRoadsTests/Dashboard/GitInfoPanelTests.swift - PASS (16 tests)
+- Checks: swift build, swift test --filter GitInfoPanelTests
+- Acceptance Criteria Met:
+  - Bouton 'New Feature' → PRD Assistant ✓
+  - Bouton 'Art Direction' → Art Direction View ✓
+  - Bouton 'Quick Loop' → Lancer loop sur branche courante ✓
+  - Dropdown recents PRDs pour reload rapide ✓
+  - Context menu sur branches pour actions ✓
