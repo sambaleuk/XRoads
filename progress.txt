@@ -1482,3 +1482,78 @@ Learnings:
 - Bash `declare -gA` for associative arrays is not available in all bash versions; use temp files for portability
 - Ruby JSON parser is available by default on macOS for JSON validation and manipulation
 - MCP configs should include always_loaded flag for MCPs that should always be available (like xroads)
+
+### Iteration 5 - US-V4-005 (Secure Env Management)
+- Created ~/.xroads/.env.template with comprehensive documentation:
+  - All required variables (Supabase, OpenAI, Anthropic, GitHub, etc.)
+  - Security notes (never commit .env, never logged)
+  - Loading priority documentation
+- Created env-loader.sh (~450 lines) in ~/.xroads/lib/:
+  - --get <VAR>: Get single variable value
+  - --export: Output all as shell export commands
+  - --validate <VAR1,VAR2>: Validate required vars exist and have values
+  - --list: List all loaded vars (sensitive values masked)
+  - --sources: Show which .env files were loaded
+  - Loading priority: ~/.xroads/.env → project .env → .env.local → project.json
+  - Security: sensitive patterns (KEY, SECRET, TOKEN, etc.) are NEVER logged
+  - Masking: shows only first/last 4 chars for sensitive values
+- Created comprehensive unit test with 29 test cases:
+  - Script existence and executability
+  - Loading priority (all 5 levels)
+  - Validation (existing, missing, empty)
+  - Security/masking (API keys, secrets, tokens)
+  - Export format and escaping
+  - .env parsing (comments, empty lines, quotes)
+  - Sources display
+  - Template content validation
+- **Unit test: tests/env/test_env_loader.sh - PASS (29/29 tests)**
+
+Files created:
+- ~/.xroads/.env.template
+- ~/.xroads/lib/env-loader.sh
+- tests/env/test_env_loader.sh
+
+Files modified:
+- prd.json (marked US-V4-005 complete, unit_test.status = "passing")
+
+Learnings:
+- Use temp file for env storage instead of associative arrays for portability
+- Mask sensitive values by checking for KEY, SECRET, TOKEN, PASSWORD, CREDENTIAL, PRIVATE, AUTH patterns
+- Ruby YAML/JSON parsers are available by default on macOS - good for project.json parsing
+
+### Iteration 6 - US-V4-006 (Gemini Loop Base Implementation)
+- Created gemini-loop script (~450 lines) in ~/bin/ for Gemini CLI autonomous loop
+- Key features implemented:
+  - Uses Gemini CLI with pattern-based prompting (based on Ralph extension patterns)
+  - Reads PRD_FILE, PROGRESS_FILE, AGENTS_FILE like nexus-loop
+  - Loads skills via skill-loader.sh with Gemini format (--cli gemini)
+  - Loads MCPs dynamically via mcp-loader.sh (xroads MCP always loaded)
+  - Emits logs to xroads-mcp via emit_mcp_log function
+  - Supports --help/-h flags with full usage documentation
+  - Handles consecutive failures (max 3 before abort)
+  - Creates logs directory for iteration logs
+  - Uses <gemini-complete> marker for completion detection
+  - Includes Gemini co-author attribution in commits
+  - Unit test requirement enforced (MANDATORY for story completion)
+- Created comprehensive unit test with 28 test cases covering:
+  - Script existence and executability
+  - Help flag functionality (--help and -h)
+  - Gemini CLI check
+  - PRD file requirement
+  - Skills loading in Gemini format
+  - Script content validation (static analysis)
+  - File creation (progress.txt, AGENTS.md)
+  - Completion detection for all stories complete
+- **Unit test: tests/loops/test_gemini_loop.sh - PASS (28/28 tests)**
+
+Files created:
+- ~/bin/gemini-loop
+- tests/loops/test_gemini_loop.sh
+
+Files modified:
+- prd.json (marked US-V4-006 complete, unit_test.status = "passing")
+
+Learnings:
+- macOS doesn't have `timeout` command - use background process with sleep+kill pattern instead
+- Gemini CLI prompt format uses system instructions with workflow sections
+- Test setup/teardown should be consistent across all test functions

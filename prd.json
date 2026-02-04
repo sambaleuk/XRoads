@@ -281,7 +281,8 @@
       "description": "Creer gemini-loop base sur Ralph avec patterns Nexus",
       "priority": "critical",
       "depends_on": ["US-V4-003", "US-V4-004"],
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-04T15:45:00Z",
       "acceptance_criteria": [
         "gemini-loop script cree dans ~/bin/",
         "Utilise gemini CLI avec extensions Ralph",
@@ -303,7 +304,7 @@
           "gemini-loop checks for gemini CLI",
           "gemini-loop loads skills in Gemini format"
         ],
-        "status": "pending"
+        "status": "passing"
       },
       "estimated_complexity": 8
     },
