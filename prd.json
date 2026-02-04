@@ -184,7 +184,8 @@
       "description": "Implementer le moteur de conversion de templates entre formats CLI",
       "priority": "critical",
       "depends_on": ["US-V4-002"],
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-04T12:15:00Z",
       "acceptance_criteria": [
         "skill-converter.sh lit un skill.yaml et extrait le template pour un CLI donne",
         "Supporte placeholders {{context}}, {{files}}, {{branch}}",
@@ -204,7 +205,7 @@
           "skill-converter.sh --skill commit --cli gemini returns Gemini template",
           "skill-converter.sh --skill commit --cli codex returns Codex template"
         ],
-        "status": "pending"
+        "status": "passing"
       },
       "estimated_complexity": 6
     },
