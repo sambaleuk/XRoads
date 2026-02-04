@@ -314,7 +314,8 @@
       "description": "Injecter les skills au demarrage de chaque loop",
       "priority": "high",
       "depends_on": ["US-V4-003", "US-V4-006"],
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-04T16:15:00Z",
       "acceptance_criteria": [
         "nexus-loop charge skills au startup via skill-loader.sh",
         "codex-loop charge skills au startup via skill-loader.sh",
@@ -337,7 +338,7 @@
           "AGENT.md contains skill instructions after init",
           "Skills are CLI-format specific"
         ],
-        "status": "pending"
+        "status": "passing"
       },
       "estimated_complexity": 5
     },

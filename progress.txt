@@ -1557,3 +1557,30 @@ Learnings:
 - macOS doesn't have `timeout` command - use background process with sleep+kill pattern instead
 - Gemini CLI prompt format uses system instructions with workflow sections
 - Test setup/teardown should be consistent across all test functions
+
+### Iteration 7 - US-V4-007 (Loop Skill Injection)
+- Implemented --skills flag in all three loop scripts (nexus-loop, codex-loop, gemini-loop)
+- Added inject_skills() function to all loops that:
+  - Loads skills via skill-loader.sh with CLI-specific format
+  - Injects skills into AGENTS.md (and codex-playbook.md for codex-loop)
+  - Uses markers "## XRoads Skills (Auto-Injected)" and "## End XRoads Skills" for clean replacement
+  - Supports both specified skills (--skills commit,prd) and default core skills
+  - Records timestamp, CLI, and branch in the injected section
+- Updated help documentation in all loops to include --skills option
+- Added argument parsing with SKILLS_ARG variable and POSITIONAL_ARGS array
+- Skills are loaded in CLI-format specific templates (claude, gemini, codex)
+- **Unit test: tests/loops/test_skill_injection.sh - PASS (34/34 tests)**
+
+Files modified:
+- ~/bin/nexus-loop (added --skills flag, inject_skills function)
+- ~/bin/codex-loop (added --skills flag, inject_skills function)
+- ~/bin/gemini-loop (added --skills flag, inject_skills function)
+
+Files created:
+- tests/loops/test_skill_injection.sh
+
+Learnings:
+- Use positional args array for clean argument parsing with flags and positional params
+- Mark sections with both start and end markers for clean sed-based replacement
+- Each loop should use its own CLI name for skill-loader.sh --cli parameter
+
