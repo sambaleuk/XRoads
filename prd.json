@@ -445,7 +445,8 @@
       "description": "Support skills specifiques au projet via .xroads/skills.json",
       "priority": "medium",
       "depends_on": ["US-V4-003"],
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-04T20:30:00Z",
       "acceptance_criteria": [
         ".xroads/skills.json schema documente",
         "skill-loader.sh lit skills projet en plus des skills globaux",
@@ -467,7 +468,7 @@
           "Project skills override global skills",
           "skill-loader.sh merges both sources"
         ],
-        "status": "pending"
+        "status": "passing"
       },
       "estimated_complexity": 4
     },

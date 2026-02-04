@@ -1627,3 +1627,74 @@ Learnings:
 - env_vars field is important for skills requiring external credentials
 - Auto-detection patterns should be documented in templates for user awareness
 - Supabase MCP template in ~/.xroads/mcp/ provides the available tools reference
+
+### Iteration 10 - US-V4-010 (XRoads MCP Integration)
+- Created xroads-log.skill.yaml in ~/.xroads/skills/core/
+- Skill provides instructions for emitting logs and status updates to XRoads UI
+- Includes comprehensive templates for all 3 CLIs:
+  - Claude: Detailed workflow with emit_log and update_status tool documentation
+  - Gemini: Extension format with numbered usage pattern steps
+  - Codex: Ritual format with log levels and status values reference
+- mcp_dependencies includes 'xroads' for auto-loading
+- required_tools lists MCP tools: mcp_xroads_emit_log, mcp_xroads_update_status, mcp_xroads_get_state
+- Updated nexus-loop:
+  - Added MCP_LOADER variable pointing to mcp-loader.sh
+  - Added load_xroads_mcp function to load xroads-mcp at startup
+  - Added emit_xroads_log function for loop event logging
+  - Calls load_xroads_mcp in init() before skill injection
+  - Emits logs at loop start, completion, and all stories done events
+- Updated codex-loop with same pattern:
+  - MCP_LOADER, load_xroads_mcp, emit_xroads_log functions
+  - Logs emitted at loop start and completion
+- Updated gemini-loop with same pattern:
+  - Refactored existing MCP functions to use consistent naming (emit_xroads_log)
+  - Added MCP_LOADER variable and load_xroads_mcp function
+  - All MCP log calls updated to use emit_xroads_log
+- **Unit test: Tests/mcp/test_xroads_mcp_integration.sh - PASS (23/23 tests)**
+
+Files created:
+- ~/.xroads/skills/core/xroads-log.skill.yaml
+- Tests/mcp/test_xroads_mcp_integration.sh
+
+Files modified:
+- ~/bin/nexus-loop (MCP integration)
+- ~/bin/codex-loop (MCP integration)
+- ~/bin/gemini-loop (MCP integration)
+
+Learnings:
+- All loops now share consistent MCP loading pattern via load_xroads_mcp
+- emit_xroads_log provides unified logging interface across all loops
+- xroads-mcp always_loaded=true ensures it's available for all loop executions
+
+### Iteration 11 - US-V4-011 (Project Skills Configuration)
+- Created PROJECT_SKILLS.md documentation at ~/.xroads/skills/project/PROJECT_SKILLS.md
+  - Comprehensive schema documentation for .xroads/skills.json
+  - Field descriptions, examples for inline and file-based skills
+  - Override behavior and loading order documentation
+  - Environment variable injection patterns
+  - Best practices and troubleshooting guide
+- Modified skill-loader.sh (v1.1.0) with project skills support:
+  - Added --project <path> flag to specify project directory
+  - Added --validate-project <path> for JSON validation
+  - Implemented load_project_config() to parse .xroads/skills.json
+  - Added bash 3.2 compatible tracking (temp files instead of associative arrays)
+  - Project skills can override global skills with override:true
+  - Support for inline templates and file-based skill references
+  - disabled_global_skills array to exclude specific skills
+  - Merges project and global skills with proper priority
+- **Unit test: tests/skills/test_project_skills.sh - PASS (17/17 tests)**
+  - Tests doc existence, --project flag, skills.json loading
+  - Tests project override behavior, source merging
+  - Tests disabled skills, validation, and file source skills
+
+Files created:
+- ~/.xroads/skills/project/PROJECT_SKILLS.md
+- tests/skills/test_project_skills.sh
+
+Files modified:
+- ~/.xroads/lib/skill-loader.sh (v1.1.0 with project support)
+
+Learnings:
+- macOS default bash is 3.2 which lacks associative arrays (declare -A)
+- Use temp files with grep for bash 3.2 compatible key-value tracking
+- jq is essential for JSON parsing in shell scripts
