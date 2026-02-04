@@ -39,6 +39,8 @@ let package = Package(
                 "Views/Components/TerminalInputBar.swift",
                 "Views/Components/ActionPickerMenu.swift",
                 "Views/Components/QuickActionBar.swift",
+                // US-V4-015: Collapsible Panel
+                "Views/Components/CollapsiblePanel.swift",
                 // Dashboard v3 Views
                 "Views/Dashboard/XRoadsDashboardView.swift",
                 "Views/Dashboard/TerminalSlotView.swift",
@@ -126,7 +128,9 @@ let package = Package(
             dependencies: ["XRoadsLib"],
             path: "XRoadsTests",
             sources: [
-                "Services/AnthropicClientTests.swift"
+                "Services/AnthropicClientTests.swift",
+                // US-V4-015: Dashboard Layout Tests
+                "Dashboard/DashboardLayoutTests.swift"
             ]
         )
     ]

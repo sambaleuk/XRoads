@@ -299,6 +299,9 @@ extension UserDefaults {
         static let geminiCliPath = "geminiCliPath"
         static let codexCliPath = "codexCliPath"
         static let fullAgenticMode = "fullAgenticMode"
+        // US-V4-015: Chat Panel Settings
+        static let chatPanelExpanded = "chatPanelExpanded"
+        static let chatPanelWidth = "chatPanelWidth"
     }
 }
 

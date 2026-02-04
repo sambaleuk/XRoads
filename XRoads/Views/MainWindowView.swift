@@ -39,6 +39,12 @@ struct MainWindowView: View {
     /// Controls the PRD loader sheet
     @State private var showPRDLoaderSheet: Bool = false
 
+    /// Controls the orchestrator chat panel visibility (US-V4-015)
+    @AppStorage(UserDefaults.Keys.chatPanelExpanded) private var showChatPanel: Bool = true
+
+    /// Chat panel width (US-V4-015)
+    @AppStorage(UserDefaults.Keys.chatPanelWidth) private var chatPanelWidth: Double = 360
+
     @AppStorage(UserDefaults.Keys.fullAgenticMode) private var isFullAgenticMode: Bool = true
 
     var body: some View {
@@ -112,11 +118,27 @@ struct MainWindowView: View {
         }
     }
 
-    /// Agentic mode layout: Git Panel | Dashboard | Logs
+    /// Agentic mode layout: Chat Panel | Git Panel | Dashboard | Logs
     @ViewBuilder
     private var agenticModeLayout: some View {
         HStack(spacing: 0) {
-            // Left: Git Info Panel
+            // Left: Orchestrator Chat Panel (US-V4-015)
+            CollapsiblePanel(
+                isExpanded: $showChatPanel,
+                width: Binding(
+                    get: { CGFloat(chatPanelWidth) },
+                    set: { chatPanelWidth = Double($0) }
+                ),
+                expandedWidth: 360,
+                minWidth: 280,
+                maxWidth: 500,
+                resizable: true,
+                edge: .leading
+            ) {
+                OrchestratorChatView()
+            }
+
+            // Git Info Panel
             GitInfoPanel()
                 .padding(Theme.Spacing.sm)
 
@@ -171,6 +193,17 @@ struct MainWindowView: View {
 
     @ViewBuilder
     private var toolbarButtons: some View {
+        // US-V4-015: Toggle Chat Panel
+        Button {
+            withAnimation(.easeInOut(duration: Theme.Animation.normal)) {
+                showChatPanel.toggle()
+            }
+        } label: {
+            Label(showChatPanel ? "Hide Orchestrator" : "Show Orchestrator", systemImage: "sidebar.leading")
+        }
+        .help("Toggle orchestrator chat panel (⌘⇧O)")
+        .keyboardShortcut("o", modifiers: [.command, .shift])
+
         Button { showNewWorktreeSheet = true } label: {
             Label("New Worktree", systemImage: "plus.rectangle.on.folder")
         }

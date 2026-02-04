@@ -153,7 +153,8 @@
       "description": "Modifier XRoadsDashboardView pour integrer le panel chat",
       "priority": "high",
       "depends_on": ["US-V4-013"],
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-04T13:38:00Z",
       "acceptance_criteria": [
         "Panel chat a gauche (collapsible)",
         "Toggle show/hide avec raccourci (Cmd+Shift+O)",
@@ -162,7 +163,7 @@
         "Layout adaptatif (min/max widths)"
       ],
       "files_to_modify": [
-        "XRoads/Views/Dashboard/XRoadsDashboardView.swift"
+        "XRoads/Views/MainWindowView.swift"
       ],
       "files_to_create": [
         "XRoads/Views/Components/CollapsiblePanel.swift"
@@ -176,7 +177,7 @@
           "State persists",
           "Keyboard shortcut works"
         ],
-        "status": "pending"
+        "status": "passing"
       },
       "estimated_complexity": 5
     },
@@ -706,6 +707,6 @@
   ],
 
   "total_stories": 28,
-  "completed_stories": 14,
-  "pending_stories": 14
+  "completed_stories": 15,
+  "pending_stories": 13
 }
