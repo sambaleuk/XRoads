@@ -39,10 +39,13 @@ struct SkillsBrowserView: View {
         }
         .sheet(isPresented: $showDetailSheet) {
             if let skill = selectedSkill {
-                SkillDetailView(
+                SkillDetailSheet(
                     skill: skill,
                     isEnabled: viewModel.isSkillEnabled(skill),
+                    isUserSkill: false, // Will be determined async
+                    missingTools: viewModel.missingTools(for: skill),
                     onToggle: { viewModel.toggleSkill(skill) },
+                    onEdit: nil, // Only for user skills
                     onDismiss: { showDetailSheet = false }
                 )
             }
@@ -323,142 +326,6 @@ private struct CategorySectionHeader: View {
         case .review: return Color(red: 0.8, green: 0.4, blue: 1.0)
         case .custom: return .textSecondary
         }
-    }
-}
-
-// MARK: - Skill Detail View (Sheet)
-
-private struct SkillDetailView: View {
-    let skill: Skill
-    let isEnabled: Bool
-    let onToggle: () -> Void
-    let onDismiss: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            // Header
-            HStack {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(skill.name)
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(Color.textPrimary)
-
-                    HStack(spacing: Theme.Spacing.xs) {
-                        Text("v\(skill.version)")
-                            .font(.system(size: 11, design: .monospaced))
-                            .foregroundStyle(Color.textTertiary)
-
-                        if let category = skill.category {
-                            Text("|")
-                                .foregroundStyle(Color.textTertiary)
-                            Image(systemName: category.iconName)
-                                .font(.system(size: 10))
-                            Text(category.displayName)
-                                .font(.system(size: 11))
-                                .foregroundStyle(Color.textSecondary)
-                        }
-
-                        if let author = skill.author {
-                            Text("|")
-                                .foregroundStyle(Color.textTertiary)
-                            Text("by \(author)")
-                                .font(.system(size: 11))
-                                .foregroundStyle(Color.textSecondary)
-                        }
-                    }
-                }
-
-                Spacer()
-
-                Button {
-                    onDismiss()
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 20))
-                        .foregroundStyle(Color.textTertiary)
-                }
-                .buttonStyle(.plain)
-            }
-            .padding(Theme.Spacing.lg)
-
-            Divider()
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
-                    // Description
-                    VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                        Text("Description")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Color.textSecondary)
-
-                        Text(skill.description)
-                            .font(.system(size: 13))
-                            .foregroundStyle(Color.textPrimary)
-                    }
-
-                    // CLI Compatibility
-                    VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                        Text("Compatible CLIs")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundStyle(Color.textSecondary)
-
-                        HStack(spacing: Theme.Spacing.sm) {
-                            ForEach(AgentType.allCases, id: \.self) { cli in
-                                CLICompatibilityBadge(
-                                    cli: cli,
-                                    isCompatible: skill.isCompatible(with: cli)
-                                )
-                            }
-                        }
-                    }
-
-                    // Required Tools
-                    if !skill.requiredTools.isEmpty {
-                        VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
-                            Text("Required Tools")
-                                .font(.system(size: 12, weight: .semibold))
-                                .foregroundStyle(Color.textSecondary)
-
-                            SkillsFlowLayout(spacing: 6) {
-                                ForEach(skill.requiredTools, id: \.self) { tool in
-                                    Text(tool)
-                                        .font(.system(size: 11, design: .monospaced))
-                                        .foregroundStyle(Color.textPrimary)
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 4)
-                                        .background(Color.bgElevated)
-                                        .cornerRadius(4)
-                                }
-                            }
-                        }
-                    }
-
-                    // Toggle
-                    HStack {
-                        Text(isEnabled ? "Enabled for this project" : "Disabled for this project")
-                            .font(.system(size: 13))
-                            .foregroundStyle(Color.textPrimary)
-
-                        Spacer()
-
-                        Button {
-                            onToggle()
-                        } label: {
-                            Text(isEnabled ? "Disable" : "Enable")
-                                .font(.system(size: 12, weight: .medium))
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .tint(isEnabled ? Color.statusError : Color.statusSuccess)
-                    }
-                    .padding(Theme.Spacing.md)
-                    .background(Color.bgElevated)
-                    .cornerRadius(Theme.Radius.md)
-                }
-                .padding(Theme.Spacing.lg)
-            }
-        }
-        .frame(width: 500, height: 450)
-        .background(Color.bgSurface)
     }
 }
 

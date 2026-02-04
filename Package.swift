@@ -55,6 +55,9 @@ let package = Package(
                 // US-V4-016: Skills Browser Views
                 "Views/Skills/SkillsBrowserView.swift",
                 "Views/Skills/SkillRowView.swift",
+                // US-V4-017: Skill Detail Sheet
+                "Views/Skills/SkillDetailSheet.swift",
+                "Views/Skills/SkillTemplateView.swift",
                 "Resources/Theme.swift",
                 "Models/AgentType.swift",
                 "Models/ActionType.swift",
@@ -137,7 +140,9 @@ let package = Package(
                 // US-V4-015: Dashboard Layout Tests
                 "Dashboard/DashboardLayoutTests.swift",
                 // US-V4-016: Skills Browser Tests
-                "Skills/SkillsBrowserViewTests.swift"
+                "Skills/SkillsBrowserViewTests.swift",
+                // US-V4-017: Skill Detail Sheet Tests
+                "Skills/SkillDetailSheetTests.swift"
             ]
         )
     ]
