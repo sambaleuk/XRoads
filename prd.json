@@ -478,7 +478,8 @@
       "description": "Detection automatique du CLI disponible pour loop generique",
       "priority": "low",
       "depends_on": ["US-V4-006", "US-V4-007"],
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-04T21:15:00Z",
       "acceptance_criteria": [
         "xroads-loop script generique cree",
         "Detecte CLI disponible: claude > gemini > codex (ordre preference)",
@@ -497,7 +498,7 @@
           "xroads-loop --cli gemini forces Gemini",
           "Error if no CLI available"
         ],
-        "status": "pending"
+        "status": "passing"
       },
       "estimated_complexity": 3
     }
