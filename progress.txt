@@ -2258,3 +2258,8 @@ Acceptance Criteria Met:
 - Delta: Added AssetPRDGenerator service to build an assets PRD from art-bible.json, created AssetPRDPreviewView with export + loop launch, added AssetPRDGenerator tests, and updated Package.swift + prd.json status.
 - Checks: ./scripts/swift-build.sh, swift test --disable-sandbox
 - Learnings: Codex /exec helper unavailable here; ran commands directly via shell.
+
+### Iteration 1 - US-V4-026
+- Delta: Added ComponentContextBuilder for detecting art-bible/code components and injecting Available Components into AGENTS.md, added component context tests, updated AGENTS.md + Package.swift, and extended skill-loader.sh with component injection support.
+- Checks: ./scripts/swift-build.sh; swift test --disable-sandbox
+- Learnings: Codex /exec helper unavailable here; ran commands directly via shell.

@@ -518,7 +518,8 @@
       "description": "Injecter les composants disponibles dans le contexte des agents",
       "priority": "high",
       "depends_on": ["US-V4-025"],
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-04T15:12:35Z",
       "acceptance_criteria": [
         "Detecte composants generes dans le projet",
         "Ajoute section 'Available Components' dans AGENTS.md",
@@ -541,7 +542,7 @@
           "Components listed with examples",
           "Missing component triggers warning"
         ],
-        "status": "pending"
+        "status": "passing"
       },
       "estimated_complexity": 5
     },

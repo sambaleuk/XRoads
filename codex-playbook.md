@@ -16,8 +16,10 @@ Use this file to leave short tactical notes for future Codex runs.
 
 
 
+
+
 ## Loaded Skills (Auto-Injected)
-<!-- Skills loaded by codex-loop at 2026-02-04 15:14:56 -->
+<!-- Skills loaded by codex-loop at 2026-02-04 15:56:06 -->
 
 # ===== SKILL: art-director =====
 
@@ -32,6 +34,7 @@ Extract Visual DNA from references and generate production-ready design system.
 - Target: {{target_audience}}
 - Keywords: {{emotional_keywords}}
 - References: {{reference_urls}}
+- Input Images: {{input_images}}
 - Style: {{style_preference}} / {{mode_preference}}
 - Platform: {{platform}}
 
@@ -53,6 +56,12 @@ Extract Visual DNA from references and generate production-ready design system.
    codex exec "cat > art-bible.json << 'EOF'
    {
      "project": "...",
+     "design_tokens": {
+       "colors": {...},
+       "typography": {...},
+       "spacing": {...},
+       "radius": {...}
+     },
      "color_system": {...},
      "typography_system": {...},
      "ui_components": [...],

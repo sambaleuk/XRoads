@@ -118,6 +118,8 @@ let package = Package(
                 "Services/PRDParser.swift",
                 // US-V4-025: Asset PRD Generator
                 "Services/AssetPRDGenerator.swift",
+                // US-V4-026: Component Context Builder
+                "Services/ComponentContextBuilder.swift",
                 "Services/CLIAdapters.swift",
                 "Services/ConfigChecker.swift",
                 "Services/ActionRegistry.swift",
@@ -186,7 +188,9 @@ let package = Package(
                 // US-V4-024: Art Director Skill Tests
                 "ArtDirection/ArtDirectorSkillTests.swift",
                 // US-V4-025: Asset PRD Generator Tests
-                "ArtDirection/AssetPRDGeneratorTests.swift"
+                "ArtDirection/AssetPRDGeneratorTests.swift",
+                // US-V4-026: Component Context Tests
+                "ArtDirection/ComponentContextTests.swift"
             ]
         )
     ]
