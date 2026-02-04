@@ -120,7 +120,8 @@
       "description": "Integration Anthropic API pour mode chat rapide",
       "priority": "critical",
       "depends_on": ["US-V4-013"],
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-04T13:33:00Z",
       "acceptance_criteria": [
         "AnthropicClient actor pour appels API",
         "Streaming response handling",
@@ -142,7 +143,7 @@
           "Messages formatted correctly",
           "Streaming handled"
         ],
-        "status": "pending"
+        "status": "passing"
       },
       "estimated_complexity": 6
     },
@@ -705,6 +706,6 @@
   ],
 
   "total_stories": 28,
-  "completed_stories": 13,
-  "pending_stories": 15
+  "completed_stories": 14,
+  "pending_stories": 14
 }

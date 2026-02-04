@@ -7,11 +7,13 @@ let package = Package(
         .macOS(.v14)
     ],
     products: [
-        .executable(name: "XRoads", targets: ["XRoads"])
+        .executable(name: "XRoads", targets: ["XRoads"]),
+        .library(name: "XRoadsLib", targets: ["XRoadsLib"])
     ],
     targets: [
-        .executableTarget(
-            name: "XRoads",
+        // Main library for testability
+        .target(
+            name: "XRoadsLib",
             path: "XRoads",
             exclude: [
                 "XRoads.entitlements",
@@ -67,6 +69,8 @@ let package = Package(
                 "Models/OrchestratorVisualState.swift",
                 // US-V4-013: Chat Model
                 "Models/ChatMessage.swift",
+                // US-V4-014: API Config
+                "Models/APIConfig.swift",
                 "Services/GitService.swift",
                 "Services/ProcessRunner.swift",
                 "Services/MCPClient.swift",
@@ -93,6 +97,8 @@ let package = Package(
                 "Services/RepoDetector.swift",
                 // US-V4-013: Orchestrator Service
                 "Services/OrchestratorService.swift",
+                // US-V4-014: Anthropic API Client
+                "Services/AnthropicClient.swift",
                 // Actions
                 "Actions/ImplementAction.swift",
                 "Actions/ReviewAction.swift",
@@ -105,6 +111,22 @@ let package = Package(
             ],
             resources: [
                 .copy("Resources/Skills")
+            ]
+        ),
+        // Executable target that depends on the library
+        .executableTarget(
+            name: "XRoads",
+            dependencies: ["XRoadsLib"],
+            path: "XRoadsMain",
+            sources: ["main.swift"]
+        ),
+        // Test target
+        .testTarget(
+            name: "XRoadsTests",
+            dependencies: ["XRoadsLib"],
+            path: "XRoadsTests",
+            sources: [
+                "Services/AnthropicClientTests.swift"
             ]
         )
     ]

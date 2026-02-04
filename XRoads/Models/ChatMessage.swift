@@ -11,12 +11,12 @@ import Foundation
 // MARK: - ChatRole
 
 /// Role of the message sender in the orchestrator chat
-enum ChatRole: String, Codable, Sendable, CaseIterable {
+public enum ChatRole: String, Codable, Sendable, CaseIterable {
     case user
     case assistant
     case system
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .user:
             return "You"
@@ -27,7 +27,7 @@ enum ChatRole: String, Codable, Sendable, CaseIterable {
         }
     }
 
-    var iconName: String {
+    public var iconName: String {
         switch self {
         case .user:
             return "person.fill"
@@ -42,11 +42,11 @@ enum ChatRole: String, Codable, Sendable, CaseIterable {
 // MARK: - OrchestratorMode
 
 /// Operating mode for the orchestrator
-enum OrchestratorMode: String, Codable, Sendable, CaseIterable {
+public enum OrchestratorMode: String, Codable, Sendable, CaseIterable {
     case api      // Fast chat via Anthropic API
     case terminal // Full execution via Claude CLI
 
-    var displayName: String {
+    public var displayName: String {
         switch self {
         case .api:
             return "API"
@@ -55,7 +55,7 @@ enum OrchestratorMode: String, Codable, Sendable, CaseIterable {
         }
     }
 
-    var iconName: String {
+    public var iconName: String {
         switch self {
         case .api:
             return "bolt.fill"
@@ -64,7 +64,7 @@ enum OrchestratorMode: String, Codable, Sendable, CaseIterable {
         }
     }
 
-    var description: String {
+    public var description: String {
         switch self {
         case .api:
             return "Fast responses for PRD generation and quick questions"
@@ -77,13 +77,13 @@ enum OrchestratorMode: String, Codable, Sendable, CaseIterable {
 // MARK: - ChatMessageStatus
 
 /// Status of a chat message (for streaming and error states)
-enum ChatMessageStatus: Codable, Sendable, Equatable {
+public enum ChatMessageStatus: Codable, Sendable, Equatable {
     case pending       // Message being sent
     case streaming     // Response is streaming
     case complete      // Message fully received
     case error(String) // Error with message
 
-    var isLoading: Bool {
+    public var isLoading: Bool {
         switch self {
         case .pending, .streaming:
             return true
@@ -96,13 +96,13 @@ enum ChatMessageStatus: Codable, Sendable, Equatable {
 // MARK: - ChatAction
 
 /// Actions that can be triggered from orchestrator responses
-struct ChatAction: Codable, Identifiable, Sendable, Hashable {
-    let id: UUID
-    let type: ChatActionType
-    let label: String
-    let payload: [String: String]?
+public struct ChatAction: Codable, Identifiable, Sendable, Hashable {
+    public let id: UUID
+    public let type: ChatActionType
+    public let label: String
+    public let payload: [String: String]?
 
-    init(
+    public init(
         id: UUID = UUID(),
         type: ChatActionType,
         label: String,
@@ -118,7 +118,7 @@ struct ChatAction: Codable, Identifiable, Sendable, Hashable {
 // MARK: - ChatActionType
 
 /// Types of actions the orchestrator can trigger
-enum ChatActionType: String, Codable, Sendable {
+public enum ChatActionType: String, Codable, Sendable {
     case createPRD         // Generate a PRD from the conversation
     case launchLoop        // Start a nexus loop with PRD
     case openFile          // Open a file in editor
@@ -131,16 +131,16 @@ enum ChatActionType: String, Codable, Sendable {
 // MARK: - ChatMessage
 
 /// Represents a single message in the orchestrator chat
-struct ChatMessage: Codable, Identifiable, Hashable, Sendable {
-    let id: UUID
-    let role: ChatRole
-    let content: String
-    let timestamp: Date
-    var status: ChatMessageStatus
-    var actions: [ChatAction]?
-    var metadata: [String: String]?
+public struct ChatMessage: Codable, Identifiable, Hashable, Sendable {
+    public let id: UUID
+    public let role: ChatRole
+    public let content: String
+    public let timestamp: Date
+    public var status: ChatMessageStatus
+    public var actions: [ChatAction]?
+    public var metadata: [String: String]?
 
-    init(
+    public init(
         id: UUID = UUID(),
         role: ChatRole,
         content: String,
@@ -159,27 +159,27 @@ struct ChatMessage: Codable, Identifiable, Hashable, Sendable {
     }
 
     /// Create a user message
-    static func user(_ content: String) -> ChatMessage {
+    public static func user(_ content: String) -> ChatMessage {
         ChatMessage(role: .user, content: content)
     }
 
     /// Create an assistant message
-    static func assistant(_ content: String, status: ChatMessageStatus = .complete) -> ChatMessage {
+    public static func assistant(_ content: String, status: ChatMessageStatus = .complete) -> ChatMessage {
         ChatMessage(role: .assistant, content: content, status: status)
     }
 
     /// Create a system message
-    static func system(_ content: String) -> ChatMessage {
+    public static func system(_ content: String) -> ChatMessage {
         ChatMessage(role: .system, content: content)
     }
 
     /// Create a streaming placeholder message
-    static func streamingPlaceholder() -> ChatMessage {
+    public static func streamingPlaceholder() -> ChatMessage {
         ChatMessage(role: .assistant, content: "", status: .streaming)
     }
 
     /// Formatted timestamp for display [HH:mm]
-    var formattedTimestamp: String {
+    public var formattedTimestamp: String {
         let formatter = DateFormatter()
         formatter.dateFormat = "HH:mm"
         return formatter.string(from: timestamp)
@@ -187,11 +187,11 @@ struct ChatMessage: Codable, Identifiable, Hashable, Sendable {
 
     // MARK: - Hashable
 
-    func hash(into hasher: inout Hasher) {
+    public func hash(into hasher: inout Hasher) {
         hasher.combine(id)
     }
 
-    static func == (lhs: ChatMessage, rhs: ChatMessage) -> Bool {
+    public static func == (lhs: ChatMessage, rhs: ChatMessage) -> Bool {
         lhs.id == rhs.id
     }
 }
@@ -199,15 +199,15 @@ struct ChatMessage: Codable, Identifiable, Hashable, Sendable {
 // MARK: - ChatContext
 
 /// Context information injected into orchestrator prompts
-struct ChatContext: Codable, Sendable {
-    let projectPath: String?
-    let currentBranch: String?
-    let worktrees: [String]
-    let availableSkills: [String]
-    let mcpServers: [String]
-    let dashboardMode: String
+public struct ChatContext: Codable, Sendable {
+    public let projectPath: String?
+    public let currentBranch: String?
+    public let worktrees: [String]
+    public let availableSkills: [String]
+    public let mcpServers: [String]
+    public let dashboardMode: String
 
-    init(
+    public init(
         projectPath: String? = nil,
         currentBranch: String? = nil,
         worktrees: [String] = [],
@@ -224,7 +224,7 @@ struct ChatContext: Codable, Sendable {
     }
 
     /// Generate system prompt context string
-    var systemPromptSection: String {
+    public var systemPromptSection: String {
         var lines: [String] = []
         lines.append("## Current XRoads Context")
 

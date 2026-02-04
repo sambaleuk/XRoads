@@ -1,15 +1,16 @@
 import SwiftUI
 
-@main
-struct XRoadsApp: App {
+public struct XRoadsApp: App {
 
     /// Global application state
     @State private var appState = AppState()
-    
+
     /// NSApplicationDelegate for lifecycle events
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
 
-    var body: some Scene {
+    public init() {}
+
+    public var body: some Scene {
         WindowGroup {
             MainWindowView()
                 .environment(\.appState, appState)

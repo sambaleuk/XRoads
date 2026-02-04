@@ -1794,3 +1794,43 @@ Learnings:
 - ProcessRunner.terminate() is throwing but not async, need try? when calling
 - Creating a testable library target from a SwiftUI macOS app requires careful handling of @main entry point
 
+### Iteration - US-V4-014 (Orchestrator API Integration)
+- Created AnthropicClient actor (`Services/AnthropicClient.swift`) for thread-safe API communication
+- Implemented streaming response handling via AsyncThrowingStream with SSE parsing
+- Added APIConfig model with support for multiple providers (Anthropic, OpenAI, Google)
+- Implemented error handling: rate limiting, auth errors, network errors, timeout, cancellation
+- Added AnthropicClientError enum with isRetryable property for retry logic
+- Built system prompt generation with ChatContext injection
+- Added convenience helpers: toAnthropicMessages, send, sendStreaming
+- Created comprehensive unit test suite (28 tests) covering:
+  - API key management and validation
+  - Configuration handling
+  - Message conversion (ChatMessage to AnthropicMessage)
+  - System prompt building
+  - Error types and retryable status
+  - Request/response encoding/decoding
+  - StreamEvent cases
+- Refactored Package.swift to support library target (XRoadsLib) for testability
+- Added public access modifiers to all types needed by tests
+- **Build verified**: `swift build` completes successfully
+- **Unit tests**: All 28 tests PASS
+
+Files created:
+- XRoads/Services/AnthropicClient.swift
+- XRoads/Models/APIConfig.swift
+- XRoadsTests/Services/AnthropicClientTests.swift
+- XRoadsMain/main.swift (entry point wrapper)
+
+Files modified:
+- XRoads/Models/ChatMessage.swift (added public access modifiers)
+- XRoads/App/XRoadsApp.swift (removed @main, added public init/body)
+- Package.swift (added XRoadsLib target, test target, new source files)
+- prd.json (marked US-V4-014 complete with timestamp)
+
+Learnings:
+- Swift actors in AsyncThrowingStream closures need careful handling to avoid actor isolation errors
+- Pre-build request before entering AsyncThrowingStream to capture actor state
+- Use static helper methods for code used in non-actor context (parseStreamingError)
+- SwiftPM test targets require public types for @testable import to work
+- Result type is useful for capturing throwing operations before crossing actor boundaries
+
