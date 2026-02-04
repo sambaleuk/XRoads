@@ -105,6 +105,9 @@ final class AppState {
     /// Visual state of the central orchestrator creature
     var orchestratorVisualState: OrchestratorVisualState = .sleeping
 
+    /// Available MCP tools for checking skill dependencies (US-V4-018)
+    var availableMCPTools: Set<String> = Set(["git", "file-read", "file-edit", "bash", "web-search"])
+
     // MARK: - Orchestration State
 
     /// Current orchestration session ID

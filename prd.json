@@ -252,7 +252,8 @@
       "description": "Afficher les skills charges dans chaque terminal slot",
       "priority": "medium",
       "depends_on": ["US-V4-016"],
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-04T13:58:00Z",
       "acceptance_criteria": [
         "Badge avec nombre de skills charges",
         "Popover au hover avec liste skills",
@@ -275,7 +276,7 @@
           "Popover lists skills",
           "Warning for missing MCP"
         ],
-        "status": "pending"
+        "status": "passing"
       },
       "estimated_complexity": 3
     },
@@ -709,6 +710,6 @@
   ],
 
   "total_stories": 28,
-  "completed_stories": 17,
-  "pending_stories": 11
+  "completed_stories": 18,
+  "pending_stories": 10
 }

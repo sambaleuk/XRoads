@@ -1931,3 +1931,88 @@ Learnings:
 - Existing Skill.swift model has category, compatibleCLIs, requiredTools - reuse these
 - FlowLayout was already defined in ChatMessageView.swift - renamed to SkillsFlowLayout to avoid conflict
 - SwiftUI @Observable works well for ViewModel pattern with computed filtered views
+
+### Iteration N - US-V4-017 (Skill Detail Sheet)
+- Created SkillDetailSheet.swift with comprehensive skill detail view:
+  - Header showing name, version, category icon, author, and badges
+  - Metadata section with description and CLI compatibility badges
+  - Templates section with CLI tabs (Claude/Gemini/Codex)
+  - Required tools section with missing tool warnings
+  - MCP dependencies section (extracted from prompt template heuristics)
+  - Actions section with enable/disable toggle and edit button for user skills
+  - Skill preview sheet showing adapted template
+- Created SkillTemplateView.swift with:
+  - SkillTemplateTabView for CLI-specific template viewing
+  - CLITabButton with active state and compatibility indicators
+  - SkillTemplateContent with adapted template display
+  - Template expansion/collapse and copy functionality
+  - CLI-specific notes explaining adapter conventions
+- Integration with SkillAdapterFactory for real-time template adaptation
+- Updated SkillsBrowserView to use SkillDetailSheet instead of internal SkillDetailView
+- Created comprehensive unit tests (21 tests):
+  - All fields displayed tests
+  - Templates shown in tabs tests
+  - Edit button for project skills tests
+  - Required tools and missing tools detection tests
+  - SkillCategory properties tests
+  - SkillAdapter integration tests
+  - SkillContext string generation tests
+  - Skill Identifiable/Hashable/Codable conformance tests
+- **Build verified**: `./scripts/swift-build.sh` completes successfully
+- **Unit tests**: All 21 tests PASS
+
+Files created:
+- XRoads/Views/Skills/SkillDetailSheet.swift
+- XRoads/Views/Skills/SkillTemplateView.swift
+- XRoadsTests/Skills/SkillDetailSheetTests.swift
+
+Files modified:
+- XRoads/Views/Skills/SkillsBrowserView.swift (replaced private SkillDetailView with SkillDetailSheet)
+- Package.swift (added new view and test files)
+- prd.json (marked US-V4-017 complete with passing tests)
+
+
+### Iteration N+1 - US-V4-018 (Terminal Slot Skills Badge)
+- Created SkillsBadge.swift component in Views/Components/ with:
+  - SkillsBadge view showing skill count with sparkles icon
+  - Popover listing skills on hover with SkillsPopoverContent
+  - Warning indicator (exclamationmark.triangle) when skills have missing MCP dependencies
+  - SkillPopoverRow showing skill name, category icon, version, and missing tools
+  - CompactSkillsBadge variant for smaller spaces
+  - onTap callback for opening Skills Browser filtered by slot
+- Modified TerminalSlotView.swift:
+  - Added onShowSkillsBrowser callback parameter
+  - Integrated SkillsBadge in header after agent indicator
+  - Badge only shows when slot.hasLoadedSkills is true
+  - Connected to appState.availableMCPTools for dependency checking
+- Modified AppState.swift:
+  - Added availableMCPTools: Set<String> property with default MCP tools
+  - Provides MCP availability info for SkillsBadge dependency checks
+- Created comprehensive SkillsBadgeTests.swift with 18 tests:
+  - Badge shows correct count (1, 3, empty)
+  - Popover lists skills with accessible properties
+  - Warning for missing MCP dependencies detection
+  - No warning when all dependencies met
+  - Specific missing tools identification
+  - Empty required tools never shows missing
+  - TerminalSlot skill count/names/hasLoadedSkills properties
+  - TerminalSlot configureAction and clearAction with skills
+  - TerminalSlot reset clears everything
+  - Skill compatibility checks
+- **Build verified**: `swift build` completes successfully
+- **Unit tests**: All 18 tests PASS
+
+Files created:
+- XRoads/Views/Components/SkillsBadge.swift
+- XRoadsTests/Components/SkillsBadgeTests.swift
+
+Files modified:
+- XRoads/Views/Dashboard/TerminalSlotView.swift (integrated SkillsBadge)
+- XRoads/ViewModels/AppState.swift (added availableMCPTools)
+- Package.swift (added SkillsBadge.swift and SkillsBadgeTests.swift)
+- prd.json (marked US-V4-018 complete with passing tests)
+
+Learnings:
+- TerminalSlot already has loadedSkills: [Skill], hasLoadedSkills, loadedSkillCount properties from US-V3-009
+- Skill model already has hasRequiredTools() and missingTools() methods for MCP dependency checking
+- Popover with onHover works well for rich skill info display in compact badge

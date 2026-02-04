@@ -17,6 +17,8 @@ struct TerminalSlotView: View {
     let onStop: () -> Void
     var onSendInput: ((String) -> Void)?
     var showInputBar: Bool = true
+    /// Callback to show Skills Browser filtered by this slot (US-V4-018)
+    var onShowSkillsBrowser: (() -> Void)?
 
     @State private var isHovered: Bool = false
     @State private var showConfigPopover: Bool = false
@@ -75,6 +77,15 @@ struct TerminalSlotView: View {
                 Text(agent.cliDisplayName)
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .foregroundStyle(agentColor)
+            }
+
+            // Skills badge (US-V4-018)
+            if slot.hasLoadedSkills {
+                SkillsBadge(
+                    skills: slot.loadedSkills,
+                    availableMCPTools: appState.availableMCPTools,
+                    onTap: { onShowSkillsBrowser?() }
+                )
             }
 
             Spacer()

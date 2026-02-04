@@ -41,6 +41,8 @@ let package = Package(
                 "Views/Components/QuickActionBar.swift",
                 // US-V4-015: Collapsible Panel
                 "Views/Components/CollapsiblePanel.swift",
+                // US-V4-018: Skills Badge
+                "Views/Components/SkillsBadge.swift",
                 // Dashboard v3 Views
                 "Views/Dashboard/XRoadsDashboardView.swift",
                 "Views/Dashboard/TerminalSlotView.swift",
@@ -142,7 +144,9 @@ let package = Package(
                 // US-V4-016: Skills Browser Tests
                 "Skills/SkillsBrowserViewTests.swift",
                 // US-V4-017: Skill Detail Sheet Tests
-                "Skills/SkillDetailSheetTests.swift"
+                "Skills/SkillDetailSheetTests.swift",
+                // US-V4-018: Skills Badge Tests
+                "Components/SkillsBadgeTests.swift"
             ]
         )
     ]
