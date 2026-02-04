@@ -1584,3 +1584,23 @@ Learnings:
 - Mark sections with both start and end markers for clean sed-based replacement
 - Each loop should use its own CLI name for skill-loader.sh --cli parameter
 
+### Iteration 8 - US-V4-008 (AgentBrowser Skill)
+- Created agent-browser.skill.yaml in ~/.xroads/skills/automation/
+- Skill provides headless browser control for E2E testing, screenshots, form filling, and web automation
+- Includes comprehensive templates for all 3 CLIs:
+  - Claude: Detailed workflow with MCP tool documentation, best practices, example login flow
+  - Gemini: Extension format with numbered steps and example form submission
+  - Codex: Ritual format with MCP tool commands and example flow
+- mcp_dependencies includes 'agent-browser' for auto-loading
+- required_tools lists browser MCP tools: browser_navigate, browser_screenshot, browser_click, browser_type, browser_wait, browser_get_content
+- **Unit test: tests/skills/test_agent_browser_skill.sh - PASS (19/19 tests)**
+
+Files created:
+- ~/.xroads/skills/automation/agent-browser.skill.yaml
+- tests/skills/test_agent_browser_skill.sh
+
+Learnings:
+- Automation skills use category 'automation' and go in ~/.xroads/skills/automation/
+- MCP tools should be listed in required_tools for the skill to specify what it needs
+- Templates should include practical examples for each CLI format
+

@@ -348,7 +348,8 @@
       "description": "Skill automation pour browser avec AgentBrowser MCP",
       "priority": "medium",
       "depends_on": ["US-V4-002", "US-V4-004"],
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-04T17:00:00Z",
       "acceptance_criteria": [
         "agent-browser.skill.yaml cree avec templates multi-CLI",
         "Depend de agent-browser MCP",
@@ -367,7 +368,7 @@
           "mcp_dependencies includes agent-browser",
           "All CLI templates present"
         ],
-        "status": "pending"
+        "status": "passing"
       },
       "estimated_complexity": 4
     },
