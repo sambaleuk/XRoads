@@ -1,15 +1,28 @@
+//
+//  SettingsView.swift
+//  XRoads
+//
+//  Created by Nexus on 2026-02-04.
+//  US-V4-019: Main settings view with tabs for different settings categories
+//
+
 import SwiftUI
 
 // MARK: - SettingsView
 
 /// Main settings view for XRoads preferences
-struct SettingsView: View {
+public struct SettingsView: View {
+
     // MARK: - State
 
     /// Selected settings tab
     @State private var selectedTab: SettingsTab = .general
 
-    var body: some View {
+    public init() {}
+
+    // MARK: - Body
+
+    public var body: some View {
         TabView(selection: $selectedTab) {
             GeneralSettingsView()
                 .tabItem {
@@ -23,7 +36,7 @@ struct SettingsView: View {
                 }
                 .tag(SettingsTab.cli)
         }
-        .frame(width: 500, height: 350)
+        .frame(width: 550, height: 500)
         .background(Color.bgApp)
         .preferredColorScheme(.dark)
     }
@@ -31,127 +44,34 @@ struct SettingsView: View {
 
 // MARK: - Settings Tabs
 
-enum SettingsTab: Hashable {
+public enum SettingsTab: Hashable, Sendable {
     case general
     case cli
-}
-
-// MARK: - GeneralSettingsView
-
-/// General application settings
-struct GeneralSettingsView: View {
-    // MARK: - App Storage
-
-    /// Default repository path for new worktrees
-    @AppStorage("defaultRepoPath") private var defaultRepoPath: String = ""
-
-    /// Whether to auto-start log streaming on launch
-    @AppStorage("autoStartLogStreaming") private var autoStartLogStreaming: Bool = true
-
-    /// Maximum number of logs to keep in memory
-    @AppStorage("maxLogEntries") private var maxLogEntries: Int = 500
-
-    var body: some View {
-        Form {
-            Section {
-                HStack {
-                    TextField("Default Repository Path", text: $defaultRepoPath)
-                        .textFieldStyle(DarkProTextFieldStyle())
-
-                    Button("Browse...") {
-                        browseForDirectory()
-                    }
-                    .buttonStyle(.bordered)
-                }
-
-                if !defaultRepoPath.isEmpty {
-                    HStack {
-                        Image(systemName: directoryExists ? "checkmark.circle.fill" : "xmark.circle.fill")
-                            .foregroundStyle(directoryExists ? Color.statusSuccess : Color.statusError)
-
-                        Text(directoryExists ? "Directory exists" : "Directory not found")
-                            .font(.caption)
-                            .foregroundStyle(Color.textSecondary)
-                    }
-                }
-            } header: {
-                Text("Default Repository")
-                    .foregroundStyle(Color.textPrimary)
-            } footer: {
-                Text("The default path used when creating new worktrees")
-                    .foregroundStyle(Color.textTertiary)
-            }
-
-            Section {
-                Toggle("Auto-start log streaming", isOn: $autoStartLogStreaming)
-                    .foregroundStyle(Color.textPrimary)
-
-                Picker("Max log entries", selection: $maxLogEntries) {
-                    Text("250").tag(250)
-                    Text("500").tag(500)
-                    Text("1000").tag(1000)
-                    Text("2000").tag(2000)
-                }
-                .foregroundStyle(Color.textPrimary)
-            } header: {
-                Text("Logging")
-                    .foregroundStyle(Color.textPrimary)
-            } footer: {
-                Text("Higher log limits may impact performance")
-                    .foregroundStyle(Color.textTertiary)
-            }
-        }
-        .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
-        .background(Color.bgSurface)
-        .padding()
-    }
-
-    // MARK: - Computed Properties
-
-    private var directoryExists: Bool {
-        var isDirectory: ObjCBool = false
-        return FileManager.default.fileExists(atPath: defaultRepoPath, isDirectory: &isDirectory) && isDirectory.boolValue
-    }
-
-    // MARK: - Actions
-
-    private func browseForDirectory() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.message = "Select default repository directory"
-        panel.prompt = "Select"
-
-        if !defaultRepoPath.isEmpty {
-            panel.directoryURL = URL(fileURLWithPath: defaultRepoPath)
-        }
-
-        if panel.runModal() == .OK, let url = panel.url {
-            defaultRepoPath = url.path
-        }
-    }
+    case mcp
+    case apiKeys
 }
 
 // MARK: - CLISettingsView
 
 /// CLI executable path settings
-struct CLISettingsView: View {
-    // MARK: - App Storage
+public struct CLISettingsView: View {
 
-    @AppStorage("claudeCliPath") private var claudeCliPath: String = "/usr/local/bin/claude"
-    @AppStorage("geminiCliPath") private var geminiCliPath: String = "/usr/local/bin/gemini"
-    @AppStorage("codexCliPath") private var codexCliPath: String = "/usr/local/bin/codex"
+    // MARK: - State
 
-    var body: some View {
+    @State private var settings = AppSettings.shared
+
+    public init() {}
+
+    // MARK: - Body
+
+    public var body: some View {
         Form {
             Section {
                 CLIPathRow(
                     name: "Claude Code",
                     icon: "brain.head.profile",
                     iconColor: Color.accentPrimary,
-                    path: $claudeCliPath,
+                    path: $settings.claudeCliPath,
                     defaultPath: "/usr/local/bin/claude"
                 )
 
@@ -159,7 +79,7 @@ struct CLISettingsView: View {
                     name: "Gemini CLI",
                     icon: "sparkles",
                     iconColor: Color.statusWarning,
-                    path: $geminiCliPath,
+                    path: $settings.geminiCliPath,
                     defaultPath: "/usr/local/bin/gemini"
                 )
 
@@ -167,11 +87,11 @@ struct CLISettingsView: View {
                     name: "Codex",
                     icon: "terminal",
                     iconColor: Color.statusSuccess,
-                    path: $codexCliPath,
+                    path: $settings.codexCliPath,
                     defaultPath: "/usr/local/bin/codex"
                 )
             } header: {
-                Text("CLI Executable Paths")
+                Label("CLI Executable Paths", systemImage: "terminal")
                     .foregroundStyle(Color.textPrimary)
             } footer: {
                 Text("Configure custom paths if CLIs are not in standard locations")
@@ -179,8 +99,13 @@ struct CLISettingsView: View {
             }
 
             Section {
-                Button("Reset to Defaults") {
-                    resetToDefaults()
+                Button(role: .destructive) {
+                    settings.resetCLIPathsToDefaults()
+                } label: {
+                    HStack {
+                        Image(systemName: "arrow.counterclockwise")
+                        Text("Reset CLI Paths to Defaults")
+                    }
                 }
                 .foregroundStyle(Color.statusError)
             }
@@ -189,14 +114,6 @@ struct CLISettingsView: View {
         .scrollContentBackground(.hidden)
         .background(Color.bgSurface)
         .padding()
-    }
-
-    // MARK: - Actions
-
-    private func resetToDefaults() {
-        claudeCliPath = "/usr/local/bin/claude"
-        geminiCliPath = "/usr/local/bin/gemini"
-        codexCliPath = "/usr/local/bin/codex"
     }
 }
 
@@ -287,87 +204,20 @@ struct StatusIndicator: View {
     }
 }
 
-// MARK: - UserDefaults Keys Extension
+// MARK: - UserDefaults Keys Extension (Backward Compatibility)
 
 extension UserDefaults {
-    /// Keys for XRoads settings
+    /// Keys for XRoads settings (backward compatibility with @AppStorage)
     enum Keys {
-        static let defaultRepoPath = "defaultRepoPath"
-        static let autoStartLogStreaming = "autoStartLogStreaming"
-        static let maxLogEntries = "maxLogEntries"
-        static let claudeCliPath = "claudeCliPath"
-        static let geminiCliPath = "geminiCliPath"
-        static let codexCliPath = "codexCliPath"
-        static let fullAgenticMode = "fullAgenticMode"
-        // US-V4-015: Chat Panel Settings
-        static let chatPanelExpanded = "chatPanelExpanded"
-        static let chatPanelWidth = "chatPanelWidth"
-    }
-}
-
-// MARK: - AppSettings
-
-/// Helper struct to access all settings in a type-safe way
-struct AppSettings {
-    /// Access to UserDefaults
-    private static var defaults: UserDefaults { .standard }
-
-    // MARK: - General Settings
-
-    /// Default repository path for new worktrees
-    static var defaultRepoPath: String {
-        get { defaults.string(forKey: UserDefaults.Keys.defaultRepoPath) ?? "" }
-        set { defaults.set(newValue, forKey: UserDefaults.Keys.defaultRepoPath) }
-    }
-
-    /// Whether to auto-start log streaming on launch
-    static var autoStartLogStreaming: Bool {
-        get { defaults.bool(forKey: UserDefaults.Keys.autoStartLogStreaming) }
-        set { defaults.set(newValue, forKey: UserDefaults.Keys.autoStartLogStreaming) }
-    }
-
-    /// Whether Full Agentic Mode is enabled
-    static var fullAgenticMode: Bool {
-        get { defaults.bool(forKey: UserDefaults.Keys.fullAgenticMode) }
-        set { defaults.set(newValue, forKey: UserDefaults.Keys.fullAgenticMode) }
-    }
-
-    /// Maximum number of logs to keep in memory
-    static var maxLogEntries: Int {
-        get {
-            let value = defaults.integer(forKey: UserDefaults.Keys.maxLogEntries)
-            return value > 0 ? value : 500
-        }
-        set { defaults.set(newValue, forKey: UserDefaults.Keys.maxLogEntries) }
-    }
-
-    // MARK: - CLI Paths
-
-    /// Claude CLI executable path
-    static var claudeCliPath: String {
-        get { defaults.string(forKey: UserDefaults.Keys.claudeCliPath) ?? "/usr/local/bin/claude" }
-        set { defaults.set(newValue, forKey: UserDefaults.Keys.claudeCliPath) }
-    }
-
-    /// Gemini CLI executable path
-    static var geminiCliPath: String {
-        get { defaults.string(forKey: UserDefaults.Keys.geminiCliPath) ?? "/usr/local/bin/gemini" }
-        set { defaults.set(newValue, forKey: UserDefaults.Keys.geminiCliPath) }
-    }
-
-    /// Codex CLI executable path
-    static var codexCliPath: String {
-        get { defaults.string(forKey: UserDefaults.Keys.codexCliPath) ?? "/usr/local/bin/codex" }
-        set { defaults.set(newValue, forKey: UserDefaults.Keys.codexCliPath) }
-    }
-
-    /// Get CLI path for a specific agent type
-    static func cliPath(for agentType: AgentType) -> String {
-        switch agentType {
-        case .claude: return claudeCliPath
-        case .gemini: return geminiCliPath
-        case .codex: return codexCliPath
-        }
+        static let defaultRepoPath = SettingsKey.defaultRepoPath.rawValue
+        static let autoStartLogStreaming = SettingsKey.autoStartLogStreaming.rawValue
+        static let maxLogEntries = SettingsKey.maxLogEntries.rawValue
+        static let claudeCliPath = SettingsKey.claudeCliPath.rawValue
+        static let geminiCliPath = SettingsKey.geminiCliPath.rawValue
+        static let codexCliPath = SettingsKey.codexCliPath.rawValue
+        static let fullAgenticMode = SettingsKey.fullAgenticMode.rawValue
+        static let chatPanelExpanded = SettingsKey.chatPanelExpanded.rawValue
+        static let chatPanelWidth = SettingsKey.chatPanelWidth.rawValue
     }
 }
 

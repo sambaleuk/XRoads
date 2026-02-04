@@ -29,6 +29,8 @@ let package = Package(
                 "Views/WorktreeCreateSheet.swift",
                 "Views/CommandPaletteView.swift",
                 "Views/SettingsView.swift",
+                // US-V4-019: General Settings View
+                "Views/Settings/GeneralSettingsView.swift",
                 "Views/ConflictResolutionSheet.swift",
                 "Views/PRDLoaderSheet.swift",
                 "Views/OrchestrationHistorySheet.swift",
@@ -81,6 +83,8 @@ let package = Package(
                 "Models/ChatMessage.swift",
                 // US-V4-014: API Config
                 "Models/APIConfig.swift",
+                // US-V4-019: App Settings Model
+                "Models/AppSettings.swift",
                 "Services/GitService.swift",
                 "Services/ProcessRunner.swift",
                 "Services/MCPClient.swift",
@@ -146,7 +150,9 @@ let package = Package(
                 // US-V4-017: Skill Detail Sheet Tests
                 "Skills/SkillDetailSheetTests.swift",
                 // US-V4-018: Skills Badge Tests
-                "Components/SkillsBadgeTests.swift"
+                "Components/SkillsBadgeTests.swift",
+                // US-V4-019: General Settings Tests
+                "Settings/GeneralSettingsTests.swift"
             ]
         )
     ]

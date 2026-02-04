@@ -286,7 +286,8 @@
       "description": "Page parametres generale (theme, raccourcis, comportement)",
       "priority": "high",
       "depends_on": [],
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-04T14:05:00Z",
       "acceptance_criteria": [
         "Section Appearance (theme selection si applicable)",
         "Section Behavior (auto-start, notifications)",
@@ -308,7 +309,7 @@
           "Settings load on launch",
           "Reset works"
         ],
-        "status": "pending"
+        "status": "passing"
       },
       "estimated_complexity": 4
     },
@@ -710,6 +711,6 @@
   ],
 
   "total_stories": 28,
-  "completed_stories": 18,
-  "pending_stories": 10
+  "completed_stories": 19,
+  "pending_stories": 9
 }

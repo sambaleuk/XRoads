@@ -2016,3 +2016,60 @@ Learnings:
 - TerminalSlot already has loadedSkills: [Skill], hasLoadedSkills, loadedSkillCount properties from US-V3-009
 - Skill model already has hasRequiredTools() and missingTools() methods for MCP dependency checking
 - Popover with onHover works well for rich skill info display in compact badge
+
+### Iteration 19 - US-V4-019 (Settings View - General)
+- Created comprehensive AppSettings.swift model with:
+  - SettingsKey enum with all UserDefaults keys
+  - AppearanceMode enum (system, dark, light) with colorScheme support
+  - AccentColorChoice enum with 7 color options
+  - KeyboardShortcutConfig struct with display string generation and Codable support
+  - AppSettings @Observable singleton for centralized settings management
+  - Type-safe property accessors with automatic UserDefaults persistence
+  - Reset methods: resetGeneralToDefaults(), resetShortcutsToDefaults(), resetCLIPathsToDefaults(), resetAllToDefaults()
+  - Backward compatibility static accessors
+- Created GeneralSettingsView.swift with:
+  - Appearance section: theme mode picker, accent color selection
+  - Behavior section: launch at login, auto-start log streaming, max log entries, notifications toggle with sub-options
+  - Keyboard Shortcuts section: editable bindings for all app shortcuts
+  - Reset to defaults button with destructive styling
+  - ShortcutRow component for displaying shortcuts with edit button
+  - ShortcutEditorSheet for editing shortcuts with modifier toggles and key input
+- Updated SettingsView.swift:
+  - Uses new AppSettings.shared for state
+  - CLISettingsView refactored to use AppSettings
+  - UserDefaults.Keys extension for backward compatibility with @AppStorage
+  - Removed duplicate DarkProTextFieldStyle (exists in WorktreeCreateSheet)
+- Created GeneralSettingsTests.swift with 23 comprehensive tests:
+  - Settings save correctly (string, bool, int values)
+  - Settings load on launch (default values)
+  - Reset works (general settings, CLI paths)
+  - AppearanceMode tests (allCases, colorScheme, persistence)
+  - AccentColorChoice tests (allCases, persistence)
+  - KeyboardShortcutConfig tests (displayString, defaults, codable, persistence)
+  - SettingsKey tests (allCases, unique raw values)
+  - Notification settings persistence
+  - Chat panel settings persistence
+  - Full agentic mode persistence
+  - Launch at login persistence
+- Updated Package.swift:
+  - Added Models/AppSettings.swift
+  - Added Views/Settings/GeneralSettingsView.swift
+  - Added XRoadsTests/Settings/GeneralSettingsTests.swift
+- **Build verified**: `./scripts/swift-build.sh` completes successfully
+- **Unit tests**: All 23 tests PASS
+
+Files created:
+- XRoads/Models/AppSettings.swift
+- XRoads/Views/Settings/GeneralSettingsView.swift
+- XRoadsTests/Settings/GeneralSettingsTests.swift
+
+Files modified:
+- XRoads/Views/SettingsView.swift (refactored, added UserDefaults.Keys extension)
+- Package.swift (added new source files)
+- prd.json (marked US-V4-019 complete with passing tests)
+
+Learnings:
+- DarkProTextFieldStyle already exists in WorktreeCreateSheet.swift - avoid duplication
+- UserDefaults.Keys extension needed for backward compatibility with existing @AppStorage usage
+- AgentType is internal so methods using it must not be public
+- @Observable requires @MainActor for thread safety in SwiftUI
