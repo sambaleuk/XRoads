@@ -419,7 +419,8 @@
       "description": "Interface assistee pour creer des PRDs avec l'orchestrateur",
       "priority": "critical",
       "depends_on": ["US-V4-013", "US-V4-014"],
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-04T15:02:00Z",
       "acceptance_criteria": [
         "Wizard step-by-step pour PRD creation",
         "Chat integre pour affiner avec AI",
@@ -442,7 +443,7 @@
           "PRD preview updates",
           "Export creates valid JSON"
         ],
-        "status": "pending"
+        "status": "passing"
       },
       "estimated_complexity": 7
     },
@@ -714,6 +715,6 @@
   ],
 
   "total_stories": 28,
-  "completed_stories": 22,
-  "pending_stories": 6
+  "completed_stories": 23,
+  "pending_stories": 5
 }

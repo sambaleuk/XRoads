@@ -27,4 +27,16 @@ extension Notification.Name {
 
     /// Notification to request app quit with cleanup
     static let requestAppQuit = Notification.Name("requestAppQuit")
+
+    /// Notification to open PRD Assistant
+    static let openPRDAssistant = Notification.Name("openPRDAssistant")
+
+    /// Notification to open Worktree Creator
+    static let openWorktreeCreator = Notification.Name("openWorktreeCreator")
+
+    /// Notification to open Art Direction pipeline
+    static let openArtDirection = Notification.Name("openArtDirection")
+
+    /// Notification to open Skills Browser
+    static let openSkillsBrowser = Notification.Name("openSkillsBrowser")
 }

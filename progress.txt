@@ -2073,3 +2073,178 @@ Learnings:
 - UserDefaults.Keys extension needed for backward compatibility with existing @AppStorage usage
 - AgentType is internal so methods using it must not be public
 - @Observable requires @MainActor for thread safety in SwiftUI
+
+### Iteration 20 - US-V4-020 (Settings View - CLI Configuration)
+- Enhanced CLI configuration with full settings management
+- Added CLIConfiguration model for path, default arguments, and enabled state
+- Added CLIValidationResult struct for validation feedback with version detection
+- Added SettingsKey enum cases for CLI args, enabled states, and preference order
+- Extended AppSettings with:
+  - claudeDefaultArgs, geminiDefaultArgs, codexDefaultArgs for default CLI arguments
+  - claudeEnabled, geminiEnabled, codexEnabled for enable/disable toggles
+  - cliPreferenceOrder for auto-detection priority
+  - Helper methods: cliDefaultArgs(for:), isCliEnabled(_:), cliConfiguration(for:), preferredCLI(availabilityChecker:)
+  - Reset methods: resetCLIArgsToDefaults(), resetCLIEnabledToDefaults(), resetCLIPreferenceOrderToDefaults(), resetAllCLIToDefaults()
+  - Private helpers: saveStringArray(), loadStringArray() for array persistence
+- Created CLISettingsView.swift with:
+  - Preference order section with reorderable badges
+  - CLI sections with enable/disable toggle, path picker, validation status, argument editor, test connection button
+  - CLIPathValidator utility for path validation and connection testing
+  - PreferenceOrderBadge for drag-to-reorder UI
+  - ValidationBadge for quick status indicator
+  - CLIValidationStatusView for detailed validation feedback
+  - CLIArgumentsEditor with tag-based argument management
+  - ArgumentTag component for individual argument display
+- Refactored SettingsView.swift to use separate CLISettingsView file
+- Created CLISettingsTests.swift with 17 comprehensive tests:
+  - test_validPathShowsGreenCheck_fileExists: validates existing file paths
+  - test_validPathShowsGreenCheck_executableFile: validates executable files
+  - test_invalidPathShowsError_fileNotFound: error for missing files
+  - test_invalidPathShowsError_emptyPath: error for empty paths
+  - test_invalidPathShowsError_notExecutable: error for non-executable files
+  - test_testConnectionExecutesCLI_success: connection test with valid CLI
+  - test_testConnectionExecutesCLI_invalidPath: connection test fails for invalid path
+  - test_cliConfiguration_defaultValues: default config values correct
+  - test_cliConfiguration_codable: config encodes/decodes correctly
+  - test_cliValidationResult_valid: valid result structure
+  - test_cliValidationResult_invalid: invalid result structure
+  - test_settingsKeys_cliKeysExist: all CLI keys exist and are unique
+  - test_cliDefaultArgs_persistence: arguments persist to UserDefaults
+  - test_cliEnabled_persistence: enabled states persist correctly
+  - test_cliPreferenceOrder_persistence: preference order persists as string
+  - test_cliPreferenceOrder_parsing: string parses to AgentType array
+  - test_resetCLISettings_resetsAllValues: reset clears all CLI settings
+- Updated Package.swift:
+  - Added Views/Settings/CLISettingsView.swift
+  - Added XRoadsTests/Settings/CLISettingsTests.swift
+- **Build verified**: `./scripts/swift-build.sh` completes successfully
+- **Unit tests**: All 17 tests PASS
+
+Files created:
+- XRoads/Views/Settings/CLISettingsView.swift
+- XRoadsTests/Settings/CLISettingsTests.swift
+
+Files modified:
+- XRoads/Models/AppSettings.swift (extended with CLI config models and methods)
+- XRoads/Views/SettingsView.swift (refactored to use separate CLISettingsView)
+- Package.swift (added new source files)
+- prd.json (marked US-V4-020 complete with passing tests)
+
+Learnings:
+- FlowLayout and DarkProTextFieldStyle already exist elsewhere - reuse, don't redeclare
+- AgentType is internal, so public properties/methods using it must be internal too
+- Use JSONEncoder/JSONDecoder for storing string arrays in UserDefaults
+
+### Iteration 9 - US-V4-021 (Settings View - MCP Configuration)
+- Created KeychainService.swift actor for secure credential storage:
+  - KeychainError enum with comprehensive error cases (itemNotFound, duplicateItem, invalidData, unexpectedStatus, encodingFailed, decodingFailed)
+  - KeychainItem struct for Codable keychain items
+  - KeychainService actor with singleton pattern
+  - Core methods: save(_:forKey:service:), retrieve(forKey:service:), delete(forKey:service:), exists(forKey:service:), deleteAll(service:)
+  - MCP-specific helpers: saveMCPCredential(), getMCPCredential(), deleteMCPCredential(), hasMCPCredential()
+  - API key helpers: saveAPIKey(), getAPIKey(), deleteAPIKey(), hasAPIKey()
+  - Uses Security framework for macOS Keychain access
+  - kSecAttrAccessibleAfterFirstUnlock for secure storage
+- Added MCP configuration models to AppSettings.swift:
+  - MCPConfiguration struct (id, name, path, arguments, isEnabled, hasCredentials, environmentVariables)
+  - MCPAutoLoadRule struct (id, mcpId, condition, isEnabled)
+  - AutoLoadCondition enum (always, hasPackageJson, hasCargoToml, hasPackageSwift, hasGitRepo, custom)
+  - MCPValidationResult struct (isValid, version, errorMessage, connectionTestPassed)
+  - Preset MCPs: xroadsMCP, fileSystemMCP, gitMCP
+- Extended AppSettings with MCP properties and helpers:
+  - mcpConfigurations array with persistence
+  - mcpAutoLoadRules array with persistence
+  - Helper methods: mcpConfiguration(forId:), updateMCPConfiguration(), addMCPConfiguration(), removeMCPConfiguration(), enabledMCPs, toggleMCPEnabled(), addAutoLoadRule(), removeAutoLoadRule(), autoLoadRules(forMCPId:)
+  - resetMCPToDefaults() method
+  - Private saveMCPConfigurations(), loadMCPConfigurations(), saveMCPAutoLoadRules(), loadMCPAutoLoadRules()
+- Created MCPSettingsView.swift with:
+  - MCP list section with enable/disable toggles
+  - MCPRowView with expand/collapse, validation badge, action buttons
+  - Auto-load rules section with toggle and delete
+  - Reset section
+  - MCPValidationBadge showing connection status
+  - MCPPathValidator utility for path validation and connection testing
+  - MCPEditSheet for editing MCP configurations
+  - MCPAddSheet for adding new MCPs with presets (Filesystem, Git, Memory)
+  - AutoLoadRuleSheet for adding auto-load rules
+  - MCPCredentialSheet for secure credential entry via Keychain
+- Added String extension for credential masking (.masked, .fullyMasked)
+- Created MCPSettingsTests.swift with 24 comprehensive tests:
+  - MCPConfiguration tests: creation, codable, equality, hashable, presets
+  - AutoLoadCondition tests: displayName, description, codable
+  - MCPAutoLoadRule tests: creation, codable
+  - MCPValidationResult tests: valid/invalid states
+  - KeychainError tests: descriptions, equality
+  - String masking tests: short, long, fully masked
+  - MCPPathValidator tests: empty path, npm package, non-existent path
+  - KeychainService async tests: credential operations, retrieve non-existent, update existing, API key operations
+- Updated Package.swift:
+  - Added Views/Settings/MCPSettingsView.swift
+  - Added Services/KeychainService.swift
+  - Added XRoadsTests/Settings/MCPSettingsTests.swift
+- **Build verified**: `./scripts/swift-build.sh` completes successfully
+- **Unit tests**: All 24 tests PASS
+
+Files created:
+- XRoads/Services/KeychainService.swift
+- XRoads/Views/Settings/MCPSettingsView.swift
+- XRoadsTests/Settings/MCPSettingsTests.swift
+
+Files modified:
+- XRoads/Models/AppSettings.swift (added MCP configuration models and methods)
+- Package.swift (added new source and test files)
+- prd.json (marked US-V4-021 complete with passing tests)
+
+Learnings:
+- Use Security framework for macOS Keychain access
+- KeychainService should be an actor for thread-safety
+- MCP configurations need to track both path and npm package references
+- Auto-load rules provide project-aware MCP loading
+
+### Iteration - US-V4-022 (Settings View - API Keys)
+- Created APIKeysSettingsView.swift for secure API key management:
+  - Extended APIProvider with UI-specific properties (iconName, keyPrefix, keyPlaceholder, docsURL)
+  - Added validateKeyFormat() method for each provider (Anthropic: sk-ant-, OpenAI: sk-, Google: AIza)
+  - APIKeyValidationResult enum: valid, invalid, testing, verified
+  - APIKeyState struct for tracking individual key states
+  - APIKeysSettingsView with expandable provider rows and status badges
+  - APIKeyRowView showing masked key, validation status, and action buttons
+  - APIKeyEditSheet for secure key entry with validation feedback
+  - APIKeyValidator utility for testing keys against provider APIs
+  - Integration with KeychainService for secure storage (no plaintext)
+- Updated SettingsView with 4th tab for API Keys:
+  - General → CLI Paths → MCP → API Keys
+  - Increased window height to 600px for 4 tabs
+- Created APIKeysTests.swift with 35 comprehensive tests:
+  - APIProvider tests: displayName, iconName, keyPrefix, keyPlaceholder, docsURL, allCases
+  - API key format validation tests for all 3 providers (valid, invalid prefix, too short)
+  - APIKeyValidationResult tests: valid, verified, invalid, testing, equality
+  - APIKeyState tests: creation, id, defaults
+  - String masking tests: short key, long key, length preservation, fullyMasked, max length
+  - KeychainService tests: save/retrieve, update, delete, hasKey, nonExistent, notStoredInPlaintext
+- Updated Package.swift:
+  - Added Views/Settings/APIKeysSettingsView.swift
+  - Added XRoadsTests/Settings/APIKeysTests.swift
+- **Build verified**: `swift build` completes successfully
+- **Unit tests**: All 35 tests PASS
+
+Files created:
+- XRoads/Views/Settings/APIKeysSettingsView.swift
+- XRoadsTests/Settings/APIKeysTests.swift
+
+Files modified:
+- XRoads/Views/SettingsView.swift (added API Keys tab)
+- Package.swift (added new source and test files)
+- prd.json (marked US-V4-022 complete with passing tests)
+
+Acceptance Criteria Met:
+- Input securise pour API keys (masked) ✓
+- Storage dans Keychain ✓
+- Validation key format ✓
+- Test key button (verify with API) ✓
+- Support multiple keys per provider ✓
+
+### Iteration 1 - US-V4-023
+- Delta: Added PRD Assistant wizard UI with live preview + copilot chat, wired PRD assistant sheet + notifications, resolved PRD model conflicts, and updated PRD export to snake_case JSON with new tests and Package.swift sources.
+- Checks: ./scripts/swift-build.sh, swift test --disable-sandbox
+- Learnings: Codex /exec helper unavailable here; ran commands directly via shell.

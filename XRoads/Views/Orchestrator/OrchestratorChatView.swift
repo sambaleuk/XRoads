@@ -386,15 +386,6 @@ final class OrchestratorChatViewModel: ObservableObject {
     }
 }
 
-// MARK: - Notification Names
-
-extension Notification.Name {
-    static let openPRDAssistant = Notification.Name("openPRDAssistant")
-    static let openWorktreeCreator = Notification.Name("openWorktreeCreator")
-    static let openArtDirection = Notification.Name("openArtDirection")
-    static let openSkillsBrowser = Notification.Name("openSkillsBrowser")
-}
-
 // MARK: - Preview
 
 #if DEBUG

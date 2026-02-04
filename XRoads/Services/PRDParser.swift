@@ -69,7 +69,7 @@ struct PRDParser {
                 throw PRDParserError.duplicateStoryID(story.id)
             }
 
-            guard let priority = TaskPriority(rawValue: story.priority.lowercased()) else {
+            guard let priority = PRDPriority(rawValue: story.priority.lowercased()) else {
                 throw PRDParserError.unsupportedPriority(story.priority)
             }
 
@@ -215,7 +215,7 @@ struct TaskSplitter {
 
     private func selectAgent(
         forWeight weight: Int,
-        basePriority: TaskPriority,
+        basePriority: PRDPriority,
         availableAgents: [AgentType],
         highPriorityAgents: [AgentType],
         highPriorityIndex: inout Int

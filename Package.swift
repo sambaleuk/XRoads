@@ -39,6 +39,10 @@ let package = Package(
                 "Views/Settings/APIKeysSettingsView.swift",
                 "Views/ConflictResolutionSheet.swift",
                 "Views/PRDLoaderSheet.swift",
+                // US-V4-023: PRD Assistant Views
+                "Views/PRD/PRDAssistantView.swift",
+                "Views/PRD/PRDWizardSteps.swift",
+                "Views/PRD/PRDPreviewView.swift",
                 "Views/OrchestrationHistorySheet.swift",
                 "Views/GitDashboardView.swift",
                 "Views/Components/MacTextField.swift",
@@ -89,6 +93,8 @@ let package = Package(
                 "Models/ChatMessage.swift",
                 // US-V4-014: API Config
                 "Models/APIConfig.swift",
+                // US-V4-023: PRD Template Models
+                "Models/PRDTemplate.swift",
                 // US-V4-019: App Settings Model
                 "Models/AppSettings.swift",
                 "Services/GitService.swift",
@@ -166,7 +172,9 @@ let package = Package(
                 // US-V4-021: MCP Settings Tests
                 "Settings/MCPSettingsTests.swift",
                 // US-V4-022: API Keys Tests
-                "Settings/APIKeysTests.swift"
+                "Settings/APIKeysTests.swift",
+                // US-V4-023: PRD Assistant Tests
+                "PRD/PRDAssistantTests.swift"
             ]
         )
     ]

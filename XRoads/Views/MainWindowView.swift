@@ -39,6 +39,9 @@ struct MainWindowView: View {
     /// Controls the PRD loader sheet
     @State private var showPRDLoaderSheet: Bool = false
 
+    /// Controls the PRD assistant sheet
+    @State private var showPRDAssistantSheet: Bool = false
+
     /// Controls the orchestrator chat panel visibility (US-V4-015)
     @AppStorage(UserDefaults.Keys.chatPanelExpanded) private var showChatPanel: Bool = true
 
@@ -54,11 +57,13 @@ struct MainWindowView: View {
             .modifier(SheetsModifier(
                 showNewWorktreeSheet: $showNewWorktreeSheet,
                 showPRDLoaderSheet: $showPRDLoaderSheet,
+                showPRDAssistantSheet: $showPRDAssistantSheet,
                 conflictSheetBinding: conflictSheetBinding,
                 historySheetBinding: historySheetBinding
             ))
             .modifier(NotificationHandlersModifier(
                 showNewWorktreeSheet: $showNewWorktreeSheet,
+                showPRDAssistantSheet: $showPRDAssistantSheet,
                 showCommandPalette: $showCommandPalette,
                 closeSelectedWorktree: closeSelectedWorktree,
                 stopSelectedAgent: stopSelectedAgent,
@@ -615,6 +620,7 @@ private struct LogsListView: View {
 private struct SheetsModifier: ViewModifier {
     @Binding var showNewWorktreeSheet: Bool
     @Binding var showPRDLoaderSheet: Bool
+    @Binding var showPRDAssistantSheet: Bool
     let conflictSheetBinding: Binding<Bool>
     let historySheetBinding: Binding<Bool>
     @Environment(\.appState) private var appState
@@ -623,6 +629,9 @@ private struct SheetsModifier: ViewModifier {
         content
             .sheet(isPresented: $showNewWorktreeSheet) {
                 WorktreeCreateSheet()
+            }
+            .sheet(isPresented: $showPRDAssistantSheet) {
+                PRDAssistantView()
             }
             .sheet(isPresented: conflictSheetBinding) {
                 ConflictResolutionSheet()
@@ -642,6 +651,7 @@ private struct SheetsModifier: ViewModifier {
 
 private struct NotificationHandlersModifier: ViewModifier {
     @Binding var showNewWorktreeSheet: Bool
+    @Binding var showPRDAssistantSheet: Bool
     @Binding var showCommandPalette: Bool
     let closeSelectedWorktree: () -> Void
     let stopSelectedAgent: () -> Void
@@ -652,6 +662,9 @@ private struct NotificationHandlersModifier: ViewModifier {
         content
             .onReceive(NotificationCenter.default.publisher(for: .showNewWorktreeSheet)) { _ in
                 showNewWorktreeSheet = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .openPRDAssistant)) { _ in
+                showPRDAssistantSheet = true
             }
             .onReceive(NotificationCenter.default.publisher(for: .closeSelectedWorktree)) { _ in
                 closeSelectedWorktree()

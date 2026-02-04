@@ -114,23 +114,8 @@ enum OrchestratorEvent: Sendable {
     case agentEvent(AgentEvent)
 }
 
-// MARK: - PRD Domain (placeholder for upcoming parser)
-
-/// Minimal representation of a PRD; will be fully populated by US-V2-002.
-struct PRDDocument: Sendable {
-    let featureName: String
-    let description: String
-    let userStories: [PRDUserStory]
-}
-
-/// Single story entry from a PRD.
-struct PRDUserStory: Identifiable, Sendable {
-    let id: String
-    let title: String
-    let description: String
-    let priority: TaskPriority
-    let dependsOn: [String]
-}
+// MARK: - PRD Domain
+// PRDDocument and PRDUserStory are defined in Models/PRDTemplate.swift
 
 /// Result of analysing a PRD prior to orchestration.
 struct PRDAnalysis: Sendable {
