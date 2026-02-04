@@ -2263,3 +2263,23 @@ Acceptance Criteria Met:
 - Delta: Added ComponentContextBuilder for detecting art-bible/code components and injecting Available Components into AGENTS.md, added component context tests, updated AGENTS.md + Package.swift, and extended skill-loader.sh with component injection support.
 - Checks: ./scripts/swift-build.sh; swift test --disable-sandbox
 - Learnings: Codex /exec helper unavailable here; ran commands directly via shell.
+
+### Iteration 1 - US-V4-027
+- Delta: Added unified Art Direction pipeline view with 4-step workflow (Create Bible → Generate PRD → Run Loop → View Components), ArtDirectionViewModel for state management, ArtPipelineProgress for step visualization, and comprehensive unit tests (19 tests).
+- Files created:
+  - XRoads/Views/ArtDirection/ArtDirectionView.swift
+  - XRoads/Views/ArtDirection/ArtPipelineProgress.swift
+  - XRoads/ViewModels/ArtDirectionViewModel.swift
+  - XRoadsTests/ArtDirection/ArtDirectionViewTests.swift
+- Files modified:
+  - Package.swift (added new source and test files)
+  - prd.json (marked US-V4-027 complete with passing tests)
+- Unit test: XRoadsTests/ArtDirection/ArtDirectionViewTests.swift - PASS (19 tests)
+- Checks: swift build, swift test --filter ArtDirectionViewTests
+- Acceptance Criteria Met:
+  - Vue unifiee du pipeline Art Direction ✓
+  - Step 1: Create/Edit Art Bible ✓
+  - Step 2: Generate Asset PRD ✓
+  - Step 3: Run Asset Loop ✓
+  - Step 4: View Generated Components ✓
+  - Progress tracking per step ✓

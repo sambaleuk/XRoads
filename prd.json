@@ -552,7 +552,8 @@
       "description": "Interface complete pour le pipeline Art Direction",
       "priority": "medium",
       "depends_on": ["US-V4-024", "US-V4-025", "US-V4-026"],
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-04T16:25:00Z",
       "acceptance_criteria": [
         "Vue unifiee du pipeline Art Direction",
         "Step 1: Create/Edit Art Bible",
@@ -575,7 +576,7 @@
           "Progress updates correctly",
           "Components shown after generation"
         ],
-        "status": "pending"
+        "status": "passing"
       },
       "estimated_complexity": 6
     },
@@ -718,6 +719,6 @@
   ],
 
   "total_stories": 28,
-  "completed_stories": 25,
-  "pending_stories": 3
+  "completed_stories": 26,
+  "pending_stories": 2
 }

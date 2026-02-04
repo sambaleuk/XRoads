@@ -47,6 +47,9 @@ let package = Package(
                 "Views/ArtDirection/ArtBiblePreviewView.swift",
                 // US-V4-025: Asset PRD Preview View
                 "Views/ArtDirection/AssetPRDPreviewView.swift",
+                // US-V4-027: Art Direction View and Pipeline Progress
+                "Views/ArtDirection/ArtDirectionView.swift",
+                "Views/ArtDirection/ArtPipelineProgress.swift",
                 "Views/OrchestrationHistorySheet.swift",
                 "Views/GitDashboardView.swift",
                 "Views/Components/MacTextField.swift",
@@ -146,6 +149,8 @@ let package = Package(
                 "ViewModels/PRDLoaderViewModel.swift",
                 // US-V4-016: Skills ViewModel
                 "ViewModels/SkillsViewModel.swift",
+                // US-V4-027: Art Direction ViewModel
+                "ViewModels/ArtDirectionViewModel.swift",
                 "Services/OrchestrationHistoryService.swift",
                 "Models/OrchestrationRecord.swift"
             ],
@@ -190,7 +195,9 @@ let package = Package(
                 // US-V4-025: Asset PRD Generator Tests
                 "ArtDirection/AssetPRDGeneratorTests.swift",
                 // US-V4-026: Component Context Tests
-                "ArtDirection/ComponentContextTests.swift"
+                "ArtDirection/ComponentContextTests.swift",
+                // US-V4-027: Art Direction View Tests
+                "ArtDirection/ArtDirectionViewTests.swift"
             ]
         )
     ]
