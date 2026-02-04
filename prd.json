@@ -148,7 +148,8 @@
       "description": "Definir les skills essentiels en format YAML avec templates multi-CLI",
       "priority": "critical",
       "depends_on": ["US-V4-001"],
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-04T11:30:00Z",
       "acceptance_criteria": [
         "commit.skill.yaml avec templates Claude/Gemini/Codex",
         "review-pr.skill.yaml avec templates Claude/Gemini/Codex",
@@ -173,7 +174,7 @@
           "All skills have claude/gemini/codex templates",
           "All skills have required_tools defined"
         ],
-        "status": "pending"
+        "status": "passing"
       },
       "estimated_complexity": 5
     },

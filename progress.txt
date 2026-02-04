@@ -1383,3 +1383,32 @@ Files created:
 
 Files modified:
 - prd.json (marked US-V4-001 complete, unit_test.status = "passing")
+
+### Iteration 2 - US-V4-002 (Core Skills Definition)
+- Created 5 core skill YAML files in ~/.xroads/skills/core/:
+  - commit.skill.yaml: Git commit with conventional commits, staged changes analysis
+  - review-pr.skill.yaml: PR code review with OWASP security checklist
+  - prd.skill.yaml: PRD implementation with Nexus Loop methodology and mandatory unit tests
+  - test-writer.skill.yaml: Unit test writing with arrange-act-assert pattern
+  - code-reviewer.skill.yaml: Comprehensive code review (correctness, security, performance, maintainability)
+- Each skill has complete templates for all 3 CLIs (Claude, Gemini, Codex)
+- Each skill has required_tools, category=core, version=1.0.0
+- Created comprehensive unit test using Ruby YAML parser (macOS built-in)
+- Test covers: file existence, YAML validity, required fields, templates completeness, category, version format, ID-filename match
+- **Unit test: tests/skills/test_core_skills.sh - PASS (60/60 tests)**
+- **Build**: N/A (YAML files only)
+
+Files created:
+- ~/.xroads/skills/core/commit.skill.yaml
+- ~/.xroads/skills/core/review-pr.skill.yaml
+- ~/.xroads/skills/core/prd.skill.yaml
+- ~/.xroads/skills/core/test-writer.skill.yaml
+- ~/.xroads/skills/core/code-reviewer.skill.yaml
+- tests/skills/test_core_skills.sh
+
+Files modified:
+- prd.json (marked US-V4-002 complete, unit_test.status = "passing")
+
+Learnings:
+- Ruby YAML parser (ruby -ryaml) is available by default on macOS and works well for YAML validation
+- Use Ruby instead of yq/PyYAML when those aren't installed
