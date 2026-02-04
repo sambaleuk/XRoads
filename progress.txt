@@ -2253,3 +2253,8 @@ Acceptance Criteria Met:
 - Delta: Added ArtBible model + ArtBiblePreviewView with visual token previews, introduced art-direction PRD template with reference inputs, and integrated art-director skill into bundled skills/resources with tests.
 - Checks: ./scripts/swift-build.sh, swift test --disable-sandbox
 - Learnings: Codex /exec helper unavailable here; ran commands directly via shell.
+
+### Iteration 1 - US-V4-025
+- Delta: Added AssetPRDGenerator service to build an assets PRD from art-bible.json, created AssetPRDPreviewView with export + loop launch, added AssetPRDGenerator tests, and updated Package.swift + prd.json status.
+- Checks: ./scripts/swift-build.sh, swift test --disable-sandbox
+- Learnings: Codex /exec helper unavailable here; ran commands directly via shell.

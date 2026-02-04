@@ -45,6 +45,8 @@ let package = Package(
                 "Views/PRD/PRDPreviewView.swift",
                 // US-V4-024: Art Direction Preview View
                 "Views/ArtDirection/ArtBiblePreviewView.swift",
+                // US-V4-025: Asset PRD Preview View
+                "Views/ArtDirection/AssetPRDPreviewView.swift",
                 "Views/OrchestrationHistorySheet.swift",
                 "Views/GitDashboardView.swift",
                 "Views/Components/MacTextField.swift",
@@ -114,6 +116,8 @@ let package = Package(
                 "Services/MergeCoordinator.swift",
                 "Services/WorktreeFactory.swift",
                 "Services/PRDParser.swift",
+                // US-V4-025: Asset PRD Generator
+                "Services/AssetPRDGenerator.swift",
                 "Services/CLIAdapters.swift",
                 "Services/ConfigChecker.swift",
                 "Services/ActionRegistry.swift",
@@ -180,7 +184,9 @@ let package = Package(
                 // US-V4-023: PRD Assistant Tests
                 "PRD/PRDAssistantTests.swift",
                 // US-V4-024: Art Director Skill Tests
-                "ArtDirection/ArtDirectorSkillTests.swift"
+                "ArtDirection/ArtDirectorSkillTests.swift",
+                // US-V4-025: Asset PRD Generator Tests
+                "ArtDirection/AssetPRDGeneratorTests.swift"
             ]
         )
     ]

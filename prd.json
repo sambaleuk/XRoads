@@ -486,7 +486,8 @@
       "description": "Generer un PRD de composants depuis l'art-bible",
       "priority": "high",
       "depends_on": ["US-V4-024"],
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-04T14:44:52Z",
       "acceptance_criteria": [
         "Parse art-bible.json et extrait composants",
         "Genere 1 US par composant (Theme, Colors, Typography, Buttons, etc.)",
@@ -507,7 +508,7 @@
           "Each US has unit_test",
           "Output is valid PRD format"
         ],
-        "status": "pending"
+        "status": "passing"
       },
       "estimated_complexity": 6
     },
@@ -716,6 +717,6 @@
   ],
 
   "total_stories": 28,
-  "completed_stories": 24,
-  "pending_stories": 4
+  "completed_stories": 25,
+  "pending_stories": 3
 }
