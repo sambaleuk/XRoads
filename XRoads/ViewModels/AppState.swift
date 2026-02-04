@@ -108,6 +108,9 @@ final class AppState {
     /// Available MCP tools for checking skill dependencies (US-V4-018)
     var availableMCPTools: Set<String> = Set(["git", "file-read", "file-edit", "bash", "web-search"])
 
+    /// Recent git commits for the right side panel
+    var recentCommits: [GitCommit] = []
+
     // MARK: - Orchestration State
 
     /// Current orchestration session ID

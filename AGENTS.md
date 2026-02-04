@@ -174,212 +174,457 @@ Refer to `prd-v2.json`, `context.md`, and `progress.txt` before starting any tas
 
 ## End Available Components
 
+
 ## XRoads Skills (Auto-Injected)
-<!-- Skills loaded by codex-loop at 2026-02-04 15:56:06 -->
-<!-- CLI: codex | Branch: main -->
+<!-- Skills loaded by nexus-loop at 2026-02-04 16:20:01 -->
+<!-- CLI: claude | Branch: main -->
 
 # ===== SKILL: art-director =====
 
-## Art Director Ritual
+# /art-director Skill
 
-### Mission
-Extract Visual DNA from references and generate production-ready design system.
+You are a **World-Class Digital Art Director & Visual Identity Architect** with 20+ years of experience at top-tier agencies (Pentagram, Huge, Instrument, Collins).
 
-### Context
+## Your Superpower
+You bridge the gap between "Brand DNA" (visual references, personality, values) and "Production-Ready Design Systems" (developer-ready specs, design tokens).
+
+## Your Attitude
+Meticulous, visionary, obsessively detail-oriented. You don't deliver generic templates; you extract the invisible essence of a visual identity and translate it into pixel-perfect direction. Allergic to mediocrity.
+
+## Operating Phases
+
+### Phase 1: ABSORPTION
+Collect all provided context:
 - Project: {{project_name}}
 - Activity: {{activity_description}}
-- Target: {{target_audience}}
-- Keywords: {{emotional_keywords}}
+- Target Audience: {{target_audience}}
+- Emotional Keywords: {{emotional_keywords}}
 - References: {{reference_urls}}
 - Input Images: {{input_images}}
-- Style: {{style_preference}} / {{mode_preference}}
+- Preferences: {{style_preference}}, {{mode_preference}}
 - Platform: {{platform}}
 
-### Ritual Steps
+### Phase 2: VISUAL DNA EXTRACTION
+Analyze references through these lenses:
 
-1. **Absorb Context**
-   - codex files read any provided reference images/URLs
-   - Extract visual patterns, colors, typography hints
+1. **CHROMATIC SIGNATURE**
+   - Dominant primary color (>40% frequency)
+   - Accent color patterns
+   - Background/negative space tendencies
+   - Warm/Cool temperature ratio
 
-2. **Analyze Visual DNA**
-   - Chromatic signature (colors, temperature)
-   - Typographic personality
-   - Photographic style
-   - Graphic language
-   - Brand energy level
+2. **TYPOGRAPHIC PERSONALITY**
+   - Implied font style (Serif/Sans-serif/Script/Display)
+   - Text density preference
 
-3. **Generate art-bible.json**
-   ```
-   codex exec "cat > art-bible.json << 'EOF'
-   {
-     "project": "...",
-     "design_tokens": {
-       "colors": {...},
-       "typography": {...},
-       "spacing": {...},
-       "radius": {...}
-     },
-     "color_system": {...},
-     "typography_system": {...},
-     "ui_components": [...],
-     "photography_direction": {...},
-     "page_architecture": [...]
-   }
-   EOF"
-   ```
+3. **PHOTOGRAPHIC DNA**
+   - Lighting signature
+   - Composition patterns
+   - Human presence style
+   - Post-processing mood
 
-4. **Validate Output**
-   - codex exec "jq . art-bible.json" to verify valid JSON
-   - Check all HEX codes present
-   - Verify WCAG compliance for text/background pairs
+4. **GRAPHIC LANGUAGE**
+   - Shape vocabulary (Rounded/Sharp/Organic)
+   - Texture preferences
+   - Pattern signatures
 
-### Quality Gates
-- No generic colors - derived from Visual DNA
-- All prompts Midjourney/DALL-E ready
-- Google Fonts or platform-native only
-- Valid parseable JSON
+5. **ENERGY & POSITIONING**
+   - Brand energy: Calm ←→ Dynamic
+   - Luxury spectrum: Accessible ←→ Premium
+
+### Phase 3: EXECUTION
+Generate `art-bible.json` with this structure:
+
+```json
+{
+  "project": "{{project_name}}",
+  "version": "1.0.0",
+  "generated_at": "ISO8601",
+  "design_tokens": {
+    "colors": {
+      "background": { "primary": "#0d1117", "secondary": "#161b22" },
+      "accent": { "primary": "#388bfd", "secondary": "#3fb950" },
+      "text": { "primary": "#e6edf3", "secondary": "#7d8590" }
+    },
+    "typography": {
+      "fontFamily": { "ui": "SF Pro", "mono": "SF Mono" },
+      "sizes": { "xs": 10, "sm": 12, "md": 14, "lg": 16, "xl": 20 }
+    },
+    "spacing": { "xs": 4, "sm": 8, "md": 16, "lg": 24, "xl": 32 },
+    "radius": { "sm": 4, "md": 8, "lg": 12 }
+  },
+
+  "verbal_moodboard": [
+    {
+      "description": "Detailed scene description",
+      "keywords": ["search", "terms"],
+      "ai_prompt": "Midjourney/DALL-E ready prompt"
+    }
+  ],
+
+  "color_system": {
+    "primary": { "hex": "#XXXXXX", "name": "Name", "usage": "Headlines, Primary CTA" },
+    "secondary": { "hex": "#XXXXXX", "name": "Name", "usage": "Accents, Links" },
+    "background": { "hex": "#XXXXXX", "name": "Name", "usage": "Page background" },
+    "surface": { "hex": "#XXXXXX", "name": "Name", "usage": "Cards, Modals" },
+    "text_primary": { "hex": "#XXXXXX", "usage": "Body copy" },
+    "text_secondary": { "hex": "#XXXXXX", "usage": "Captions, Metadata" },
+    "success": { "hex": "#XXXXXX" },
+    "error": { "hex": "#XXXXXX" },
+    "warning": { "hex": "#XXXXXX" }
+  },
+
+  "typography_system": {
+    "display": { "font": "Font Name", "weight": 700, "size_desktop": 48, "size_mobile": 32, "letter_spacing": -0.02 },
+    "heading": { "font": "Font Name", "weight": 600, "size": 24 },
+    "body": { "font": "Font Name", "weight": 400, "size": 16, "line_height": 1.6 },
+    "caption": { "font": "Font Name", "weight": 400, "size": 12 },
+    "button": { "font": "Font Name", "weight": 600, "case": "uppercase" }
+  },
+
+  "ui_components": [
+    {
+      "name": "ComponentName",
+      "description": "What it is and when to use",
+      "style_specs": { "background": "surface", "radius": 12, "padding": 16 },
+      "visual_prompt": "AI-ready prompt for generating preview",
+      "interaction": { "hover": "description", "active": "description" }
+    }
+  ],
+
+  "photography_direction": {
+    "style": "Description of shooting style",
+    "lighting": "Lighting guidelines",
+    "composition": "Framing rules",
+    "ai_prompts": ["Ready-to-use prompts"],
+    "dos": ["Do this"],
+    "donts": ["Avoid this"]
+  },
+
+  "graphic_elements": {
+    "icon_style": "Description + recommended library",
+    "decorative": ["Dividers", "Shapes", "Backgrounds"],
+    "micro_interactions": ["Hover effects", "Transitions"]
+  },
+
+  "page_architecture": [
+    {
+      "page": "Homepage",
+      "sections": [
+        {
+          "name": "Hero",
+          "purpose": "First impression, value proposition",
+          "layout": "Full-width, centered content",
+          "visual_prompt": "AI prompt for section",
+          "copy_direction": { "tone": "confident", "length": "short", "key_message": "..." }
+        }
+      ]
+    }
+  ]
+}
+```
+
+## Quality Standards (NON-NEGOTIABLE)
+- All color codes in HEX, WCAG AA compliant
+- Typography limited to Google Fonts (or SF Pro/SF Mono for Apple platforms)
+- Every prompt must be copy-paste ready for Midjourney v6 / DALL-E 3
+- Output must be valid JSON, parseable for downstream PRD generation
+- No generic suggestions - every element traces to Visual DNA
+
+## Output
+Write the complete `art-bible.json` file to the project root.
 
 # ===== SKILL: prd =====
 
-## PRD Implementation Ritual
+# /prd Skill - Nexus Loop Implementation
 
-**Steps:**
-1. Read `prd.json` - find first incomplete story
-2. Read `progress.txt` + `AGENTS.md` for context
-3. Verify story has `unit_test` field (REQUIRED)
-4. Implement acceptance criteria
-5. Write test at `unit_test.file`
-6. Run: build + typecheck + unit test (ALL must pass)
+## Purpose
+Implement user stories from prd.json with mandatory unit tests, following the Nexus Loop methodology.
 
-**On Pass:**
-- Update prd.json: status=complete, unit_test.status=passing
-- `git commit -m "feat(scope): US-XXX desc"`
+## Workflow
+1. **Read PRD**: Parse `{{prd_path}}` or `prd.json`
+2. **Find Next Story**: Get first story with status != "complete"
+3. **Read Context**: Check `progress.txt` for learnings, `AGENTS.md` for patterns
+4. **Verify Unit Test**: Each story MUST have a `unit_test` object:
+   ```json
+   "unit_test": {
+     "file": "tests/xxx.test.ts",
+     "name": "test_function",
+     "description": "Validates behavior",
+     "assertions": [...],
+     "status": "pending"
+   }
+   ```
+5. **Implement Story**: Write code for acceptance criteria
+6. **Write Unit Test**: Create test file at `unit_test.file` path
+7. **Run & Verify**:
+   - Build passes: `npm run build` or equivalent
+   - Typecheck passes: `npm run typecheck` (if applicable)
+   - **Unit test PASSES** (MANDATORY)
+
+## Completion Criteria (ALL must pass)
+- Implementation done
+- Build passes
+- Unit test PASSES
+- Update prd.json: story status="complete", unit_test.status="passing"
+- Commit: `feat(scope): US-XXX description`
 - Append to progress.txt
 
-**On Fail:**
-- No commit, no status change
-- Log to progress.txt
+## If Tests FAIL
+- Do NOT mark complete
+- Do NOT commit
+- Log to progress.txt what went wrong
+- Loop will retry next iteration
 
 Context: XRoads Complete UI & Orchestrator System
+Branch: main
+Assigned Stories: {{assigned_stories}}
 
 # ===== SKILL: commit =====
 
-## Commit Ritual
+# /commit Skill
 
-**Steps:**
-1. `git status` - check what's staged
-2. `git diff --cached` - analyze changes
-3. `git log --oneline -5` - match style
-4. Determine type: feat|fix|docs|style|refactor|test|chore
-5. `git commit -m "type(scope): description\n\nCo-Authored-By: Codex <noreply@openai.com>"`
+## Purpose
+Analyze staged changes and create a well-structured commit following Conventional Commits.
 
-**Constraints:**
-- No `git add .` or `-A`
-- No `--no-verify`
-- Check for .env/credentials before staging
+## Workflow
+1. Run `git status` to see all staged and unstaged changes
+2. Run `git diff --cached` to analyze staged changes in detail
+3. Run `git log --oneline -5` to understand recent commit style
+4. Determine the appropriate commit type and scope:
+   - feat: New feature
+   - fix: Bug fix
+   - docs: Documentation only
+   - style: Formatting, no code change
+   - refactor: Code restructuring
+   - test: Adding tests
+   - chore: Maintenance tasks
+5. Draft a concise commit message (1-2 sentences) focusing on "why" not "what"
+6. Execute: `git commit -m "$(cat <<'EOF'
+   type(scope): description
+
+   Co-Authored-By: Claude <noreply@anthropic.com>
+   EOF
+   )"`
+
+## Important
+- Never use `git add .` or `git add -A` - stage specific files
+- Never skip pre-commit hooks unless explicitly requested
+- Warn if staging files that look like secrets (.env, credentials)
 
 Context: XRoads Complete UI & Orchestrator System
+Branch: main
 
 # ===== SKILL: review-pr =====
 
-## PR Review Ritual
+# /review-pr Skill
 
-**Steps:**
-1. `gh pr view` - get context
-2. `gh pr diff` - see changes
-3. `gh pr checks` - CI status
+## Purpose
+Perform a thorough code review of pull request changes with structured feedback.
 
-**Checklist:**
-- Correctness: logic errors
-- Security: OWASP Top 10
-- Performance: queries, memory
-- Maintainability: naming, DRY
-- Testing: coverage
-- Documentation: API docs
+## Workflow
+1. Get PR context:
+   - `gh pr view` to understand the PR description and status
+   - `gh pr diff` to see all changes
+   - `gh pr checks` to see CI status
+2. Analyze changes against this checklist:
+   - [ ] **Correctness**: Does the code do what it claims?
+   - [ ] **Security**: Any OWASP Top 10 vulnerabilities? (injection, XSS, auth issues)
+   - [ ] **Performance**: N+1 queries, memory leaks, blocking operations?
+   - [ ] **Maintainability**: Clear naming, DRY, appropriate abstraction?
+   - [ ] **Testing**: Are there adequate tests? Edge cases covered?
+   - [ ] **Documentation**: Updated docs for public API changes?
+3. For each issue found:
+   - Severity: critical/major/minor/suggestion
+   - File and line number
+   - Clear explanation
+   - Suggested fix (if applicable)
+4. Provide summary with:
+   - Overall assessment (approve/request changes/comment)
+   - List of blocking issues (if any)
+   - Positive feedback on good patterns
 
-**Output:** `review.md`
-- Issues: severity|file:line|description|fix
-- Verdict: approve|request-changes|comment
+## Output Format
+Write review to `{{worktree_path}}/review.md` with sections for each checklist item.
 
 Context: XRoads Complete UI & Orchestrator System
+Branch: main
 
 # ===== SKILL: xroads-log =====
 
-## XRoads Logging Ritual
+# XRoads Logging Skill
 
-The xroads-mcp server streams logs to XRoads UI.
+## Purpose
+Use XRoads MCP to emit logs and status updates so the XRoads UI can track your progress in real-time.
 
-**Log Levels:**
-- info: Normal progress updates
-- debug: Detailed diagnostics
-- warn: Recoverable issues
-- error: Failures
+## Available MCP Tools
+The `xroads-mcp` server provides these tools:
 
-**Status Values:**
-- running: Active work
-- planning: Analysis phase
-- complete: Task done
-- error: Blocked
+### emit_log
+Emit a log entry visible in XRoads UI terminal panel.
+```json
+{
+  "level": "info|debug|warn|error",
+  "source": "claude",
+  "worktree": "{{worktree_path}}",
+  "message": "Description of what happened",
+  "metadata": {"optional": "additional data"}
+}
+```
 
-**Workflow:**
-1. Iteration start: emit_log(info, "Starting iteration N for US-XXX")
-2. Work begins: update_status(running, task="Implementing feature")
-3. Success: emit_log(info, "Completed") + update_status(complete)
-4. Failure: emit_log(error, "Reason") + update_status(error)
+### update_status
+Update your agent status shown in XRoads dashboard.
+```json
+{
+  "agent": "claude",
+  "worktree": "{{worktree_path}}",
+  "status": "idle|running|planning|complete|error",
+  "task": "Current task description",
+  "progress": 50
+}
+```
+
+## When to Log
+- **info**: Starting/completing tasks, iteration progress
+- **debug**: Detailed step information (optional)
+- **warn**: Recoverable issues, retries needed
+- **error**: Failures that need attention
+
+## When to Update Status
+- **running**: When actively working on implementation
+- **planning**: When analyzing code or designing solution
+- **complete**: When story is done with passing tests
+- **error**: When blocked or failed
+
+## Best Practices
+- Log at start of iteration: `emit_log(info, "Starting iteration N for story US-XXX")`
+- Update status before long operations: `update_status(running, task="Implementing feature X")`
+- Log completion: `emit_log(info, "Story US-XXX completed with passing unit test")`
+- Update status on completion: `update_status(complete, progress=100)`
 
 Context: XRoads Complete UI & Orchestrator System
+Branch: main
 
 # ===== SKILL: test-writer =====
 
-## Test Writer Ritual
+# /test-writer Skill
 
-**Steps:**
-1. Read target code - understand APIs
-2. Plan tests:
-   - Happy path
-   - Edge cases (empty, null, bounds)
-   - Errors
-   - Async
-3. Write tests:
-   - describe/it structure
-   - "should X when Y" naming
-   - Arrange-Act-Assert pattern
-4. Mock external dependencies
-5. Run - all must pass, coverage >80%
+## Purpose
+Write comprehensive unit tests with proper assertions, mocking, and edge case coverage.
 
-**Output:** `tests/*.test.ts` or `*Tests.swift`
+## Workflow
+1. **Understand the Code**:
+   - Read the target file(s) to understand functionality
+   - Identify public APIs and their contracts
+   - Note dependencies that need mocking
+2. **Plan Test Cases**:
+   - Happy path scenarios
+   - Edge cases (empty inputs, nulls, boundaries)
+   - Error conditions and exception handling
+   - Async behavior (if applicable)
+3. **Write Tests**:
+   - Use describe/it blocks for organization
+   - Clear test names: "should [behavior] when [condition]"
+   - One assertion per test (when possible)
+   - Setup/teardown with beforeEach/afterEach
+4. **Mock Dependencies**:
+   - Mock external services, APIs, databases
+   - Use dependency injection where possible
+   - Verify mock interactions
+5. **Run & Verify**:
+   - All tests pass
+   - Coverage meets threshold (aim for >80%)
+   - No flaky tests
 
-**Format:**
+## Test Structure
 ```
-describe('[X]', () => {
-  it('should Y when Z', () => { ... });
+describe('[Component/Function Name]', () => {
+  describe('[method or feature]', () => {
+    it('should [expected behavior] when [condition]', () => {
+      // Arrange
+      // Act
+      // Assert
+    });
+  });
 });
 ```
 
+## Output
+Write tests to appropriate location based on project structure:
+- `tests/` or `__tests__/` directory
+- `*.test.ts`, `*.spec.ts`, or `*Tests.swift`
+
 Context: XRoads Complete UI & Orchestrator System
+Files: 
 
 # ===== SKILL: code-reviewer =====
 
-## Code Review Ritual
+# /code-reviewer Skill
 
-**Categories:**
-1. Correctness: logic, edge cases, nulls
-2. Security: OWASP Top 10 (injection, XSS, auth)
-3. Performance: N+1, memory, blocking
-4. Maintainability: naming, DRY, complexity
-5. Testing: coverage, edge cases
+## Purpose
+Perform comprehensive code review analyzing correctness, security, performance, and maintainability.
 
-**Steps:**
-1. Read files
-2. Analyze each category
-3. Report: severity|category|file:line|description|fix
+## Review Categories
 
-**Severity:** critical > major > minor > suggestion
+### 1. Correctness
+- Logic errors and edge cases
+- Off-by-one errors
+- Null/undefined handling
+- Type safety issues
+- Incomplete error handling
 
-**Output:** `review.md`
-- Issues by severity
-- Summary assessment
+### 2. Security (OWASP Top 10)
+- **Injection**: SQL, command, LDAP injection
+- **Broken Auth**: Weak passwords, session issues
+- **XSS**: Unsanitized output
+- **IDOR**: Insecure direct object references
+- **Misconfig**: Debug enabled, default creds
+- **Sensitive Data**: Hardcoded secrets, logging PII
+- **Missing Access Control**: Authorization checks
+- **CSRF**: Missing tokens
+- **Vulnerable Components**: Outdated dependencies
+- **Insufficient Logging**: Missing audit trails
+
+### 3. Performance
+- N+1 queries
+- Memory leaks
+- Blocking main thread
+- Unnecessary re-renders
+- Missing caching
+- Inefficient algorithms
+
+### 4. Maintainability
+- Clear naming conventions
+- DRY (Don't Repeat Yourself)
+- Single Responsibility
+- Appropriate abstraction level
+- Code complexity (cyclomatic)
+- Documentation for public APIs
+
+### 5. Testing
+- Test coverage adequacy
+- Edge case coverage
+- Integration test needs
+
+## Workflow
+1. Read files to review ( or specified paths)
+2. Analyze against each category
+3. For each issue:
+   - Severity: critical/major/minor/suggestion
+   - Category: correctness/security/performance/maintainability/testing
+   - File:line location
+   - Description
+   - Suggested fix
+4. Output summary to `review.md`
+
+## Issue Severity Guide
+- **Critical**: Security vulnerabilities, data loss, crashes
+- **Major**: Bugs, significant performance issues
+- **Minor**: Code smell, minor inefficiency
+- **Suggestion**: Style, optional improvements
 
 Context: XRoads Complete UI & Orchestrator System
+Files: 
+Branch: main
 
 ## End XRoads Skills

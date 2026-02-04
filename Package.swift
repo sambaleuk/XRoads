@@ -104,6 +104,8 @@ let package = Package(
                 "Models/PRDTemplate.swift",
                 // US-V4-024: Art Bible Model
                 "Models/ArtBible.swift",
+                // Git Commit Model for Right Side Panel
+                "Models/GitCommit.swift",
                 // US-V4-019: App Settings Model
                 "Models/AppSettings.swift",
                 "Services/GitService.swift",

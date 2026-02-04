@@ -123,7 +123,7 @@ struct MainWindowView: View {
         }
     }
 
-    /// Agentic mode layout: Chat Panel | Git Panel | Dashboard | Logs
+    /// Agentic mode layout: Chat Panel | Dashboard (max space) | Right Panel (Git + Logs stacked)
     @ViewBuilder
     private var agenticModeLayout: some View {
         HStack(spacing: 0) {
@@ -134,20 +134,16 @@ struct MainWindowView: View {
                     get: { CGFloat(chatPanelWidth) },
                     set: { chatPanelWidth = Double($0) }
                 ),
-                expandedWidth: 360,
-                minWidth: 280,
-                maxWidth: 500,
+                expandedWidth: 320,
+                minWidth: 260,
+                maxWidth: 450,
                 resizable: true,
                 edge: .leading
             ) {
                 OrchestratorChatView()
             }
 
-            // Git Info Panel
-            GitInfoPanel()
-                .padding(Theme.Spacing.sm)
-
-            // Center: Dashboard with brain and slots
+            // Center: Dashboard with brain and slots (maximized space)
             XRoadsDashboardView(
                 dashboardMode: Binding(
                     get: { appState.dashboardMode },
@@ -161,14 +157,14 @@ struct MainWindowView: View {
                     get: { appState.orchestratorVisualState },
                     set: { appState.orchestratorVisualState = $0 }
                 ),
-                showGitPanel: false  // Git panel is handled here, not in dashboard
+                showGitPanel: false
             )
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            // Right: Logs panel
+            // Right: Stacked panels (Git Recent, Git Worktrees, MCP Logs)
             if showInspector {
-                InspectorColumn()
-                    .frame(width: Theme.Layout.inspectorWidth)
+                RightSidePanel()
+                    .frame(width: 280)
             }
         }
         .background(Color.bgApp)
@@ -345,7 +341,274 @@ private struct ContentColumn: View {
     }
 }
 
-// MARK: - Inspector Column (Logs)
+// MARK: - Right Side Panel (Git Recent, Worktrees, Logs - Stacked)
+
+private struct RightSidePanel: View {
+    @Environment(\.appState) private var appState
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Section 1: Git Recent Commits
+            GitRecentSection()
+                .frame(height: 180)
+
+            Divider()
+                .background(Color.borderMuted)
+
+            // Section 2: Git Worktrees
+            GitWorktreesSection()
+                .frame(height: 200)
+
+            Divider()
+                .background(Color.borderMuted)
+
+            // Section 3: MCP Logs (fills remaining space)
+            MCPLogsSection()
+        }
+        .background(Color.bgCanvas)
+    }
+}
+
+// MARK: - Git Recent Section
+
+private struct GitRecentSection: View {
+    @Environment(\.appState) private var appState
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Image(systemName: "clock.arrow.circlepath")
+                    .foregroundStyle(Color.accentPrimary)
+                    .font(.system(size: 12))
+
+                Text("RECENT")
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Color.textSecondary)
+
+                Spacer()
+            }
+            .padding(.horizontal, Theme.Spacing.sm)
+            .padding(.vertical, Theme.Spacing.xs)
+            .background(Color.bgSurface)
+
+            // Recent commits list
+            ScrollView {
+                LazyVStack(spacing: 2) {
+                    ForEach(appState.recentCommits.prefix(8), id: \.hash) { commit in
+                        GitCommitRow(commit: commit)
+                    }
+
+                    if appState.recentCommits.isEmpty {
+                        Text("No recent commits")
+                            .font(.caption)
+                            .foregroundStyle(Color.textTertiary)
+                            .padding()
+                    }
+                }
+                .padding(.horizontal, Theme.Spacing.xs)
+                .padding(.vertical, Theme.Spacing.xs)
+            }
+        }
+    }
+}
+
+// MARK: - Git Commit Row
+
+private struct GitCommitRow: View {
+    let commit: GitCommit
+
+    var body: some View {
+        HStack(spacing: Theme.Spacing.xs) {
+            // Hash
+            Text(String(commit.hash.prefix(7)))
+                .font(.system(size: 10, design: .monospaced))
+                .foregroundStyle(Color.terminalCyan)
+
+            // Message
+            Text(commit.message)
+                .font(.system(size: 11))
+                .foregroundStyle(Color.textPrimary)
+                .lineLimit(1)
+                .truncationMode(.tail)
+
+            Spacer()
+
+            // Time ago
+            Text(commit.timeAgo)
+                .font(.system(size: 10))
+                .foregroundStyle(Color.textTertiary)
+        }
+        .padding(.horizontal, Theme.Spacing.xs)
+        .padding(.vertical, 3)
+        .background(Color.bgApp.opacity(0.5))
+        .cornerRadius(Theme.Radius.xs)
+    }
+}
+
+// MARK: - Git Worktrees Section
+
+private struct GitWorktreesSection: View {
+    @Environment(\.appState) private var appState
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Image(systemName: "arrow.triangle.branch")
+                    .foregroundStyle(Color.statusSuccess)
+                    .font(.system(size: 12))
+
+                Text("WORKTREES")
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Color.textSecondary)
+
+                Spacer()
+
+                Text("\(appState.worktrees.count)")
+                    .font(.system(size: 10, weight: .medium, design: .monospaced))
+                    .foregroundStyle(Color.textTertiary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.bgElevated)
+                    .cornerRadius(Theme.Radius.xs)
+            }
+            .padding(.horizontal, Theme.Spacing.sm)
+            .padding(.vertical, Theme.Spacing.xs)
+            .background(Color.bgSurface)
+
+            // Worktrees list
+            ScrollView {
+                LazyVStack(spacing: 2) {
+                    ForEach(appState.worktrees) { worktree in
+                        WorktreeRow(worktree: worktree)
+                    }
+
+                    if appState.worktrees.isEmpty {
+                        VStack(spacing: Theme.Spacing.xs) {
+                            Text("No worktrees")
+                                .font(.caption)
+                                .foregroundStyle(Color.textTertiary)
+
+                            Button {
+                                NotificationCenter.default.post(name: .showNewWorktreeSheet, object: nil)
+                            } label: {
+                                Label("Create", systemImage: "plus")
+                                    .font(.caption)
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                        }
+                        .padding()
+                    }
+                }
+                .padding(.horizontal, Theme.Spacing.xs)
+                .padding(.vertical, Theme.Spacing.xs)
+            }
+        }
+    }
+}
+
+// MARK: - Worktree Row
+
+private struct WorktreeRow: View {
+    @Environment(\.appState) private var appState
+    let worktree: Worktree
+
+    private var agent: Agent? {
+        appState.agent(for: worktree)
+    }
+
+    var body: some View {
+        HStack(spacing: Theme.Spacing.xs) {
+            // Status indicator
+            Circle()
+                .fill(statusColor)
+                .frame(width: 6, height: 6)
+
+            // Branch name
+            Text(worktree.branch)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundStyle(Color.textPrimary)
+                .lineLimit(1)
+
+            Spacer()
+
+            // Agent badge
+            if let agent = agent {
+                Text(agent.type.shortName)
+                    .font(.system(size: 9, weight: .bold, design: .monospaced))
+                    .foregroundStyle(agent.type.neonColor)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 2)
+                    .background(agent.type.neonColor.opacity(0.15))
+                    .cornerRadius(Theme.Radius.xs)
+            }
+        }
+        .padding(.horizontal, Theme.Spacing.xs)
+        .padding(.vertical, 4)
+        .background(Color.bgApp.opacity(0.5))
+        .cornerRadius(Theme.Radius.xs)
+    }
+
+    private var statusColor: Color {
+        if let agent = agent {
+            switch agent.status {
+            case .running: return Color.statusSuccess
+            case .error: return Color.statusError
+            default: return Color.textTertiary
+            }
+        }
+        return Color.textTertiary
+    }
+}
+
+// MARK: - MCP Logs Section
+
+private struct MCPLogsSection: View {
+    @Environment(\.appState) private var appState
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Image(systemName: "terminal")
+                    .foregroundStyle(Color.terminalCyan)
+                    .font(.system(size: 12))
+
+                Text("MCP LOGS")
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(Color.textSecondary)
+
+                Spacer()
+
+                // MCP Connection Status
+                MCPStatusBadge(status: appState.mcpConnectionStatus, isStreaming: appState.isStreamingLogs)
+
+                Button {
+                    appState.clearLogs()
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.textSecondary)
+                }
+                .buttonStyle(.plain)
+                .help("Clear logs (⌘L)")
+            }
+            .padding(.horizontal, Theme.Spacing.sm)
+            .padding(.vertical, Theme.Spacing.xs)
+            .background(Color.bgSurface)
+
+            // Logs Area
+            LogsListView(logs: appState.filteredLogs)
+        }
+        .task {
+            await appState.startLogStreaming()
+        }
+    }
+}
+
+// MARK: - Inspector Column (Logs) - Legacy for non-agentic mode
 
 private struct InspectorColumn: View {
     @Environment(\.appState) private var appState
