@@ -41,6 +41,19 @@ public enum SettingsKey: String, CaseIterable {
     case geminiCliPath = "geminiCliPath"
     case codexCliPath = "codexCliPath"
 
+    // CLI Default Arguments
+    case claudeDefaultArgs = "claudeDefaultArgs"
+    case geminiDefaultArgs = "geminiDefaultArgs"
+    case codexDefaultArgs = "codexDefaultArgs"
+
+    // CLI Enabled States
+    case claudeEnabled = "claudeEnabled"
+    case geminiEnabled = "geminiEnabled"
+    case codexEnabled = "codexEnabled"
+
+    // CLI Preference Order (comma-separated AgentType rawValues)
+    case cliPreferenceOrder = "cliPreferenceOrder"
+
     // Orchestrator
     case fullAgenticMode = "fullAgenticMode"
 
@@ -100,6 +113,72 @@ public enum AccentColorChoice: String, Codable, Sendable, CaseIterable {
         case .pink: return Color(hex: "#EC4899")
         case .teal: return .statusInfo
         }
+    }
+}
+
+// MARK: - CLI Configuration Model
+
+/// Configuration for a single CLI tool
+public struct CLIConfiguration: Codable, Sendable, Equatable {
+    /// Path to the CLI executable
+    public var path: String
+
+    /// Default arguments to pass when launching
+    public var defaultArguments: [String]
+
+    /// Whether this CLI is enabled for use
+    public var isEnabled: Bool
+
+    public init(path: String, defaultArguments: [String] = [], isEnabled: Bool = true) {
+        self.path = path
+        self.defaultArguments = defaultArguments
+        self.isEnabled = isEnabled
+    }
+
+    /// Default configuration for Claude CLI
+    public static let defaultClaude = CLIConfiguration(
+        path: "/usr/local/bin/claude",
+        defaultArguments: ["--dangerously-skip-permissions"],
+        isEnabled: true
+    )
+
+    /// Default configuration for Gemini CLI
+    public static let defaultGemini = CLIConfiguration(
+        path: "/usr/local/bin/gemini",
+        defaultArguments: ["--sandbox=false"],
+        isEnabled: true
+    )
+
+    /// Default configuration for Codex CLI
+    public static let defaultCodex = CLIConfiguration(
+        path: "/usr/local/bin/codex",
+        defaultArguments: ["--approval-mode", "full-auto"],
+        isEnabled: true
+    )
+}
+
+// MARK: - CLI Validation Result
+
+/// Result of CLI path validation
+public struct CLIValidationResult: Sendable, Equatable {
+    /// Whether the path exists and is executable
+    public let isValid: Bool
+
+    /// Version string if available
+    public let version: String?
+
+    /// Error message if validation failed
+    public let errorMessage: String?
+
+    /// Whether a test connection succeeded
+    public let connectionTestPassed: Bool
+
+    public static func valid(version: String?, connectionTestPassed: Bool = false) -> CLIValidationResult {
+        CLIValidationResult(isValid: true, version: version, errorMessage: nil, connectionTestPassed: connectionTestPassed)
+    }
+
+    public static func invalid(error: String) -> CLIValidationResult {
+        CLIValidationResult(isValid: false, version: nil, errorMessage: error, connectionTestPassed: false)
     }
 }
 
@@ -257,6 +336,52 @@ public final class AppSettings {
         didSet { save(codexCliPath, forKey: .codexCliPath) }
     }
 
+    // MARK: - CLI Default Arguments
+
+    /// Claude CLI default arguments
+    public var claudeDefaultArgs: [String] = ["--dangerously-skip-permissions"] {
+        didSet { saveStringArray(claudeDefaultArgs, forKey: .claudeDefaultArgs) }
+    }
+
+    /// Gemini CLI default arguments
+    public var geminiDefaultArgs: [String] = ["--sandbox=false"] {
+        didSet { saveStringArray(geminiDefaultArgs, forKey: .geminiDefaultArgs) }
+    }
+
+    /// Codex CLI default arguments
+    public var codexDefaultArgs: [String] = ["--approval-mode", "full-auto"] {
+        didSet { saveStringArray(codexDefaultArgs, forKey: .codexDefaultArgs) }
+    }
+
+    // MARK: - CLI Enabled States
+
+    /// Whether Claude CLI is enabled
+    public var claudeEnabled: Bool = true {
+        didSet { save(claudeEnabled, forKey: .claudeEnabled) }
+    }
+
+    /// Whether Gemini CLI is enabled
+    public var geminiEnabled: Bool = true {
+        didSet { save(geminiEnabled, forKey: .geminiEnabled) }
+    }
+
+    /// Whether Codex CLI is enabled
+    public var codexEnabled: Bool = true {
+        didSet { save(codexEnabled, forKey: .codexEnabled) }
+    }
+
+    // MARK: - CLI Preference Order
+
+    /// Order of preference for CLI auto-detection (first enabled & available wins)
+    var cliPreferenceOrder: [AgentType] = [.claude, .gemini, .codex] {
+        didSet {
+            let rawValues = cliPreferenceOrder.map { $0.rawValue }
+            save(rawValues.joined(separator: ","), forKey: .cliPreferenceOrder)
+        }
+    }
+
+    // MARK: - CLI Configuration Helpers
+
     /// Get CLI path for a specific agent type
     func cliPath(for agentType: AgentType) -> String {
         switch agentType {
@@ -264,6 +389,43 @@ public final class AppSettings {
         case .gemini: return geminiCliPath
         case .codex: return codexCliPath
         }
+    }
+
+    /// Get default arguments for a specific agent type
+    func cliDefaultArgs(for agentType: AgentType) -> [String] {
+        switch agentType {
+        case .claude: return claudeDefaultArgs
+        case .gemini: return geminiDefaultArgs
+        case .codex: return codexDefaultArgs
+        }
+    }
+
+    /// Check if a specific agent type is enabled
+    func isCliEnabled(_ agentType: AgentType) -> Bool {
+        switch agentType {
+        case .claude: return claudeEnabled
+        case .gemini: return geminiEnabled
+        case .codex: return codexEnabled
+        }
+    }
+
+    /// Get full CLI configuration for a specific agent type
+    func cliConfiguration(for agentType: AgentType) -> CLIConfiguration {
+        CLIConfiguration(
+            path: cliPath(for: agentType),
+            defaultArguments: cliDefaultArgs(for: agentType),
+            isEnabled: isCliEnabled(agentType)
+        )
+    }
+
+    /// Get the first available and enabled CLI in preference order
+    func preferredCLI(availabilityChecker: (String) -> Bool) -> AgentType? {
+        for agentType in cliPreferenceOrder {
+            if isCliEnabled(agentType) && availabilityChecker(cliPath(for: agentType)) {
+                return agentType
+            }
+        }
+        return nil
     }
 
     // MARK: - Orchestrator Settings
@@ -317,6 +479,33 @@ public final class AppSettings {
         codexCliPath = "/usr/local/bin/codex"
     }
 
+    /// Reset CLI arguments to defaults
+    public func resetCLIArgsToDefaults() {
+        claudeDefaultArgs = ["--dangerously-skip-permissions"]
+        geminiDefaultArgs = ["--sandbox=false"]
+        codexDefaultArgs = ["--approval-mode", "full-auto"]
+    }
+
+    /// Reset CLI enabled states to defaults
+    public func resetCLIEnabledToDefaults() {
+        claudeEnabled = true
+        geminiEnabled = true
+        codexEnabled = true
+    }
+
+    /// Reset CLI preference order to defaults
+    public func resetCLIPreferenceOrderToDefaults() {
+        cliPreferenceOrder = [.claude, .gemini, .codex]
+    }
+
+    /// Reset all CLI settings to defaults
+    public func resetAllCLIToDefaults() {
+        resetCLIPathsToDefaults()
+        resetCLIArgsToDefaults()
+        resetCLIEnabledToDefaults()
+        resetCLIPreferenceOrderToDefaults()
+    }
+
     /// Reset all settings to defaults
     public func resetAllToDefaults() {
         resetGeneralToDefaults()
@@ -367,6 +556,27 @@ public final class AppSettings {
         geminiCliPath = defaults.string(forKey: SettingsKey.geminiCliPath.rawValue) ?? "/usr/local/bin/gemini"
         codexCliPath = defaults.string(forKey: SettingsKey.codexCliPath.rawValue) ?? "/usr/local/bin/codex"
 
+        // CLI Default Arguments
+        claudeDefaultArgs = loadStringArray(forKey: .claudeDefaultArgs) ?? ["--dangerously-skip-permissions"]
+        geminiDefaultArgs = loadStringArray(forKey: .geminiDefaultArgs) ?? ["--sandbox=false"]
+        codexDefaultArgs = loadStringArray(forKey: .codexDefaultArgs) ?? ["--approval-mode", "full-auto"]
+
+        // CLI Enabled States
+        claudeEnabled = defaults.object(forKey: SettingsKey.claudeEnabled.rawValue) as? Bool ?? true
+        geminiEnabled = defaults.object(forKey: SettingsKey.geminiEnabled.rawValue) as? Bool ?? true
+        codexEnabled = defaults.object(forKey: SettingsKey.codexEnabled.rawValue) as? Bool ?? true
+
+        // CLI Preference Order
+        if let orderString = defaults.string(forKey: SettingsKey.cliPreferenceOrder.rawValue) {
+            let rawValues = orderString.split(separator: ",").map { String($0) }
+            cliPreferenceOrder = rawValues.compactMap { AgentType(rawValue: $0) }
+            if cliPreferenceOrder.isEmpty {
+                cliPreferenceOrder = [.claude, .gemini, .codex]
+            }
+        } else {
+            cliPreferenceOrder = [.claude, .gemini, .codex]
+        }
+
         // Orchestrator
         fullAgenticMode = defaults.bool(forKey: SettingsKey.fullAgenticMode.rawValue)
 
@@ -395,6 +605,22 @@ public final class AppSettings {
             return nil
         }
         return shortcut
+    }
+
+    /// Save a string array to UserDefaults
+    private func saveStringArray(_ array: [String], forKey key: SettingsKey) {
+        if let data = try? JSONEncoder().encode(array) {
+            defaults.set(data, forKey: key.rawValue)
+        }
+    }
+
+    /// Load a string array from UserDefaults
+    private func loadStringArray(forKey key: SettingsKey) -> [String]? {
+        guard let data = defaults.data(forKey: key.rawValue),
+              let array = try? JSONDecoder().decode([String].self, from: data) else {
+            return nil
+        }
+        return array
     }
 }
 

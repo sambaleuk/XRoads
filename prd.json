@@ -319,7 +319,8 @@
       "description": "Configuration des CLIs (paths, options par defaut)",
       "priority": "high",
       "depends_on": ["US-V4-019"],
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-04T14:12:00Z",
       "acceptance_criteria": [
         "Path picker pour chaque CLI (Claude, Gemini, Codex)",
         "Default arguments per CLI",
@@ -342,7 +343,7 @@
           "Invalid path shows error",
           "Test connection executes CLI"
         ],
-        "status": "pending"
+        "status": "passing"
       },
       "estimated_complexity": 4
     },
@@ -711,6 +712,6 @@
   ],
 
   "total_stories": 28,
-  "completed_stories": 19,
-  "pending_stories": 9
+  "completed_stories": 20,
+  "pending_stories": 8
 }

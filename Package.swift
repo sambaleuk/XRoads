@@ -31,6 +31,8 @@ let package = Package(
                 "Views/SettingsView.swift",
                 // US-V4-019: General Settings View
                 "Views/Settings/GeneralSettingsView.swift",
+                // US-V4-020: CLI Settings View
+                "Views/Settings/CLISettingsView.swift",
                 "Views/ConflictResolutionSheet.swift",
                 "Views/PRDLoaderSheet.swift",
                 "Views/OrchestrationHistorySheet.swift",
@@ -152,7 +154,9 @@ let package = Package(
                 // US-V4-018: Skills Badge Tests
                 "Components/SkillsBadgeTests.swift",
                 // US-V4-019: General Settings Tests
-                "Settings/GeneralSettingsTests.swift"
+                "Settings/GeneralSettingsTests.swift",
+                // US-V4-020: CLI Settings Tests
+                "Settings/CLISettingsTests.swift"
             ]
         )
     ]
