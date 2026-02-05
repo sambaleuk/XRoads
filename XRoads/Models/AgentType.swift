@@ -49,4 +49,13 @@ enum AgentType: String, Codable, Hashable, Sendable, CaseIterable {
         case .codex: return "CX"
         }
     }
+
+    /// Loop script name for this agent type
+    var loopScriptName: String {
+        switch self {
+        case .claude: return "nexus-loop"
+        case .gemini: return "gemini-loop"
+        case .codex: return "codex-loop"
+        }
+    }
 }

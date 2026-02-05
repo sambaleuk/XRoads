@@ -10,6 +10,7 @@ struct PRDLoaderSheet: View {
     @StateObject private var viewModel = PRDLoaderViewModel()
     @State private var repoPath: String = ""
     @State private var isStarting: Bool = false
+    @State private var showSlotAssignment: Bool = false
 
     init(initialURL: URL? = nil) {
         self.initialURL = initialURL
@@ -41,6 +42,14 @@ struct PRDLoaderSheet: View {
         }
         .onChange(of: viewModel.document?.featureName ?? "") { _, _ in
             appState.setActivePRD(url: viewModel.selectedURL, name: viewModel.document?.featureName)
+        }
+        .sheet(isPresented: $showSlotAssignment) {
+            if let doc = viewModel.document, let url = repoURL {
+                SlotAssignmentSheet(prd: doc, repoPath: url) {
+                    // Close this sheet when SlotAssignmentSheet completes
+                    dismiss()
+                }
+            }
         }
     }
 
@@ -188,17 +197,8 @@ struct PRDLoaderSheet: View {
     }
 
     private func startOrchestration() {
-        guard let doc = viewModel.document, let url = repoURL else { return }
-
-        isStarting = true
-
-        Task {
-            await appState.startOrchestration(document: doc, repoPath: url)
-            await MainActor.run {
-                isStarting = false
-                dismiss()
-            }
-        }
+        guard viewModel.document != nil, repoURL != nil else { return }
+        showSlotAssignment = true
     }
 
     private func browseForRepo() {

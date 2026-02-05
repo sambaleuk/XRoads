@@ -40,6 +40,7 @@ let package = Package(
                 "Views/Settings/APIKeysSettingsView.swift",
                 "Views/ConflictResolutionSheet.swift",
                 "Views/PRDLoaderSheet.swift",
+                "Views/SlotAssignmentSheet.swift",
                 // US-V4-023: PRD Assistant Views
                 "Views/PRD/PRDAssistantView.swift",
                 "Views/PRD/PRDWizardSteps.swift",
@@ -152,6 +153,11 @@ let package = Package(
                 // US-V4-021: Keychain Service
                 "Services/KeychainService.swift",
                 "Services/LoopScriptLocator.swift",
+                "Services/LoopLauncher.swift",
+                "Services/DependencyTracker.swift",
+                "Services/StatusMonitor.swift",
+                "Services/LayeredDispatcher.swift",
+                "Services/WorktreePathResolver.swift",
                 // Actions
                 "Actions/ImplementAction.swift",
                 "Actions/ReviewAction.swift",
@@ -211,7 +217,9 @@ let package = Package(
                 // US-V4-027: Art Direction View Tests
                 "ArtDirection/ArtDirectionViewTests.swift",
                 // US-V4-028: Git Info Panel Quick Actions Tests
-                "Dashboard/GitInfoPanelTests.swift"
+                "Dashboard/GitInfoPanelTests.swift",
+                // Orchestration Workflow Tests
+                "Orchestrator/OrchestrationWorkflowTests.swift"
             ]
         )
     ]

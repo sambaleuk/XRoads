@@ -45,34 +45,19 @@ struct XRoadsDashboardView: View {
 
     @ViewBuilder
     private var mainContent: some View {
-        switch dashboardMode {
-        case .single:
-            SingleTerminalLayout(
-                slot: $terminalSlots[0],
-                onStart: { startSlot(1) },
-                onStop: { stopSlot(1) },
-                onSendInput: { [appState] text in
-                    Task {
-                        await appState.sendInputToSlot(1, text: text)
-                    }
+        // Always show the 6-slot grid layout (agentic mode)
+        TerminalGridLayout(
+            slots: $terminalSlots,
+            orchestratorState: orchestratorState,
+            onStartSlot: startSlot,
+            onStopSlot: stopSlot,
+            onSendInput: { [appState] slotNumber, text in
+                Task {
+                    await appState.sendInputToSlot(slotNumber, text: text)
                 }
-            )
-            .padding(Theme.Spacing.md)
-
-        case .agentic:
-            TerminalGridLayout(
-                slots: $terminalSlots,
-                orchestratorState: orchestratorState,
-                onStartSlot: startSlot,
-                onStopSlot: stopSlot,
-                onSendInput: { [appState] slotNumber, text in
-                    Task {
-                        await appState.sendInputToSlot(slotNumber, text: text)
-                    }
-                }
-            )
-            .padding(Theme.Spacing.md)
-        }
+            }
+        )
+        .padding(Theme.Spacing.md)
     }
 
     // MARK: - Computed Properties
@@ -200,6 +185,7 @@ struct XRoadsDashboardView: View {
 // MARK: - Dashboard Top Bar
 
 struct DashboardTopBar: View {
+    @Environment(\.appState) private var appState
     @Binding var mode: DashboardMode
     let progress: Double
     let activeAgents: Int
@@ -209,8 +195,8 @@ struct DashboardTopBar: View {
 
     var body: some View {
         HStack(spacing: Theme.Spacing.md) {
-            // Mode toggle
-            modeToggle
+            // Orchestration status (replaces mode toggle)
+            orchestrationStatus
 
             Divider()
                 .frame(height: 24)
@@ -229,52 +215,103 @@ struct DashboardTopBar: View {
         .background(Color.bgSurface)
     }
 
-    // MARK: - Mode Toggle
+    // MARK: - Orchestration Status
 
-    private var modeToggle: some View {
-        HStack(spacing: 2) {
-            ForEach(DashboardMode.allCases, id: \.self) { dashboardMode in
-                Button {
-                    withAnimation(.easeInOut(duration: 0.2)) {
-                        mode = dashboardMode
-                    }
-                } label: {
-                    HStack(spacing: Theme.Spacing.xs) {
-                        Image(systemName: dashboardMode.iconName)
-                            .font(.system(size: 12))
-                        Text(dashboardMode.displayName)
-                            .font(.small)
-                    }
-                    .foregroundStyle(mode == dashboardMode ? Color.textPrimary : Color.textSecondary)
-                    .padding(.horizontal, Theme.Spacing.sm)
-                    .padding(.vertical, Theme.Spacing.xs)
-                    .background(mode == dashboardMode ? Color.bgElevated : .clear)
-                    .cornerRadius(Theme.Radius.sm)
+    private var orchestrationStatus: some View {
+        HStack(spacing: Theme.Spacing.sm) {
+            // Status icon with animation
+            Image(systemName: orchestrationIcon)
+                .font(.system(size: 14))
+                .foregroundStyle(orchestrationColor)
+                .symbolEffect(.pulse, options: .repeating, isActive: appState.isDispatching)
+
+            VStack(alignment: .leading, spacing: 2) {
+                // Phase name
+                Text(appState.dispatchPhase == .idle ? "READY" : appState.dispatchPhase.rawValue.uppercased())
+                    .font(.caption.bold())
+                    .foregroundStyle(Color.textPrimary)
+
+                // Message or PRD name
+                if let prd = appState.currentPRD {
+                    Text(prd.featureName)
+                        .font(.caption2)
+                        .foregroundStyle(Color.textSecondary)
+                        .lineLimit(1)
+                } else if !appState.dispatchMessage.isEmpty {
+                    Text(appState.dispatchMessage)
+                        .font(.caption2)
+                        .foregroundStyle(Color.textSecondary)
+                        .lineLimit(1)
                 }
-                .buttonStyle(.plain)
+            }
+
+            // Layer indicator when dispatching
+            if appState.isDispatching && appState.totalDispatchLayers > 0 {
+                Text("L\(appState.currentDispatchLayer)/\(appState.totalDispatchLayers)")
+                    .font(.caption.bold())
+                    .foregroundStyle(Color.accentPrimary)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
+                    .background(Color.accentPrimary.opacity(0.15))
+                    .clipShape(Capsule())
             }
         }
-        .padding(2)
-        .background(Color.bgApp)
-        .cornerRadius(Theme.Radius.sm)
+        .frame(minWidth: 180, alignment: .leading)
+    }
+
+    private var orchestrationIcon: String {
+        switch appState.dispatchPhase {
+        case .idle: return "circle"
+        case .preparingWorktrees: return "folder.badge.plus"
+        case .validatingWorktrees: return "checkmark.shield"
+        case .launchingLayer: return "play.circle"
+        case .monitoring: return "eye.circle"
+        case .completed: return "checkmark.circle.fill"
+        case .failed: return "xmark.circle.fill"
+        }
+    }
+
+    private var orchestrationColor: Color {
+        switch appState.dispatchPhase {
+        case .idle: return Color.textTertiary
+        case .preparingWorktrees, .validatingWorktrees: return Color.accentPrimary
+        case .launchingLayer: return Color.statusWarning
+        case .monitoring: return Color.statusSuccess
+        case .completed: return Color.statusSuccess
+        case .failed: return Color.statusError
+        }
     }
 
     // MARK: - Progress Section
 
     private var progressSection: some View {
         HStack(spacing: Theme.Spacing.sm) {
-            // Progress bar
-            ProgressView(value: progress)
-                .progressViewStyle(.linear)
-                .tint(Color.accentPrimary)
-                .frame(width: 120)
+            // Story progress when dispatching
+            if let dispatchProgress = appState.dispatchProgress {
+                VStack(alignment: .leading, spacing: 2) {
+                    ProgressView(value: Double(dispatchProgress.storiesComplete),
+                                 total: Double(max(1, dispatchProgress.totalStories)))
+                        .progressViewStyle(.linear)
+                        .tint(Color.statusSuccess)
+                        .frame(width: 140)
 
-            // Percentage
-            Text("\(Int(progress * 100))%")
-                .font(.small)
-                .fontWeight(.medium)
-                .foregroundStyle(Color.textPrimary)
-                .frame(width: 40, alignment: .trailing)
+                    Text("\(dispatchProgress.storiesComplete)/\(dispatchProgress.totalStories) stories")
+                        .font(.caption2)
+                        .foregroundStyle(Color.textSecondary)
+                }
+            } else {
+                // Fallback to slot progress
+                ProgressView(value: progress)
+                    .progressViewStyle(.linear)
+                    .tint(Color.accentPrimary)
+                    .frame(width: 120)
+
+                Text("\(Int(progress * 100))%")
+                    .font(.small)
+                    .fontWeight(.medium)
+                    .foregroundStyle(Color.textPrimary)
+                    .frame(width: 40, alignment: .trailing)
+            }
 
             // Active agents count
             HStack(spacing: 4) {
@@ -293,22 +330,32 @@ struct DashboardTopBar: View {
 
     private var actionButtons: some View {
         HStack(spacing: Theme.Spacing.sm) {
-            Button(action: onStartAll) {
-                Label("Start All", systemImage: "play.fill")
-                    .font(.small)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(.statusSuccess)
-            .controlSize(.small)
-            .disabled(totalAgents == 0)
+            if appState.isDispatching {
+                Button(action: onStopAll) {
+                    Label("Stop Dispatch", systemImage: "stop.fill")
+                        .font(.small)
+                }
+                .buttonStyle(.bordered)
+                .tint(.statusError)
+                .controlSize(.small)
+            } else {
+                Button(action: onStartAll) {
+                    Label("Start All", systemImage: "play.fill")
+                        .font(.small)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.statusSuccess)
+                .controlSize(.small)
+                .disabled(totalAgents == 0)
 
-            Button(action: onStopAll) {
-                Label("Stop All", systemImage: "stop.fill")
-                    .font(.small)
+                Button(action: onStopAll) {
+                    Label("Stop All", systemImage: "stop.fill")
+                        .font(.small)
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+                .disabled(activeAgents == 0)
             }
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .disabled(activeAgents == 0)
         }
     }
 }

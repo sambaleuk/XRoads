@@ -141,6 +141,36 @@ final class AppState {
         }
     }
 
+    // MARK: - Dispatch Progress State (LayeredDispatcher)
+
+    /// Current dispatch phase
+    var dispatchPhase: DispatchPhase = .idle
+
+    /// Dispatch progress info
+    var dispatchProgress: DispatchProgress?
+
+    /// Current dispatch message
+    var dispatchMessage: String = ""
+
+    /// Whether a layered dispatch is active
+    var isDispatching: Bool {
+        switch dispatchPhase {
+        case .idle, .completed, .failed:
+            return false
+        default:
+            return true
+        }
+    }
+
+    /// PRD being dispatched
+    var currentPRD: PRDDocument?
+
+    /// Current layer being executed
+    var currentDispatchLayer: Int = 0
+
+    /// Total layers in dispatch
+    var totalDispatchLayers: Int = 0
+
     // MARK: - Private Properties
 
     /// Task for log streaming
@@ -748,6 +778,260 @@ final class AppState {
         for slot in activeSlots {
             await stopSlot(slot.slotNumber)
         }
+    }
+
+    // MARK: - PRD Dispatch to Slots (Manual Orchestration)
+
+    /// Dispatches a PRD to manually configured slots using loop scripts
+    /// Creates isolated git worktrees for each slot and manages dependencies
+    /// - Parameters:
+    ///   - prd: The full PRD document
+    ///   - slotAssignments: Dictionary mapping slot numbers to story IDs
+    ///   - repoPath: Path to the main git repository
+    func dispatchPRDToSlots(
+        prd: PRDDocument,
+        slotAssignments: [Int: [String]],
+        repoPath: URL? = nil
+    ) async {
+        guard !slotAssignments.isEmpty else {
+            addLog(LogEntry(level: .warn, source: "orchestrator", worktree: nil, message: "No slot assignments provided"))
+            return
+        }
+
+        // Use provided repo path or try to get from projectPath
+        guard let mainRepoPath = repoPath ?? (projectPath.map { URL(fileURLWithPath: $0) }) else {
+            addLog(LogEntry(level: .error, source: "orchestrator", worktree: nil, message: "No repository path configured"))
+            return
+        }
+
+        orchestratorVisualState = .distributing
+        addLog(LogEntry(level: .info, source: "orchestrator", worktree: nil, message: "Starting orchestration for \(prd.featureName) with \(slotAssignments.count) slots"))
+
+        // Initialize status file for dependency tracking
+        let sessionId = UUID()
+        var statusFilePath: URL?
+        do {
+            statusFilePath = try await services.loopLauncher.initializeSession(
+                repoPath: mainRepoPath,
+                sessionId: sessionId,
+                prd: prd
+            )
+            addLog(LogEntry(level: .info, source: "orchestrator", worktree: nil, message: "Status file created at \(statusFilePath?.path ?? "unknown")"))
+        } catch {
+            addLog(LogEntry(level: .warn, source: "orchestrator", worktree: nil, message: "Could not create status file: \(error.localizedDescription)"))
+        }
+
+        // Sort slots by dependency layer (slots with fewer dependencies first)
+        let sortedSlots = slotAssignments.sorted { (a, b) in
+            let aStories = prd.userStories.filter { a.value.contains($0.id) }
+            let bStories = prd.userStories.filter { b.value.contains($0.id) }
+            let aMaxDeps = aStories.map { $0.dependsOn.count }.max() ?? 0
+            let bMaxDeps = bStories.map { $0.dependsOn.count }.max() ?? 0
+            return aMaxDeps < bMaxDeps
+        }
+
+        for (slotNumber, storyIds) in sortedSlots {
+            guard let index = terminalSlots.firstIndex(where: { $0.slotNumber == slotNumber }),
+                  let agentType = terminalSlots[index].agentType else {
+                addLog(LogEntry(level: .error, source: "orchestrator", worktree: nil, message: "Slot \(slotNumber) has no agent configured"))
+                continue
+            }
+
+            // Filter stories for this slot
+            let assignedStories = prd.userStories.filter { storyIds.contains($0.id) }
+
+            guard !assignedStories.isEmpty else {
+                addLog(LogEntry(level: .warn, source: "orchestrator", worktree: nil, message: "No stories found for slot \(slotNumber)"))
+                continue
+            }
+
+            // Generate branch name: agent/slot-N-story-ids
+            let storyIdsSuffix = storyIds.prefix(2).joined(separator: "-").lowercased()
+            let branchName = "xroads/slot-\(slotNumber)-\(agentType.rawValue)-\(storyIdsSuffix)"
+
+            // Build loop configuration with worktree support
+            let config = LoopConfiguration(
+                slotNumber: slotNumber,
+                agentType: agentType,
+                repoPath: mainRepoPath,
+                branchName: branchName,
+                stories: assignedStories,
+                fullPRD: prd,
+                maxIterations: 15,
+                sleepSeconds: 5,
+                statusFilePath: statusFilePath
+            )
+
+            // Update slot status
+            terminalSlots[index].status = .starting
+            terminalSlots[index].currentTask = "Creating worktree for \(assignedStories.count) stories..."
+
+            // Update slot's worktree info with the actual worktree path
+            let worktreePath = config.worktreePath
+            terminalSlots[index].worktree = Worktree(
+                id: UUID(),
+                path: worktreePath.path,
+                branch: branchName,
+                createdAt: Date()
+            )
+
+            do {
+                let slotIndex = index
+                let actualWorktreePath = worktreePath.path
+
+                addLog(LogEntry(level: .info, source: "orchestrator", worktree: actualWorktreePath, message: "Creating worktree for slot \(slotNumber): \(branchName)"))
+
+                let processId = try await services.loopLauncher.launchLoop(
+                    config: config,
+                    onOutput: { [weak self] (output: String) in
+                        Task { @MainActor [weak self] in
+                            guard let self = self else { return }
+                            let entry = LogEntry(
+                                level: .debug,
+                                source: agentType.rawValue,
+                                worktree: actualWorktreePath,
+                                message: output
+                            )
+                            self.terminalSlots[slotIndex].addLog(entry)
+                            self.addLog(entry)
+                        }
+                    }
+                )
+
+                terminalSlots[index].processId = processId
+                terminalSlots[index].status = .running
+                terminalSlots[index].addLog(LogEntry(
+                    level: .info,
+                    source: agentType.rawValue,
+                    worktree: actualWorktreePath,
+                    message: "Loop started for stories: \(storyIds.joined(separator: ", "))"
+                ))
+
+                addLog(LogEntry(
+                    level: .info,
+                    source: "orchestrator",
+                    worktree: actualWorktreePath,
+                    message: "\(agentType.displayName) loop started on slot \(slotNumber) with \(assignedStories.count) stories in branch \(branchName)"
+                ))
+
+            } catch {
+                terminalSlots[index].status = .error
+                terminalSlots[index].addLog(LogEntry(
+                    level: .error,
+                    source: agentType.rawValue,
+                    worktree: nil,
+                    message: "Failed to start loop: \(error.localizedDescription)"
+                ))
+                addLog(LogEntry(
+                    level: .error,
+                    source: "orchestrator",
+                    worktree: nil,
+                    message: "Slot \(slotNumber) launch failed: \(error.localizedDescription)"
+                ))
+            }
+        }
+
+        updateOrchestratorVisualState()
+    }
+
+    /// Starts loops on all configured slots with their pre-assigned stories
+    /// Requires that each slot has a worktree with a prd.json already in place
+    func startLoopsOnConfiguredSlots() async {
+        let slotsToStart = terminalSlots.filter { $0.isConfigured && $0.status == .ready }
+
+        guard !slotsToStart.isEmpty else {
+            addLog(LogEntry(level: .warn, source: "orchestrator", worktree: nil, message: "No configured slots ready to start"))
+            return
+        }
+
+        orchestratorVisualState = .distributing
+
+        for slot in slotsToStart {
+            guard let worktree = slot.worktree,
+                  let agentType = slot.agentType,
+                  let index = terminalSlots.firstIndex(where: { $0.id == slot.id }) else {
+                continue
+            }
+
+            // Check if prd.json exists in the worktree
+            let prdPath = URL(fileURLWithPath: worktree.path).appendingPathComponent("prd.json")
+            guard FileManager.default.fileExists(atPath: prdPath.path) else {
+                terminalSlots[index].status = .error
+                terminalSlots[index].addLog(LogEntry(
+                    level: .error,
+                    source: "system",
+                    worktree: worktree.path,
+                    message: "No prd.json found in worktree. Configure slot assignments first."
+                ))
+                continue
+            }
+
+            terminalSlots[index].status = .starting
+
+            do {
+                let slotIndex = index
+                let loopScript = agentType.loopScriptName
+                let scriptsDir = "/Users/birahimmbow/Projets/CrossRoads/scripts"
+                let scriptPath = "\(scriptsDir)/\(loopScript)"
+
+                var environment = ProcessInfo.processInfo.environment
+                environment["CROSSROADS_SLOT"] = String(slot.slotNumber)
+                environment["CROSSROADS_AGENT"] = agentType.rawValue
+
+                let processId = try await services.ptyRunner.launch(
+                    executable: scriptPath,
+                    arguments: ["10", "3"],  // max_iterations, sleep_seconds
+                    workingDirectory: worktree.path,
+                    environment: environment,
+                    onOutput: { [weak self] (output: String) in
+                        Task { @MainActor [weak self] in
+                            guard let self = self else { return }
+                            let entry = LogEntry(
+                                level: .debug,
+                                source: agentType.rawValue,
+                                worktree: worktree.path,
+                                message: output
+                            )
+                            self.terminalSlots[slotIndex].addLog(entry)
+                            self.addLog(entry)
+                        }
+                    },
+                    onTermination: { [weak self] (exitCode: Int32) in
+                        Task { @MainActor [weak self] in
+                            guard let self = self else { return }
+                            self.terminalSlots[slotIndex].status = exitCode == 0 ? .completed : .error
+                            self.terminalSlots[slotIndex].addLog(LogEntry(
+                                level: exitCode == 0 ? .info : .error,
+                                source: agentType.rawValue,
+                                worktree: worktree.path,
+                                message: "Loop exited with code \(exitCode)"
+                            ))
+                            self.updateOrchestratorVisualState()
+                        }
+                    }
+                )
+
+                terminalSlots[index].processId = processId
+                terminalSlots[index].status = .running
+                terminalSlots[index].addLog(LogEntry(
+                    level: .info,
+                    source: agentType.rawValue,
+                    worktree: worktree.path,
+                    message: "\(loopScript) started"
+                ))
+
+            } catch {
+                terminalSlots[index].status = .error
+                terminalSlots[index].addLog(LogEntry(
+                    level: .error,
+                    source: agentType.rawValue,
+                    worktree: worktree.path,
+                    message: "Failed to start loop: \(error.localizedDescription)"
+                ))
+            }
+        }
+
+        updateOrchestratorVisualState()
     }
 
     // MARK: - Agent Management

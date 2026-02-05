@@ -1,0 +1,483 @@
+//
+//  LoopLauncher.swift
+//  XRoads
+//
+//  Created by Nexus on 2026-02-05.
+//  Service for launching loop scripts with worktree isolation and dependency tracking
+//
+
+import Foundation
+
+// MARK: - LoopLauncherError
+
+enum LoopLauncherError: LocalizedError {
+    case loopScriptNotFound(AgentType)
+    case worktreeNotConfigured
+    case worktreeCreationFailed(String)
+    case prdWriteFailed(URL)
+    case slotNotReady(Int)
+    case processLaunchFailed(String)
+    case gitError(String)
+
+    var errorDescription: String? {
+        switch self {
+        case .loopScriptNotFound(let type):
+            return "Loop script for \(type.displayName) not found"
+        case .worktreeNotConfigured:
+            return "Slot has no worktree configured"
+        case .worktreeCreationFailed(let reason):
+            return "Failed to create worktree: \(reason)"
+        case .prdWriteFailed(let url):
+            return "Failed to write PRD to \(url.path)"
+        case .slotNotReady(let slotNumber):
+            return "Slot \(slotNumber) is not ready to start"
+        case .processLaunchFailed(let reason):
+            return "Failed to launch loop: \(reason)"
+        case .gitError(let reason):
+            return "Git error: \(reason)"
+        }
+    }
+}
+
+// MARK: - LoopConfiguration
+
+/// Configuration for launching a loop on a slot
+struct LoopConfiguration: Sendable {
+    let slotNumber: Int
+    let agentType: AgentType
+    let repoPath: URL           // Main repository path
+    let branchName: String      // Branch name for this slot's worktree
+    let stories: [PRDUserStory] // Stories assigned to this slot
+    let fullPRD: PRDDocument    // Full PRD for context
+    let maxIterations: Int
+    let sleepSeconds: Int
+    let statusFilePath: URL?    // Shared status file for dependency tracking
+
+    /// Computed worktree path - uses centralized resolver for consistency
+    var worktreePath: URL {
+        // Extract story IDs from branch name for path computation
+        // Branch format: xroads/slot-X-agent-us-xxx-us-yyy
+        let storyIds = stories.map { $0.id }
+        return WorktreePathResolver.resolve(
+            repoPath: repoPath,
+            slotNumber: slotNumber,
+            agentType: agentType,
+            storyIds: storyIds
+        )
+    }
+
+    init(
+        slotNumber: Int,
+        agentType: AgentType,
+        repoPath: URL,
+        branchName: String,
+        stories: [PRDUserStory],
+        fullPRD: PRDDocument,
+        maxIterations: Int = 15,
+        sleepSeconds: Int = 5,
+        statusFilePath: URL? = nil
+    ) {
+        self.slotNumber = slotNumber
+        self.agentType = agentType
+        self.repoPath = repoPath
+        self.branchName = branchName
+        self.stories = stories
+        self.fullPRD = fullPRD
+        self.maxIterations = maxIterations
+        self.sleepSeconds = sleepSeconds
+        self.statusFilePath = statusFilePath
+    }
+}
+
+// MARK: - LoopLauncher
+
+/// Actor for launching loop scripts on terminal slots with worktree isolation
+actor LoopLauncher {
+
+    private let ptyRunner: PTYProcessRunner
+    private let gitService: GitService
+    private let dependencyTracker: DependencyTracker
+    private let fileManager: FileManager = .default
+    private let scriptsDirectory: URL
+
+    init(
+        ptyRunner: PTYProcessRunner = PTYProcessRunner(),
+        gitService: GitService = GitService(),
+        dependencyTracker: DependencyTracker = DependencyTracker()
+    ) {
+        self.ptyRunner = ptyRunner
+        self.gitService = gitService
+        self.dependencyTracker = dependencyTracker
+
+        // Find scripts directory
+        let bundleScripts = Bundle.main.bundleURL.appendingPathComponent("Contents/Resources/scripts")
+        let projectScripts = URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            .appendingPathComponent("scripts")
+        let userScripts = FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".nexus/bin")
+
+        if FileManager.default.fileExists(atPath: bundleScripts.path) {
+            self.scriptsDirectory = bundleScripts
+        } else if FileManager.default.fileExists(atPath: projectScripts.path) {
+            self.scriptsDirectory = projectScripts
+        } else {
+            self.scriptsDirectory = userScripts
+        }
+    }
+
+    // MARK: - Public Methods
+
+    /// Initialize status file for orchestration session
+    func initializeSession(
+        repoPath: URL,
+        sessionId: UUID,
+        prd: PRDDocument
+    ) async throws -> URL {
+        return try await dependencyTracker.initializeStatusFile(
+            repoPath: repoPath,
+            sessionId: sessionId,
+            prd: prd
+        )
+    }
+
+    /// Calculate dependency layers for story assignment suggestions
+    func calculateDependencyLayers(stories: [PRDUserStory]) async -> [DependencyLayer] {
+        return await dependencyTracker.calculateLayers(stories: stories)
+    }
+
+    /// Launch a loop script on a slot with worktree creation
+    func launchLoop(
+        config: LoopConfiguration,
+        onOutput: @escaping PTYProcessRunner.OutputHandler
+    ) async throws -> UUID {
+        // 1. Find the loop script
+        let loopScript = try findLoopScript(for: config.agentType)
+
+        // 2. Create or prepare the worktree
+        let worktreePath = try await createWorktreeIfNeeded(config: config)
+
+        // 3. Prepare the worktree with PRD and context files
+        try await prepareWorktree(config: config, worktreePath: worktreePath)
+
+        // 4. Build environment
+        var environment = ProcessInfo.processInfo.environment
+        environment["CROSSROADS_SLOT"] = String(config.slotNumber)
+        environment["CROSSROADS_AGENT"] = config.agentType.rawValue
+        environment["CROSSROADS_WORKTREE"] = worktreePath.path
+        environment["CROSSROADS_REPO"] = config.repoPath.path
+        environment["CROSSROADS_BRANCH"] = config.branchName
+        if let statusPath = config.statusFilePath {
+            environment["CROSSROADS_STATUS_FILE"] = statusPath.path
+        }
+
+        // 5. Launch the loop via PTY
+        let processId = try await ptyRunner.launch(
+            executable: loopScript.path,
+            arguments: [String(config.maxIterations), String(config.sleepSeconds)],
+            workingDirectory: worktreePath.path,
+            environment: environment,
+            onOutput: onOutput,
+            onTermination: { exitCode in
+                print("[LoopLauncher] Slot \(config.slotNumber) loop terminated with code: \(exitCode)")
+            }
+        )
+
+        return processId
+    }
+
+    /// Stop a running loop
+    func stopLoop(processId: UUID) async throws {
+        try await ptyRunner.terminate(id: processId)
+    }
+
+    /// Check if a loop is running
+    func isLoopRunning(processId: UUID) async -> Bool {
+        return await ptyRunner.isRunning(id: processId)
+    }
+
+    /// Send input to a running loop
+    func sendInput(processId: UUID, text: String) async throws {
+        try await ptyRunner.sendInput(id: processId, text: text)
+    }
+
+    /// Get the actual worktree path for a config
+    func getWorktreePath(config: LoopConfiguration) -> URL {
+        return config.worktreePath
+    }
+
+    // MARK: - Private Methods
+
+    /// Create a git worktree for the slot if it doesn't exist
+    private func createWorktreeIfNeeded(config: LoopConfiguration) async throws -> URL {
+        let worktreePath = config.worktreePath
+
+        // Check if worktree already exists
+        if fileManager.fileExists(atPath: worktreePath.path) {
+            // Verify it's a valid worktree
+            let gitDir = worktreePath.appendingPathComponent(".git")
+            if fileManager.fileExists(atPath: gitDir.path) {
+                print("[LoopLauncher] Worktree exists at \(worktreePath.path)")
+                return worktreePath
+            } else {
+                // Directory exists but is not a worktree, remove it
+                try? fileManager.removeItem(at: worktreePath)
+            }
+        }
+
+        // Create parent directory
+        let parentDir = worktreePath.deletingLastPathComponent()
+        try fileManager.createDirectory(at: parentDir, withIntermediateDirectories: true)
+
+        // Create the worktree using git
+        do {
+            try await gitService.createWorktree(
+                repoPath: config.repoPath.path,
+                branch: config.branchName,
+                worktreePath: worktreePath.path
+            )
+            print("[LoopLauncher] Created worktree: \(worktreePath.path)")
+            return worktreePath
+        } catch {
+            throw LoopLauncherError.worktreeCreationFailed(error.localizedDescription)
+        }
+    }
+
+    /// Find the loop script for an agent type
+    private func findLoopScript(for agentType: AgentType) throws -> URL {
+        let scriptName = agentType.loopScriptName
+        let scriptPath = scriptsDirectory.appendingPathComponent(scriptName)
+
+        guard fileManager.fileExists(atPath: scriptPath.path) else {
+            // Try alternative locations
+            let alternatives = [
+                URL(fileURLWithPath: "/Users/birahimmbow/Projets/CrossRoads/scripts/\(scriptName)"),
+                URL(fileURLWithPath: "/Users/birahimmbow/.nexus/bin/\(scriptName)"),
+                URL(fileURLWithPath: "/Users/birahimmbow/Projets/Nexus-scripts/bin/\(scriptName)")
+            ]
+
+            for alt in alternatives {
+                if fileManager.fileExists(atPath: alt.path) {
+                    return alt
+                }
+            }
+
+            throw LoopLauncherError.loopScriptNotFound(agentType)
+        }
+
+        return scriptPath
+    }
+
+    /// Prepare the worktree with PRD and context files
+    private func prepareWorktree(config: LoopConfiguration, worktreePath: URL) async throws {
+        // 1. Create filtered PRD with only assigned stories (but keep dependencies info)
+        let filteredPRD = createFilteredPRD(config: config)
+        let prdPath = worktreePath.appendingPathComponent("prd.json")
+
+        do {
+            let encoder = JSONEncoder()
+            encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+            encoder.keyEncodingStrategy = .convertToSnakeCase
+            encoder.dateEncodingStrategy = .iso8601
+            let data = try encoder.encode(filteredPRD)
+            try data.write(to: prdPath, options: .atomic)
+        } catch {
+            throw LoopLauncherError.prdWriteFailed(prdPath)
+        }
+
+        // 2. Create AGENT.md with dependency awareness
+        let agentMd = await createAgentMd(config: config, worktreePath: worktreePath)
+        let agentPath = worktreePath.appendingPathComponent("AGENT.md")
+        try? agentMd.write(to: agentPath, atomically: true, encoding: .utf8)
+
+        // 3. Ensure notes directory exists
+        let notesPath = worktreePath.appendingPathComponent("notes")
+        try? fileManager.createDirectory(at: notesPath, withIntermediateDirectories: true)
+
+        // 4. Create initial notes files
+        let notesFiles = ["decisions.md", "learnings.md", "blockers.md"]
+        for filename in notesFiles {
+            let filePath = notesPath.appendingPathComponent(filename)
+            if !fileManager.fileExists(atPath: filePath.path) {
+                let content = "# \(filename.replacingOccurrences(of: ".md", with: "").capitalized)\n\n"
+                try? content.write(to: filePath, atomically: true, encoding: .utf8)
+            }
+        }
+
+        // 5. Create PROGRESS.md
+        let progressPath = worktreePath.appendingPathComponent("PROGRESS.md")
+        if !fileManager.fileExists(atPath: progressPath.path) {
+            let progressContent = """
+            # Progress Tracker
+
+            ## Feature: \(config.fullPRD.featureName)
+            ## Agent: \(config.agentType.displayName)
+            ## Slot: \(config.slotNumber)
+            ## Branch: \(config.branchName)
+
+            ---
+
+            ## Assigned Stories
+
+            \(config.stories.map { "- [ ] \($0.id): \($0.title)" }.joined(separator: "\n"))
+
+            ## Learnings
+
+            (This section is updated automatically by the loop)
+
+            ## Blockers
+
+            (List any blockers encountered)
+
+            """
+            try? progressContent.write(to: progressPath, atomically: true, encoding: .utf8)
+        }
+    }
+
+    /// Create a filtered PRD with only the assigned stories
+    private func createFilteredPRD(config: LoopConfiguration) -> PRDDocument {
+        return PRDDocument(
+            featureName: config.fullPRD.featureName,
+            description: config.fullPRD.description,
+            author: config.fullPRD.author,
+            templateType: config.fullPRD.templateType,
+            userStories: config.stories,
+            vision: config.fullPRD.vision
+        )
+    }
+
+    /// Create AGENT.md content with dependency awareness
+    private func createAgentMd(config: LoopConfiguration, worktreePath: URL) async -> String {
+        let storyList = config.stories.map { story in
+            let deps = story.dependsOn.isEmpty ? "None" : story.dependsOn.joined(separator: ", ")
+            return """
+            ### \(story.id): \(story.title)
+            - **Priority:** \(story.priority.rawValue)
+            - **Depends on:** \(deps)
+            - **Description:** \(story.description)
+            """
+        }.joined(separator: "\n\n")
+
+        let otherStories = config.fullPRD.userStories
+            .filter { story in !config.stories.contains(where: { $0.id == story.id }) }
+
+        let otherStoriesList = otherStories.isEmpty ? "None - you have all stories" :
+            otherStories.map { "- \($0.id): \($0.title) (assigned elsewhere)" }.joined(separator: "\n")
+
+        // Build dependency check and status file instructions
+        let statusFilePath = config.statusFilePath?.path ?? "\(config.repoPath.path)/.crossroads/status.json"
+        let hasDependencies = config.stories.contains { !$0.dependsOn.isEmpty }
+
+        let statusFileInstructions = """
+
+        ## CRITICAL: Status File Coordination
+
+        **CENTRAL STATUS FILE:** `\(statusFilePath)`
+
+        This file tracks ALL stories across ALL agents. You MUST:
+
+        1. **READ** this file before starting ANY story to check if dependencies are complete
+        2. **UPDATE** this file when you COMPLETE a story
+
+        ### Checking Dependencies
+        ```bash
+        cat "\(statusFilePath)" | jq '.stories["US-XXX"].status'
+        ```
+        If status is NOT "complete", the dependency is not ready.
+
+        ### Updating Status on Completion
+        After completing a story (e.g., US-001), update the central status file using jq:
+        ```bash
+        STORY_ID="US-001"
+        TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        jq --arg id "$STORY_ID" --arg ts "$TIMESTAMP" \\
+          '.stories[$id].status = "complete" | .stories[$id].completedAt = $ts | .updatedAt = $ts' \\
+          "\(statusFilePath)" > /tmp/status_update.json && \\
+          mv /tmp/status_update.json "\(statusFilePath)"
+        ```
+
+        **THIS IS MANDATORY** - other agents are polling this file!
+
+        """
+
+        let dependencyInstructions = hasDependencies ? """
+
+        ## Dependency Workflow
+
+        Your stories have dependencies. Before implementing:
+
+        1. Read `\(statusFilePath)` to check dependency status
+        2. If ALL dependencies have `"status": "complete"`, proceed
+        3. If ANY dependency is NOT complete:
+           - Log: "⏳ Waiting for dependencies..."
+           - Sleep 30 seconds and re-check
+           - Do NOT proceed until dependencies are satisfied
+        4. Only implement stories whose dependencies are ALL complete
+
+        """ : ""
+
+        return """
+        # AGENT BRIEF – \(config.agentType.displayName)
+
+        ## Session Overview
+        - **Feature:** \(config.fullPRD.featureName)
+        - **Slot:** \(config.slotNumber)
+        - **Branch:** \(config.branchName)
+        - **Worktree:** \(worktreePath.path)
+        - **Main Repo:** \(config.repoPath.path)
+
+        ## CRITICAL: Working Directory
+
+        **YOU MUST WORK AT THE ROOT OF THIS WORKTREE.**
+
+        - Your current directory is: `\(worktreePath.path)`
+        - DO NOT create subdirectories for the project (no `myproject/`, `app/`, etc.)
+        - All source files go directly here: `src/`, `package.json`, etc.
+        - The `notes/` and `prd.json` are already at this root
+
+        Example correct structure:
+        ```
+        \(worktreePath.lastPathComponent)/
+        ├── src/
+        ├── package.json
+        ├── prd.json (already here)
+        ├── AGENT.md (already here)
+        └── notes/ (already here)
+        ```
+        \(statusFileInstructions)
+        ## Your Assigned Stories
+
+        \(storyList)
+        \(dependencyInstructions)
+
+        ## Full Feature Context
+
+        \(config.fullPRD.description)
+
+        ## Other Stories (Context Only - DO NOT Implement)
+
+        \(otherStoriesList)
+
+        ## Workflow
+
+        1. Read `\(statusFilePath)` to check dependency status
+        2. Read local prd.json to find the next incomplete story
+        3. If story has dependencies, verify they're "complete" in status.json
+        4. Implement the story with unit tests AT THE WORKTREE ROOT
+        5. Run tests and ensure they pass
+        6. Update local prd.json status to "complete"
+        7. **UPDATE CENTRAL STATUS FILE** (see above command)
+        8. Commit changes with proper message
+        9. Move to the next story
+
+        ## Coordination
+
+        - **ALWAYS update status.json** when completing stories
+        - Document decisions in `notes/decisions.md`
+        - Report blockers in `notes/blockers.md`
+        - Record learnings in `notes/learnings.md`
+
+        ---
+        *Generated by XRoads Orchestrator with Dependency Tracking*
+        """
+    }
+}

@@ -29,6 +29,12 @@ protocol ServiceContainer: Sendable {
     /// Agent launcher for starting CLI agents in worktrees
     var agentLauncher: AgentLauncher { get }
 
+    /// Loop launcher for running loop scripts (nexus-loop, gemini-loop, codex-loop)
+    var loopLauncher: LoopLauncher { get }
+
+    /// Layered dispatcher for dependency-aware loop launching
+    var layeredDispatcher: LayeredDispatcher { get }
+
     /// Claude orchestrator for Full Agentic Mode
     var orchestrator: ClaudeOrchestrator { get }
 }
@@ -47,6 +53,8 @@ final class DefaultServiceContainer: ServiceContainer, @unchecked Sendable {
     let notesSyncService: NotesSyncService
     let historyService: OrchestrationHistoryService
     let agentLauncher: AgentLauncher
+    let loopLauncher: LoopLauncher
+    let layeredDispatcher: LayeredDispatcher
     let orchestrator: ClaudeOrchestrator
 
     init(
@@ -68,6 +76,8 @@ final class DefaultServiceContainer: ServiceContainer, @unchecked Sendable {
         self.notesSyncService = notesSyncService
         self.historyService = historyService
         self.agentLauncher = AgentLauncher(ptyRunner: ptyRunner)
+        self.loopLauncher = LoopLauncher(ptyRunner: ptyRunner, gitService: gitService)
+        self.layeredDispatcher = LayeredDispatcher(loopLauncher: loopLauncher, gitService: gitService)
         self.orchestrator = ClaudeOrchestrator(
             gitService: gitService,
             processRunner: processRunner,
@@ -91,6 +101,8 @@ final class MockServiceContainer: ServiceContainer, @unchecked Sendable {
     let notesSyncService: NotesSyncService
     let historyService: OrchestrationHistoryService
     let agentLauncher: AgentLauncher
+    let loopLauncher: LoopLauncher
+    let layeredDispatcher: LayeredDispatcher
     let orchestrator: ClaudeOrchestrator
 
     init() {
@@ -104,6 +116,8 @@ final class MockServiceContainer: ServiceContainer, @unchecked Sendable {
         self.notesSyncService = NotesSyncService()
         self.historyService = OrchestrationHistoryService()
         self.agentLauncher = AgentLauncher(ptyRunner: ptyRunner)
+        self.loopLauncher = LoopLauncher(ptyRunner: ptyRunner, gitService: gitService)
+        self.layeredDispatcher = LayeredDispatcher(loopLauncher: loopLauncher, gitService: gitService)
         self.orchestrator = ClaudeOrchestrator(
             gitService: gitService,
             processRunner: processRunner,
