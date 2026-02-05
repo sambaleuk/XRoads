@@ -122,6 +122,7 @@ actor ActionRunner {
     private let skillRegistry: SkillRegistry
     private let skillLoader: SkillLoader
     private let agentLauncher: AgentLauncher
+    private let ptyRunner: PTYProcessRunner
     private let fileManager: FileManager
 
     // MARK: - State
@@ -134,11 +135,13 @@ actor ActionRunner {
     init(
         skillRegistry: SkillRegistry = .shared,
         skillLoader: SkillLoader = .shared,
-        agentLauncher: AgentLauncher = AgentLauncher()
+        agentLauncher: AgentLauncher = AgentLauncher(),
+        ptyRunner: PTYProcessRunner = PTYProcessRunner()
     ) {
         self.skillRegistry = skillRegistry
         self.skillLoader = skillLoader
         self.agentLauncher = agentLauncher
+        self.ptyRunner = ptyRunner
         self.fileManager = .default
     }
 
@@ -151,7 +154,7 @@ actor ActionRunner {
     /// - Returns: The result of the action run
     func run(
         request: ActionRunRequest,
-        onOutput: @escaping ProcessRunner.OutputHandler
+        onOutput: @escaping PTYProcessRunner.OutputHandler
     ) async throws -> ActionRunResult {
         // Validate worktree path
         guard fileManager.fileExists(atPath: request.worktreePath) else {
@@ -423,12 +426,12 @@ actor ActionRunner {
         }
     }
 
-    /// Launch the CLI agent with prepared configuration
+    /// Launch the CLI agent with prepared configuration using PTY for proper terminal emulation
     private func launchAgent(
         request: ActionRunRequest,
         skills: [Skill],
         instructions: String,
-        onOutput: @escaping ProcessRunner.OutputHandler
+        onOutput: @escaping PTYProcessRunner.OutputHandler
     ) async throws -> UUID {
         // Build environment variables
         var environment = Foundation.ProcessInfo.processInfo.environment
@@ -449,20 +452,32 @@ actor ActionRunner {
             )
         }
 
-        // Launch via ProcessRunner
-        let processRunner = ProcessRunner()
-
+        // Launch via PTYProcessRunner for proper terminal emulation
+        // This is required for interactive CLIs like Claude Code, Gemini CLI, and Codex
         do {
-            let processID = try await processRunner.launch(
+            let processID = try await ptyRunner.launch(
                 executable: adapter.executablePath,
                 arguments: adapter.launchArguments(worktreePath: request.worktreePath),
                 workingDirectory: request.worktreePath,
                 environment: environment,
-                onOutput: onOutput
+                onOutput: onOutput,
+                onTermination: { exitCode in
+                    print("[ActionRunner] Process terminated with exit code: \(exitCode)")
+                }
             )
 
+            // Wait a bit for the process to initialize before sending input
+            try await Task.sleep(nanoseconds: 800_000_000)  // 800ms for PTY initialization
+
+            // Check if process is still running before sending input
+            guard await ptyRunner.isRunning(id: processID) else {
+                // Process exited immediately, likely due to an error
+                // The output handler should have captured the error message
+                return processID
+            }
+
             // Send launch instructions
-            try await processRunner.sendInput(
+            try await ptyRunner.sendInput(
                 id: processID,
                 text: adapter.formatCommand(instructions)
             )
@@ -490,7 +505,7 @@ extension ActionRunner {
         worktreePath: String,
         prdPath: String? = nil,
         taskDescription: String? = nil,
-        onOutput: @escaping ProcessRunner.OutputHandler
+        onOutput: @escaping PTYProcessRunner.OutputHandler
     ) async throws -> ActionRunResult {
         let request = ActionRunRequest(
             actionType: actionType,
@@ -525,7 +540,7 @@ extension ActionRunner {
         prdPath: String? = nil,
         assignedStories: [String] = [],
         coordinationNotes: String? = nil,
-        onOutput: @escaping ProcessRunner.OutputHandler
+        onOutput: @escaping PTYProcessRunner.OutputHandler
     ) async throws -> ActionRunResult {
         let request = ActionRunRequest(
             actionType: actionType,

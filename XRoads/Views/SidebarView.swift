@@ -169,17 +169,17 @@ private struct SidebarEmptyState: View {
                 .font(.system(size: 48))
                 .foregroundStyle(Color.textTertiary)
 
-            Text("No Worktrees")
+            Text("No Sessions")
                 .font(.h2)
                 .foregroundStyle(Color.textSecondary)
 
-            Text("Create a worktree to start\nworking with AI agents")
+            Text("Start a session to begin\nworking with AI agents")
                 .font(.small)
                 .foregroundStyle(Color.textTertiary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, Theme.Spacing.md)
 
-            Button("Create Worktree") {
+            Button("Start Session") {
                 onCreateTapped()
             }
             .buttonStyle(.borderedProminent)

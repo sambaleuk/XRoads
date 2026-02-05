@@ -1,0 +1,132 @@
+#!/bin/bash
+#
+# Nexus Init - Initialize a project for autonomous development
+# Part of XRoads / Nexus Scripts
+#
+# Usage: nexus-init [feature-name]
+#
+
+set -e
+
+# Find script directory and load common library
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Try bundled lib first, then fallback to ~/.nexus
+if [[ -f "${SCRIPT_DIR}/lib/common.sh" ]]; then
+    source "${SCRIPT_DIR}/lib/common.sh"
+elif [[ -f "${HOME}/.nexus/lib/common.sh" ]]; then
+    source "${HOME}/.nexus/lib/common.sh"
+else
+    echo "Error: common.sh not found"
+    exit 1
+fi
+
+FEATURE_NAME=${1:-"new-feature"}
+
+# ============================================================================
+# TEMPLATES
+# ============================================================================
+create_prd_template() {
+    local name="$1"
+    local branch="$2"
+    local date="$3"
+    cat << EOF
+{
+  "feature_name": "$name",
+  "branch": "$branch",
+  "created_at": "$date",
+  "status": "in_progress",
+  "user_stories": [
+    {
+      "id": "US-001",
+      "title": "Example Story",
+      "description": "As a user, I want to...",
+      "priority": "high",
+      "status": "pending",
+      "acceptance_criteria": [
+        "Criterion 1",
+        "Criterion 2"
+      ],
+      "unit_test": {
+        "file": "tests/unit/example.test.ts",
+        "name": "test_example_functionality",
+        "description": "Verify the example works correctly",
+        "assertions": ["assert result is correct"],
+        "status": "pending"
+      }
+    }
+  ]
+}
+EOF
+}
+
+# ============================================================================
+# MAIN
+# ============================================================================
+main() {
+    show_nexus_banner "I N I T" "$BLUE"
+
+    log_info "Initializing project for: ${YELLOW}$FEATURE_NAME${NC}"
+    echo ""
+
+    local target_branch="feat/$FEATURE_NAME"
+    local created_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+
+    # Create prd.json
+    if [ ! -f "$PRD_FILE" ]; then
+        create_prd_template "$FEATURE_NAME" "$target_branch" "$created_at" > "$PRD_FILE"
+        log_success "Created $PRD_FILE"
+    else
+        log_warn "$PRD_FILE already exists, skipping"
+    fi
+
+    # Create progress.txt
+    if [ ! -f "$PROGRESS_FILE" ]; then
+        create_progress_file "$FEATURE_NAME" > "$PROGRESS_FILE"
+        log_success "Created $PROGRESS_FILE"
+    else
+        log_warn "$PROGRESS_FILE already exists, skipping"
+    fi
+
+    # Create AGENTS.md
+    if [ ! -f "$AGENTS_FILE" ]; then
+        create_agents_file > "$AGENTS_FILE"
+        log_success "Created $AGENTS_FILE"
+    else
+        log_warn "$AGENTS_FILE already exists, skipping"
+    fi
+
+    # Git branch
+    if command -v git &> /dev/null && [ -d ".git" ]; then
+        local current_branch=$(git branch --show-current 2>/dev/null || echo "")
+
+        if [ "$current_branch" != "$target_branch" ]; then
+            echo ""
+            log_info "Current branch: $current_branch"
+            read -p "Create and switch to branch '$target_branch'? (y/n) " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                git checkout -b "$target_branch" 2>/dev/null || git checkout "$target_branch"
+                log_success "Switched to $target_branch"
+            fi
+        fi
+    fi
+
+    # Summary
+    echo ""
+    echo -e "${GREEN}╔════════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${GREEN}║${NC}              Nexus Initialized!                             ${GREEN}║${NC}"
+    echo -e "${GREEN}╚════════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+    echo -e "Files created:"
+    echo -e "  - ${YELLOW}$PRD_FILE${NC}        - Define your user stories here"
+    echo -e "  - ${DIM}$PROGRESS_FILE${NC}   - Learning log (auto-updated)"
+    echo -e "  - ${DIM}$AGENTS_FILE${NC}       - Codebase patterns (auto-updated)"
+    echo ""
+    echo -e "Next steps:"
+    echo -e "  1. Edit ${YELLOW}$PRD_FILE${NC} to add your user stories"
+    echo -e "  2. Run ${CYAN}nexus-loop${NC} to start autonomous development"
+    echo ""
+}
+
+main

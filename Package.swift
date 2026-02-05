@@ -27,6 +27,7 @@ let package = Package(
                 "Views/TerminalView.swift",
                 "Views/WorktreeCard.swift",
                 "Views/WorktreeCreateSheet.swift",
+                "Views/StartSessionSheet.swift",
                 "Views/CommandPaletteView.swift",
                 "Views/SettingsView.swift",
                 // US-V4-019: General Settings View
@@ -62,6 +63,8 @@ let package = Package(
                 "Views/Components/CollapsiblePanel.swift",
                 // US-V4-018: Skills Badge
                 "Views/Components/SkillsBadge.swift",
+                // Loop Configuration Panel
+                "Views/Components/LoopConfigurationPanel.swift",
                 // Dashboard v3 Views
                 "Views/Dashboard/XRoadsDashboardView.swift",
                 "Views/Dashboard/TerminalSlotView.swift",
@@ -73,6 +76,9 @@ let package = Package(
                 "Views/Orchestrator/OrchestratorChatView.swift",
                 "Views/Orchestrator/ChatMessageView.swift",
                 "Views/Orchestrator/ChatInputBar.swift",
+                // PRD Auto-Detection System
+                "Views/Orchestrator/PRDProposalView.swift",
+                "Views/Orchestrator/PRDPreviewSheet.swift",
                 // US-V4-016: Skills Browser Views
                 "Views/Skills/SkillsBrowserView.swift",
                 "Views/Skills/SkillRowView.swift",
@@ -110,6 +116,7 @@ let package = Package(
                 "Models/AppSettings.swift",
                 "Services/GitService.swift",
                 "Services/ProcessRunner.swift",
+                "Services/PTYProcess.swift",
                 "Services/MCPClient.swift",
                 "Services/ServiceContainer.swift",
                 "Services/Orchestrator.swift",
@@ -138,10 +145,13 @@ let package = Package(
                 "Services/RepoDetector.swift",
                 // US-V4-013: Orchestrator Service
                 "Services/OrchestratorService.swift",
+                // PRD Auto-Detection
+                "Services/PRDDetector.swift",
                 // US-V4-014: Anthropic API Client
                 "Services/AnthropicClient.swift",
                 // US-V4-021: Keychain Service
                 "Services/KeychainService.swift",
+                "Services/LoopScriptLocator.swift",
                 // Actions
                 "Actions/ImplementAction.swift",
                 "Actions/ReviewAction.swift",

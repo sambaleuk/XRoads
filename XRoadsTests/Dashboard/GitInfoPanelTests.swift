@@ -366,4 +366,268 @@ final class GitInfoPanelTests: XCTestCase {
         await fulfillment(of: [expectation], timeout: 1.0)
         XCTAssertNotNil(receivedNotification, "Context menu Create Worktree should post notification")
     }
+
+    // MARK: - Test: Git Repository Detection
+
+    func test_gitService_isGitRepository_detectsGitRepo() async throws {
+        // Given: A temporary directory with a .git folder
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("test-git-repo-\(UUID().uuidString)")
+
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        // Initialize a git repo
+        let gitService = GitService()
+        try await gitService.initializeRepository(path: tempDir.path)
+
+        // When: Checking if it's a git repository
+        let isRepo = await gitService.isGitRepository(path: tempDir.path)
+
+        // Then: It should be detected as a git repository
+        XCTAssertTrue(isRepo, "Should detect the directory as a git repository")
+    }
+
+    func test_gitService_isGitRepository_nonGitDirectory() async {
+        // Given: A temporary directory without git
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("test-non-git-\(UUID().uuidString)")
+
+        try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        // When: Checking if it's a git repository
+        let gitService = GitService()
+        let isRepo = await gitService.isGitRepository(path: tempDir.path)
+
+        // Then: It should NOT be detected as a git repository
+        XCTAssertFalse(isRepo, "Should not detect a non-git directory as a repository")
+    }
+
+    // MARK: - Test: Git Initialization
+
+    func test_gitService_initializeRepository_createsRepo() async throws {
+        // Given: An empty temporary directory
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("test-init-repo-\(UUID().uuidString)")
+
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        // When: Initializing a git repository
+        let gitService = GitService()
+        try await gitService.initializeRepository(path: tempDir.path)
+
+        // Then: The .git directory should exist
+        let gitDir = tempDir.appendingPathComponent(".git")
+        XCTAssertTrue(FileManager.default.fileExists(atPath: gitDir.path),
+                      ".git directory should be created")
+
+        // And: The repo should be valid
+        let isRepo = await gitService.isGitRepository(path: tempDir.path)
+        XCTAssertTrue(isRepo, "Initialized directory should be a valid git repository")
+    }
+
+    func test_gitService_initializeRepository_createsInitialCommit() async throws {
+        // Given: An empty temporary directory
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("test-init-commit-\(UUID().uuidString)")
+
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        // When: Initializing a git repository
+        let gitService = GitService()
+        try await gitService.initializeRepository(path: tempDir.path)
+
+        // Then: There should be at least one commit
+        let commits = try await gitService.getRecentCommits(path: tempDir.path, count: 1)
+        XCTAssertFalse(commits.isEmpty, "Repository should have an initial commit")
+        XCTAssertEqual(commits.first?.message, "Initial commit",
+                       "Initial commit message should be 'Initial commit'")
+    }
+
+    // MARK: - Test: AppState Git Status Check
+
+    @MainActor
+    func test_appState_checkGitRepositoryStatus_detectsGitRepo() async throws {
+        // Given: A temp git repo and AppState with that project path
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("test-appstate-git-\(UUID().uuidString)")
+
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let gitService = GitService()
+        try await gitService.initializeRepository(path: tempDir.path)
+
+        let appState = AppState(services: MockServiceContainer())
+        appState.projectPath = tempDir.path
+
+        // When: Checking git repository status
+        await appState.checkGitRepositoryStatus()
+
+        // Then: isGitRepository should be true
+        XCTAssertTrue(appState.isGitRepository, "AppState should detect git repository")
+    }
+
+    @MainActor
+    func test_appState_checkGitRepositoryStatus_detectsNonGitDir() async {
+        // Given: A non-git directory
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("test-appstate-nongit-\(UUID().uuidString)")
+
+        try? FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let appState = AppState(services: MockServiceContainer())
+        appState.projectPath = tempDir.path
+
+        // When: Checking git repository status
+        await appState.checkGitRepositoryStatus()
+
+        // Then: isGitRepository should be false
+        XCTAssertFalse(appState.isGitRepository, "AppState should detect non-git directory")
+    }
+
+    @MainActor
+    func test_appState_checkGitRepositoryStatus_noProjectPath() async {
+        // Given: AppState with no project path
+        let appState = AppState(services: MockServiceContainer())
+        appState.projectPath = nil
+
+        // When: Checking git repository status
+        await appState.checkGitRepositoryStatus()
+
+        // Then: isGitRepository should be false
+        XCTAssertFalse(appState.isGitRepository, "AppState should return false when no project path")
+    }
+
+    // MARK: - Test: AppState Initialize Git Repository
+
+    @MainActor
+    func test_appState_initializeGitRepository_createsRepo() async throws {
+        // Given: A non-git directory
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("test-appstate-init-\(UUID().uuidString)")
+
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let appState = AppState(services: MockServiceContainer())
+        appState.projectPath = tempDir.path
+
+        // Verify it's not a git repo initially
+        await appState.checkGitRepositoryStatus()
+        XCTAssertFalse(appState.isGitRepository, "Should not be a git repo initially")
+
+        // When: Initializing git repository
+        try await appState.initializeGitRepository()
+
+        // Then: isGitRepository should be true
+        XCTAssertTrue(appState.isGitRepository, "Should be a git repo after initialization")
+        XCTAssertFalse(appState.isInitializingGit, "isInitializingGit should be false after completion")
+    }
+
+    @MainActor
+    func test_appState_initializeGitRepository_throwsWithNoPath() async {
+        // Given: AppState with no project path
+        let appState = AppState(services: MockServiceContainer())
+        appState.projectPath = nil
+
+        // When/Then: Initializing should throw an error
+        do {
+            try await appState.initializeGitRepository()
+            XCTFail("Should throw an error when no project path is set")
+        } catch {
+            // Expected
+            XCTAssertTrue(error is AppError, "Should throw AppError")
+        }
+    }
+
+    // MARK: - Test: AppState Create Project Folder
+
+    @MainActor
+    func test_appState_createProjectFolder_withGitInit() async throws {
+        // Given: A parent directory
+        let parentDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("test-parent-\(UUID().uuidString)")
+
+        try FileManager.default.createDirectory(at: parentDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: parentDir) }
+
+        let appState = AppState(services: MockServiceContainer())
+        appState.projectPath = parentDir.path
+
+        // When: Creating a project folder with git init
+        let folderName = "my-new-project"
+        let newPath = try await appState.createProjectFolder(
+            name: folderName,
+            at: parentDir.path,
+            initGit: true
+        )
+
+        // Then: The folder should exist and be a git repo
+        XCTAssertTrue(FileManager.default.fileExists(atPath: newPath),
+                      "New folder should exist")
+        XCTAssertEqual(appState.projectPath, newPath, "projectPath should be updated")
+        XCTAssertTrue(appState.isGitRepository, "Should be a git repository")
+
+        // Cleanup
+        try? FileManager.default.removeItem(atPath: newPath)
+    }
+
+    @MainActor
+    func test_appState_createProjectFolder_withoutGitInit() async throws {
+        // Given: A parent directory
+        let parentDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("test-parent-nogit-\(UUID().uuidString)")
+
+        try FileManager.default.createDirectory(at: parentDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: parentDir) }
+
+        let appState = AppState(services: MockServiceContainer())
+        appState.projectPath = parentDir.path
+
+        // When: Creating a project folder without git init
+        let folderName = "plain-folder"
+        let newPath = try await appState.createProjectFolder(
+            name: folderName,
+            at: parentDir.path,
+            initGit: false
+        )
+
+        // Then: The folder should exist but NOT be a git repo
+        XCTAssertTrue(FileManager.default.fileExists(atPath: newPath),
+                      "New folder should exist")
+        XCTAssertEqual(appState.projectPath, newPath, "projectPath should be updated")
+        XCTAssertFalse(appState.isGitRepository, "Should not be a git repository")
+
+        // Cleanup
+        try? FileManager.default.removeItem(atPath: newPath)
+    }
+
+    // MARK: - Test: AppState Set Project Path
+
+    @MainActor
+    func test_appState_setProjectPath_checksGitStatus() async throws {
+        // Given: A git repository
+        let tempDir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("test-setpath-\(UUID().uuidString)")
+
+        try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tempDir) }
+
+        let gitService = GitService()
+        try await gitService.initializeRepository(path: tempDir.path)
+
+        let appState = AppState(services: MockServiceContainer())
+
+        // When: Setting the project path
+        await appState.setProjectPath(tempDir.path)
+
+        // Then: Git status should be automatically checked
+        XCTAssertEqual(appState.projectPath, tempDir.path, "projectPath should be set")
+        XCTAssertTrue(appState.isGitRepository, "isGitRepository should be true")
+    }
 }

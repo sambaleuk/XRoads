@@ -126,46 +126,52 @@ struct MainWindowView: View {
     /// Agentic mode layout: Chat Panel | Dashboard (max space) | Right Panel (Git + Logs stacked)
     @ViewBuilder
     private var agenticModeLayout: some View {
-        HStack(spacing: 0) {
-            // Left: Orchestrator Chat Panel (US-V4-015)
-            CollapsiblePanel(
-                isExpanded: $showChatPanel,
-                width: Binding(
-                    get: { CGFloat(chatPanelWidth) },
-                    set: { chatPanelWidth = Double($0) }
-                ),
-                expandedWidth: 320,
-                minWidth: 260,
-                maxWidth: 450,
-                resizable: true,
-                edge: .leading
-            ) {
-                OrchestratorChatView()
+        VStack(spacing: 0) {
+            // Main content
+            HStack(spacing: 0) {
+                // Left: Orchestrator Chat Panel (US-V4-015)
+                CollapsiblePanel(
+                    isExpanded: $showChatPanel,
+                    width: Binding(
+                        get: { CGFloat(chatPanelWidth) },
+                        set: { chatPanelWidth = Double($0) }
+                    ),
+                    expandedWidth: 320,
+                    minWidth: 260,
+                    maxWidth: 450,
+                    resizable: true,
+                    edge: .leading
+                ) {
+                    OrchestratorChatView()
+                }
+
+                // Center: Dashboard with brain and slots (maximized space)
+                XRoadsDashboardView(
+                    dashboardMode: Binding(
+                        get: { appState.dashboardMode },
+                        set: { appState.dashboardMode = $0 }
+                    ),
+                    terminalSlots: Binding(
+                        get: { appState.terminalSlots },
+                        set: { appState.terminalSlots = $0 }
+                    ),
+                    orchestratorState: Binding(
+                        get: { appState.orchestratorVisualState },
+                        set: { appState.orchestratorVisualState = $0 }
+                    ),
+                    showGitPanel: false
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                // Right: Stacked panels (Git Recent, Git Worktrees, MCP Logs)
+                if showInspector {
+                    RightSidePanel()
+                        .frame(width: 280)
+                }
             }
 
-            // Center: Dashboard with brain and slots (maximized space)
-            XRoadsDashboardView(
-                dashboardMode: Binding(
-                    get: { appState.dashboardMode },
-                    set: { appState.dashboardMode = $0 }
-                ),
-                terminalSlots: Binding(
-                    get: { appState.terminalSlots },
-                    set: { appState.terminalSlots = $0 }
-                ),
-                orchestratorState: Binding(
-                    get: { appState.orchestratorVisualState },
-                    set: { appState.orchestratorVisualState = $0 }
-                ),
-                showGitPanel: false
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            // Right: Stacked panels (Git Recent, Git Worktrees, MCP Logs)
-            if showInspector {
-                RightSidePanel()
-                    .frame(width: 280)
-            }
+            // Bottom: Loop Configuration Panel
+            LoopConfigurationPanel()
         }
         .background(Color.bgApp)
     }
@@ -206,9 +212,9 @@ struct MainWindowView: View {
         .keyboardShortcut("o", modifiers: [.command, .shift])
 
         Button { showNewWorktreeSheet = true } label: {
-            Label("New Worktree", systemImage: "plus.rectangle.on.folder")
+            Label("Start Session", systemImage: "play.circle.fill")
         }
-        .help("Create a new worktree (⌘N)")
+        .help("Start a new development session (⌘N)")
 
         Button {
             withAnimation(.easeInOut(duration: Theme.Animation.normal)) {
@@ -348,16 +354,24 @@ private struct RightSidePanel: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // Section 1: Git Recent Commits
-            GitRecentSection()
-                .frame(height: 180)
+            // Section 0: Project & Git Status (always visible)
+            ProjectGitStatusSection()
 
             Divider()
                 .background(Color.borderMuted)
 
+            // Section 1: Git Recent Commits (only if git repo)
+            if appState.isGitRepository {
+                GitRecentSection()
+                    .frame(height: 160)
+
+                Divider()
+                    .background(Color.borderMuted)
+            }
+
             // Section 2: Git Worktrees
             GitWorktreesSection()
-                .frame(height: 200)
+                .frame(height: 180)
 
             Divider()
                 .background(Color.borderMuted)
@@ -366,6 +380,249 @@ private struct RightSidePanel: View {
             MCPLogsSection()
         }
         .background(Color.bgCanvas)
+        .task {
+            // Check git status when panel appears
+            await appState.checkGitRepositoryStatus()
+        }
+    }
+}
+
+// MARK: - Project & Git Status Section (Always Visible)
+
+private struct ProjectGitStatusSection: View {
+    @Environment(\.appState) private var appState
+    @State private var showNewFolderSheet: Bool = false
+    @State private var showFolderPicker: Bool = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Image(systemName: appState.isGitRepository ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                    .foregroundStyle(appState.isGitRepository ? Color.statusSuccess : Color.statusWarning)
+                    .font(.system(size: 12))
+
+                Text(appState.isGitRepository ? "PROJECT" : "NO GIT REPO")
+                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                    .foregroundStyle(appState.isGitRepository ? Color.textSecondary : Color.statusWarning)
+
+                Spacer()
+
+                // Open folder button
+                Button {
+                    showFolderPicker = true
+                } label: {
+                    Image(systemName: "folder")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.textSecondary)
+                }
+                .buttonStyle(.plain)
+                .help("Open different folder")
+            }
+            .padding(.horizontal, Theme.Spacing.sm)
+            .padding(.vertical, Theme.Spacing.xs)
+            .background(Color.bgSurface)
+
+            // Content
+            VStack(spacing: Theme.Spacing.sm) {
+                // Project path display
+                if let path = appState.projectPath {
+                    HStack(spacing: 4) {
+                        Image(systemName: "folder.fill")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color.accentPrimary)
+
+                        Text(URL(fileURLWithPath: path).lastPathComponent)
+                            .font(.system(size: 11, weight: .medium, design: .monospaced))
+                            .foregroundStyle(Color.textPrimary)
+                            .lineLimit(1)
+
+                        Spacer()
+                    }
+                } else {
+                    Text("No project selected")
+                        .font(.caption)
+                        .foregroundStyle(Color.textTertiary)
+                }
+
+                // Git status and actions
+                if !appState.isGitRepository {
+                    // NOT a git repo - show init options prominently
+                    VStack(spacing: Theme.Spacing.xs) {
+                        Text("Initialize git to use branches and worktrees")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color.textSecondary)
+                            .multilineTextAlignment(.center)
+
+                        HStack(spacing: Theme.Spacing.xs) {
+                            // Initialize Git button - PROMINENT
+                            Button {
+                                initializeGit()
+                            } label: {
+                                HStack(spacing: 4) {
+                                    if appState.isInitializingGit {
+                                        ProgressView()
+                                            .scaleEffect(0.6)
+                                    } else {
+                                        Image(systemName: "plus.circle.fill")
+                                    }
+                                    Text("Init Git")
+                                }
+                                .font(.system(size: 11, weight: .semibold))
+                                .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .tint(Color.statusSuccess)
+                            .controlSize(.small)
+                            .disabled(appState.isInitializingGit || appState.projectPath == nil)
+
+                            // Create New Folder button
+                            Button {
+                                showNewFolderSheet = true
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "folder.badge.plus")
+                                    Text("New")
+                                }
+                                .font(.system(size: 11))
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                        }
+                    }
+                    .padding(.top, Theme.Spacing.xs)
+                } else {
+                    // IS a git repo - show current branch
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.triangle.branch")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color.statusSuccess)
+
+                        Text("Git repository ready")
+                            .font(.system(size: 10))
+                            .foregroundStyle(Color.statusSuccess)
+
+                        Spacer()
+                    }
+                }
+            }
+            .padding(Theme.Spacing.sm)
+        }
+        .sheet(isPresented: $showNewFolderSheet) {
+            NewProjectFolderSheet { folderName, initGit in
+                Task {
+                    await createNewFolder(name: folderName, initGit: initGit)
+                }
+            }
+        }
+        .fileImporter(
+            isPresented: $showFolderPicker,
+            allowedContentTypes: [.folder],
+            allowsMultipleSelection: false
+        ) { result in
+            if case .success(let urls) = result, let url = urls.first {
+                Task {
+                    await appState.setProjectPath(url.path)
+                }
+            }
+        }
+    }
+
+    private func initializeGit() {
+        Task {
+            do {
+                try await appState.initializeGitRepository()
+            } catch {
+                appState.setError(.gitError(error.localizedDescription))
+            }
+        }
+    }
+
+    private func createNewFolder(name: String, initGit: Bool) async {
+        guard let currentPath = appState.projectPath else { return }
+        let parentPath = (currentPath as NSString).deletingLastPathComponent
+
+        do {
+            _ = try await appState.createProjectFolder(name: name, at: parentPath, initGit: initGit)
+        } catch {
+            appState.setError(.gitError(error.localizedDescription))
+        }
+    }
+}
+
+
+// MARK: - New Project Folder Sheet
+
+private struct NewProjectFolderSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @State private var folderName: String = ""
+    @State private var initGit: Bool = true
+
+    let onCreate: (String, Bool) -> Void
+
+    var body: some View {
+        VStack(spacing: Theme.Spacing.lg) {
+            // Header
+            HStack {
+                Image(systemName: "folder.badge.plus")
+                    .font(.title2)
+                    .foregroundStyle(Color.accentPrimary)
+
+                Text("Create New Project")
+                    .font(.headline)
+
+                Spacer()
+
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(Color.textSecondary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            // Folder name input
+            VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                Text("Folder Name")
+                    .font(.caption)
+                    .foregroundStyle(Color.textSecondary)
+
+                TextField("my-new-project", text: $folderName)
+                    .textFieldStyle(.roundedBorder)
+            }
+
+            // Init git toggle
+            Toggle(isOn: $initGit) {
+                HStack {
+                    Image(systemName: "arrow.triangle.branch")
+                        .foregroundStyle(Color.statusSuccess)
+                    Text("Initialize Git repository")
+                }
+            }
+            .toggleStyle(.switch)
+
+            Spacer()
+
+            // Buttons
+            HStack {
+                Button("Cancel") {
+                    dismiss()
+                }
+                .buttonStyle(.bordered)
+
+                Spacer()
+
+                Button("Create") {
+                    onCreate(folderName, initGit)
+                    dismiss()
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(folderName.isEmpty)
+            }
+        }
+        .padding()
+        .frame(width: 350, height: 250)
     }
 }
 
@@ -599,8 +856,8 @@ private struct MCPLogsSection: View {
             .padding(.vertical, Theme.Spacing.xs)
             .background(Color.bgSurface)
 
-            // Logs Area
-            LogsListView(logs: appState.filteredLogs)
+            // Logs Area - Compact style for narrow panel
+            TerminalView(logs: appState.filteredLogs, style: .compact)
         }
         .task {
             await appState.startLogStreaming()
@@ -872,9 +1129,10 @@ private struct EmptySelectionView: View {
 
 private struct LogsListView: View {
     let logs: [LogEntry]
+    var style: TerminalDisplayStyle = .wide
 
     var body: some View {
-        TerminalView(logs: logs)
+        TerminalView(logs: logs, style: style)
     }
 }
 
@@ -891,7 +1149,7 @@ private struct SheetsModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .sheet(isPresented: $showNewWorktreeSheet) {
-                WorktreeCreateSheet()
+                StartSessionSheet()
             }
             .sheet(isPresented: $showPRDAssistantSheet) {
                 PRDAssistantView()

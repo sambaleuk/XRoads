@@ -111,6 +111,12 @@ final class AppState {
     /// Recent git commits for the right side panel
     var recentCommits: [GitCommit] = []
 
+    /// Whether the current project path is a git repository
+    var isGitRepository: Bool = false
+
+    /// Whether git initialization is in progress
+    var isInitializingGit: Bool = false
+
     // MARK: - Orchestration State
 
     /// Current orchestration session ID
@@ -375,24 +381,40 @@ final class AppState {
 
         do {
             let slotIndex = index
-            let processId = try await services.processRunner.launch(
+            // Use PTYProcessRunner for proper terminal emulation
+            // This is required for interactive CLIs like Claude Code, Gemini CLI, Codex
+            let processId = try await services.ptyRunner.launch(
                 executable: adapter.executablePath,
                 arguments: adapter.launchArguments(worktreePath: worktree.path),
                 workingDirectory: worktree.path,
-                environment: nil
-            ) { [weak self] output in
-                Task { @MainActor [weak self] in
-                    guard let self = self else { return }
-                    let entry = LogEntry(
-                        level: .debug,
-                        source: agentType.rawValue,
-                        worktree: worktree.path,
-                        message: output
-                    )
-                    self.terminalSlots[slotIndex].addLog(entry)
-                    self.addLog(entry)
+                environment: nil as [String: String]?,
+                onOutput: { [weak self] (output: String) in
+                    Task { @MainActor [weak self] in
+                        guard let self = self else { return }
+                        let entry = LogEntry(
+                            level: .debug,
+                            source: agentType.rawValue,
+                            worktree: worktree.path,
+                            message: output
+                        )
+                        self.terminalSlots[slotIndex].addLog(entry)
+                        self.addLog(entry)
+                    }
+                },
+                onTermination: { [weak self] (exitCode: Int32) in
+                    Task { @MainActor [weak self] in
+                        guard let self = self else { return }
+                        self.terminalSlots[slotIndex].status = exitCode == 0 ? .completed : .error
+                        self.terminalSlots[slotIndex].addLog(LogEntry(
+                            level: exitCode == 0 ? .info : .error,
+                            source: agentType.rawValue,
+                            worktree: worktree.path,
+                            message: "Agent exited with code \(exitCode)"
+                        ))
+                        self.updateOrchestratorVisualState()
+                    }
                 }
-            }
+            )
 
             terminalSlots[index].processId = processId
             terminalSlots[index].status = .running
@@ -400,7 +422,7 @@ final class AppState {
                 level: .info,
                 source: agentType.rawValue,
                 worktree: worktree.path,
-                message: "Agent started"
+                message: "Agent started with PTY"
             ))
             updateOrchestratorVisualState()
 
@@ -425,7 +447,7 @@ final class AppState {
         }
 
         do {
-            try await services.processRunner.terminate(id: processId)
+            try await services.ptyRunner.terminate(id: processId)
         } catch {
             // Process may already be terminated
         }
@@ -476,7 +498,7 @@ final class AppState {
         }
 
         do {
-            try await services.processRunner.sendInput(id: processId, text: text)
+            try await services.ptyRunner.sendInput(id: processId, text: text)
 
             // Echo input in terminal output
             let echoEntry = LogEntry(
@@ -529,7 +551,7 @@ final class AppState {
         }
 
         do {
-            try await services.processRunner.sendInput(id: processId, text: text)
+            try await services.ptyRunner.sendInput(id: processId, text: text)
 
             // Echo input in terminal output
             let echoEntry = LogEntry(
@@ -564,7 +586,7 @@ final class AppState {
     /// - Returns: true if a process is running in the slot
     func isProcessRunningInSlot(_ slotNumber: Int) async -> Bool {
         guard let processId = processIdForSlot(slotNumber) else { return false }
-        return await services.processRunner.isRunning(id: processId)
+        return await services.ptyRunner.isRunning(id: processId)
     }
 
     /// Updates the orchestrator visual state based on slot states
@@ -591,7 +613,16 @@ final class AppState {
     // MARK: - Unified Action Flow (US-V3-014)
 
     /// Shared ActionRunner instance for unified action execution
-    private let actionRunner = ActionRunner()
+    /// Uses the shared ptyRunner from services for proper PTY-based process management
+    @ObservationIgnored
+    private var _actionRunner: ActionRunner?
+
+    private var actionRunner: ActionRunner {
+        if _actionRunner == nil {
+            _actionRunner = ActionRunner(ptyRunner: services.ptyRunner)
+        }
+        return _actionRunner!
+    }
 
     /// Executes an action in a terminal slot using ActionRunner
     /// Works identically for both Single and Agentic modes
@@ -749,7 +780,7 @@ final class AppState {
 
         // Check if already running
         if let existingProcessId = worktreeProcessIds[worktree.id],
-           await services.processRunner.isRunning(id: existingProcessId) {
+           await services.ptyRunner.isRunning(id: existingProcessId) {
             addLog(LogEntry(level: .warn, source: "system", worktree: worktree.path, message: "Agent already running"))
             return
         }
@@ -772,23 +803,30 @@ final class AppState {
             // Update MCP status
             await updateMCPStatus(agent: agent.type.rawValue, worktree: worktree.path, status: .running, task: "Initializing")
 
-            // Launch the process with MCP-connected output handler
+            // Launch the process with PTY for proper terminal emulation
             let agentType = agent.type
             let worktreePath = worktree.path
-            let processId = try await services.processRunner.launch(
+            let processId = try await services.ptyRunner.launch(
                 executable: adapter.executablePath,
                 arguments: adapter.launchArguments(worktreePath: worktree.path),
                 workingDirectory: worktree.path,
-                environment: nil
-            ) { [weak self] output in
-                Task { @MainActor [weak self] in
-                    guard let self = self else { return }
-                    await self.handleAgentOutput(output, agentType: agentType, worktreePath: worktreePath)
+                environment: nil as [String: String]?,
+                onOutput: { [weak self] (output: String) in
+                    Task { @MainActor [weak self] in
+                        guard let self = self else { return }
+                        await self.handleAgentOutput(output, agentType: agentType, worktreePath: worktreePath)
+                    }
+                },
+                onTermination: { [weak self] (exitCode: Int32) in
+                    Task { @MainActor [weak self] in
+                        guard let self = self else { return }
+                        await self.handleAgentTermination(exitCode: exitCode, agentType: agentType, worktreePath: worktreePath)
+                    }
                 }
-            }
+            )
 
             worktreeProcessIds[worktree.id] = processId
-            await emitToMCP(level: .info, source: agent.type.rawValue, worktree: worktree.path, message: "Agent started (PID: \(processId))")
+            await emitToMCP(level: .info, source: agent.type.rawValue, worktree: worktree.path, message: "Agent started with PTY (PID: \(processId))")
 
         } catch {
             agent.status = .error
@@ -811,6 +849,32 @@ final class AppState {
 
         // Detect status changes from output patterns
         await detectAndUpdateStatus(from: trimmed, agentType: agentType, worktreePath: worktreePath)
+    }
+
+    /// Handles agent process termination
+    private func handleAgentTermination(exitCode: Int32, agentType: AgentType, worktreePath: String) async {
+        let level: LogLevel = exitCode == 0 ? .info : .error
+        let message = exitCode == 0 ? "Agent completed successfully" : "Agent exited with code \(exitCode)"
+
+        await emitToMCP(level: level, source: agentType.rawValue, worktree: worktreePath, message: message)
+        await updateMCPStatus(
+            agent: agentType.rawValue,
+            worktree: worktreePath,
+            status: exitCode == 0 ? .complete : .error,
+            task: nil
+        )
+
+        // Update local agent status
+        if let worktree = worktrees.first(where: { $0.path == worktreePath }),
+           var agent = agent(for: worktree) {
+            agent.status = exitCode == 0 ? .idle : .error
+            setAgent(agent)
+        }
+
+        // Remove from process tracking
+        if let worktree = worktrees.first(where: { $0.path == worktreePath }) {
+            worktreeProcessIds.removeValue(forKey: worktree.id)
+        }
     }
 
     /// Parses log level from output content
@@ -901,7 +965,7 @@ final class AppState {
         }
 
         do {
-            try await services.processRunner.terminate(id: processId)
+            try await services.ptyRunner.terminate(id: processId)
             agent.status = .idle
             setAgent(agent)
             worktreeProcessIds.removeValue(forKey: worktree.id)
@@ -914,7 +978,7 @@ final class AppState {
     /// Checks if an agent is running for a worktree
     func isAgentRunning(for worktree: Worktree) async -> Bool {
         guard let processId = worktreeProcessIds[worktree.id] else { return false }
-        return await services.processRunner.isRunning(id: processId)
+        return await services.ptyRunner.isRunning(id: processId)
     }
 
     // MARK: - Log Management
@@ -1173,6 +1237,99 @@ final class AppState {
     /// Clears the current error
     func clearError() {
         self.error = nil
+    }
+
+    // MARK: - Git Repository Management
+
+    /// Checks if the current project path is a git repository
+    func checkGitRepositoryStatus() async {
+        guard let path = projectPath else {
+            await MainActor.run { self.isGitRepository = false }
+            return
+        }
+
+        let gitPath = (path as NSString).appendingPathComponent(".git")
+        let exists = FileManager.default.fileExists(atPath: gitPath)
+        await MainActor.run { self.isGitRepository = exists }
+    }
+
+    /// Initializes a git repository at the current project path
+    func initializeGitRepository() async throws {
+        guard let path = projectPath else {
+            throw AppError.gitError("No project path set")
+        }
+
+        await MainActor.run { self.isInitializingGit = true }
+
+        do {
+            try await services.gitService.initializeRepository(path: path)
+            await MainActor.run {
+                self.isGitRepository = true
+                self.isInitializingGit = false
+            }
+            addLog(LogEntry(level: .info, source: "git", worktree: nil, message: "Git repository initialized at \(path)"))
+        } catch {
+            await MainActor.run { self.isInitializingGit = false }
+            addLog(LogEntry(level: .error, source: "git", worktree: nil, message: "Failed to init git: \(error.localizedDescription)"))
+            throw AppError.gitError(error.localizedDescription)
+        }
+    }
+
+    /// Creates a new project folder and optionally initializes git
+    func createProjectFolder(name: String, at parentPath: String, initGit: Bool) async throws -> String {
+        let newPath = (parentPath as NSString).appendingPathComponent(name)
+
+        // Create folder
+        try FileManager.default.createDirectory(atPath: newPath, withIntermediateDirectories: true, attributes: nil)
+
+        // Update project path
+        await MainActor.run { self.projectPath = newPath }
+
+        // Init git if requested
+        if initGit {
+            try await services.gitService.initializeRepository(path: newPath)
+            await MainActor.run { self.isGitRepository = true }
+            addLog(LogEntry(level: .info, source: "system", worktree: nil, message: "Created project folder '\(name)' with git"))
+        } else {
+            await MainActor.run { self.isGitRepository = false }
+            addLog(LogEntry(level: .info, source: "system", worktree: nil, message: "Created project folder '\(name)'"))
+        }
+
+        return newPath
+    }
+
+    /// Sets the project path and checks git status
+    func setProjectPath(_ path: String) async {
+        await MainActor.run { self.projectPath = path }
+        await checkGitRepositoryStatus()
+
+        // Also load recent commits if it's a git repo
+        if isGitRepository {
+            await loadRecentCommits()
+        }
+    }
+
+    /// Loads recent commits for the current project
+    func loadRecentCommits() async {
+        guard let path = projectPath, isGitRepository else {
+            await MainActor.run { self.recentCommits = [] }
+            return
+        }
+
+        do {
+            let commitInfos = try await services.gitService.getRecentCommits(path: path, count: 10)
+            let commits = commitInfos.map { info in
+                GitCommit(
+                    hash: info.sha,
+                    message: info.message,
+                    author: info.author,
+                    date: info.date
+                )
+            }
+            await MainActor.run { self.recentCommits = commits }
+        } catch {
+            addLog(LogEntry(level: .debug, source: "git", worktree: nil, message: "Could not load commits: \(error.localizedDescription)"))
+        }
     }
 
     // MARK: - MCP Log Streaming
@@ -1535,7 +1692,7 @@ final class AppState {
         // Stop all agent processes
         for session in activeAgentSessions {
             do {
-                try await services.processRunner.terminate(id: session.processId)
+                try await services.ptyRunner.terminate(id: session.processId)
             } catch {
                 addLog(LogEntry(level: .debug, source: "orchestrator", worktree: nil, message: "Process \(session.processId) already terminated"))
             }

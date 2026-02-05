@@ -120,10 +120,9 @@ struct ClaudeAdapter: CLIAdapter {
 
     func launchArguments(worktreePath: String) -> [String] {
         // Claude Code CLI in interactive mode
-        // Working directory is set by ProcessRunner, no need for --cwd
-        return [
-            "--dangerously-skip-permissions"  // Skip permission prompts for automation
-        ]
+        // Working directory is set by ProcessRunner
+        // Use minimal flags - let it run interactively
+        return []  // No flags needed for interactive mode
     }
 
     func formatCommand(_ command: String) -> String {
@@ -187,11 +186,10 @@ struct GeminiAdapter: CLIAdapter {
     }
 
     func launchArguments(worktreePath: String) -> [String] {
-        // Gemini CLI arguments for interactive mode with sandbox disabled
+        // Gemini CLI in interactive mode
         // Working directory is set by ProcessRunner
-        return [
-            "--sandbox=false"  // Allow file system access
-        ]
+        // Sandbox mode is controlled by ~/.gemini/settings.json, not CLI flags
+        return []  // No flags needed for interactive mode
     }
 
     func formatCommand(_ command: String) -> String {
@@ -256,10 +254,11 @@ struct CodexAdapter: CLIAdapter {
     }
 
     func launchArguments(worktreePath: String) -> [String] {
-        // Codex CLI arguments
+        // Codex CLI in interactive mode
         // Working directory is set by ProcessRunner
+        // Note: codex uses --full-auto not --approval-mode
         return [
-            "--approval-mode", "full-auto"  // Approve all changes automatically
+            "--full-auto"  // Approve all changes automatically
         ]
     }
 

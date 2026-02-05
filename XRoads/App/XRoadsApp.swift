@@ -21,6 +21,12 @@ public struct XRoadsApp: App {
                 .onAppear {
                     // Store reference for cleanup
                     appDelegate.appState = appState
+
+                    // Initialize project path to current working directory
+                    Task {
+                        let cwd = FileManager.default.currentDirectoryPath
+                        await appState.setProjectPath(cwd)
+                    }
                 }
         }
         .windowStyle(.automatic)

@@ -45,4 +45,8 @@ extension Notification.Name {
 
     /// Notification to load a PRD file from path
     static let loadPRDFromPath = Notification.Name("loadPRDFromPath")
+
+    /// Notification to launch an agent loop with PRD
+    /// UserInfo keys: agent (AgentType), prdPath (String), branch (String), projectPath (String)
+    static let launchAgentLoop = Notification.Name("launchAgentLoop")
 }

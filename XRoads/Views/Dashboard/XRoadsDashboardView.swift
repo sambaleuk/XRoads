@@ -96,8 +96,31 @@ struct XRoadsDashboardView: View {
     // MARK: - Actions
 
     private func startSlot(_ slotNumber: Int) {
-        guard let index = terminalSlots.firstIndex(where: { $0.slotNumber == slotNumber }) else { return }
-        guard terminalSlots[index].isConfigured else { return }
+        guard let index = terminalSlots.firstIndex(where: { $0.slotNumber == slotNumber }) else {
+            print("[Dashboard] Slot \(slotNumber) not found")
+            return
+        }
+
+        let slot = terminalSlots[index]
+        print("[Dashboard] Starting slot \(slotNumber): configured=\(slot.isConfigured), agent=\(slot.agentType?.rawValue ?? "nil"), worktree=\(slot.worktree?.branch ?? "nil"), action=\(slot.actionType?.rawValue ?? "nil")")
+
+        // Check configuration and provide feedback
+        guard slot.worktree != nil else {
+            print("[Dashboard] Slot \(slotNumber) missing worktree")
+            appState.addLog(LogEntry(level: .warn, source: "dashboard", worktree: nil, message: "Slot \(slotNumber): Please select a branch/worktree first"))
+            return
+        }
+        guard slot.agentType != nil else {
+            print("[Dashboard] Slot \(slotNumber) missing agent")
+            appState.addLog(LogEntry(level: .warn, source: "dashboard", worktree: nil, message: "Slot \(slotNumber): Please select an agent first"))
+            return
+        }
+
+        // Auto-set action if missing
+        if slot.actionType == nil {
+            terminalSlots[index].actionType = .implement
+            print("[Dashboard] Auto-set action to .implement for slot \(slotNumber)")
+        }
 
         terminalSlots[index].status = .starting
         updateOrchestratorState()

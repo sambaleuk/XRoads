@@ -14,38 +14,62 @@ import SwiftUI
 struct OrchestratorChatView: View {
     @Environment(\.appState) private var appState
     @StateObject private var viewModel = OrchestratorChatViewModel()
+    @State private var showPRDFullView = false
+    @State private var selectedPRDForView: DetectedPRD?
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            chatHeader
+        ZStack {
+            VStack(spacing: 0) {
+                // Header
+                chatHeader
 
-            Divider()
-                .background(Color.borderMuted)
+                Divider()
+                    .background(Color.borderMuted)
 
-            // Messages area
-            messagesArea
+                // Messages area
+                messagesArea
 
-            // Context bar
-            ChatContextBar(
-                projectPath: appState.projectPath,
-                branch: viewModel.currentBranch,
-                mode: appState.dashboardMode,
-                onOpenProject: openProjectPicker
-            )
+                // Context bar
+                ChatContextBar(
+                    projectPath: appState.projectPath,
+                    branch: viewModel.currentBranch,
+                    mode: appState.dashboardMode,
+                    onOpenProject: openProjectPicker
+                )
 
-            // Input bar
-            ChatInputBar(
-                text: $viewModel.inputText,
-                mode: $viewModel.mode,
-                isLoading: viewModel.isLoading,
-                onSend: sendMessage,
-                onStop: stopGeneration
+                // Input bar
+                ChatInputBar(
+                    text: $viewModel.inputText,
+                    mode: $viewModel.mode,
+                    isLoading: viewModel.isLoading,
+                    onSend: sendMessage,
+                    onStop: stopGeneration
+                )
+            }
+
+            // PRD Proposal Overlay
+            PRDProposalOverlay(
+                detectedPRD: viewModel.detectedPRD,
+                onDismiss: {
+                    withAnimation { viewModel.dismissPRDProposal() }
+                },
+                onViewPRD: { prd in
+                    selectedPRDForView = prd
+                    showPRDFullView = true
+                },
+                onLaunch: { prd, agent, branch in
+                    launchImplementation(prd: prd, agent: agent, branch: branch)
+                }
             )
         }
         .background(Color.bgApp)
         .task {
             await viewModel.loadContext(from: appState)
+        }
+        .sheet(isPresented: $showPRDFullView) {
+            if let prd = selectedPRDForView {
+                PRDPreviewSheet(prd: prd)
+            }
         }
     }
 
@@ -257,6 +281,72 @@ struct OrchestratorChatView: View {
             }
         }
     }
+
+    private func launchImplementation(prd: DetectedPRD, agent: AgentType, branch: String) {
+        Task {
+            // Dismiss the proposal
+            await MainActor.run {
+                withAnimation { viewModel.dismissPRDProposal() }
+            }
+
+            // Save PRD to file
+            guard let projectPath = appState.projectPath else {
+                await viewModel.addSystemMessage("Veuillez d'abord sélectionner un projet.")
+                return
+            }
+
+            let prdPath = "\(projectPath)/prd.json"
+            do {
+                try prd.rawJSON.write(toFile: prdPath, atomically: true, encoding: .utf8)
+            } catch {
+                await viewModel.addSystemMessage("Erreur lors de la sauvegarde du PRD: \(error.localizedDescription)")
+                return
+            }
+
+            // Create branch if needed
+            let gitService = GitService()
+            do {
+                // Try to checkout existing branch first
+                try await gitService.checkout(branch: branch, repoPath: projectPath)
+            } catch {
+                // Branch doesn't exist, create it
+                do {
+                    // Create and checkout new branch
+                    let process = Process()
+                    process.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+                    process.arguments = ["checkout", "-b", branch]
+                    process.currentDirectoryURL = URL(fileURLWithPath: projectPath)
+                    try process.run()
+                    process.waitUntilExit()
+                } catch {
+                    // Continue anyway, branch creation is not critical
+                }
+            }
+
+            // Notify about launch
+            await viewModel.addSystemMessage("""
+                🚀 Lancement de l'implémentation...
+
+                **PRD:** \(prd.title)
+                **Agent:** \(agent.displayName)
+                **Branche:** \(branch)
+
+                La loop démarre dans le terminal.
+                """)
+
+            // Launch the loop
+            NotificationCenter.default.post(
+                name: .launchAgentLoop,
+                object: nil,
+                userInfo: [
+                    "agent": agent,
+                    "prdPath": prdPath,
+                    "branch": branch,
+                    "projectPath": projectPath
+                ]
+            )
+        }
+    }
 }
 
 // MARK: - ViewModel
@@ -270,6 +360,7 @@ final class OrchestratorChatViewModel: ObservableObject {
     @Published var isLoading: Bool = false
     @Published var currentBranch: String?
     @Published var lastMessageContent: String = ""
+    @Published var detectedPRD: DetectedPRD?
 
     private let orchestratorService = OrchestratorService()
     private var context: ChatContext?
@@ -336,6 +427,13 @@ final class OrchestratorChatViewModel: ObservableObject {
             }
             lastMessageContent = response.content
 
+            // Detect PRD in response
+            if let prd = PRDDetector.detect(in: response.content) {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    detectedPRD = prd
+                }
+            }
+
         } catch {
             // Update last message with error
             if let lastIndex = messages.indices.last,
@@ -380,9 +478,24 @@ final class OrchestratorChatViewModel: ObservableObject {
 
     func clearChat() {
         messages.removeAll()
+        detectedPRD = nil
         Task {
             await orchestratorService.clearConversation()
         }
+    }
+
+    func dismissPRDProposal() {
+        detectedPRD = nil
+    }
+
+    func addSystemMessage(_ content: String) {
+        let systemMessage = ChatMessage(
+            role: .assistant,
+            content: content,
+            status: .complete,
+            metadata: ["type": "system"]
+        )
+        messages.append(systemMessage)
     }
 }
 

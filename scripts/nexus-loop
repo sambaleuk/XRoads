@@ -1,0 +1,171 @@
+#!/bin/bash
+#
+# Nexus Loop - Autonomous AI Agent for Feature Implementation (Claude Code)
+# Part of XRoads / Nexus Scripts
+#
+# Usage: nexus-loop [max_iterations] [sleep_seconds]
+#
+
+set -e
+
+# Find script directory and load common library
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Try bundled lib first, then fallback to ~/.nexus
+if [[ -f "${SCRIPT_DIR}/lib/common.sh" ]]; then
+    source "${SCRIPT_DIR}/lib/common.sh"
+elif [[ -f "${HOME}/.nexus/lib/common.sh" ]]; then
+    source "${HOME}/.nexus/lib/common.sh"
+else
+    echo "Error: common.sh not found"
+    exit 1
+fi
+
+# Configuration
+MAX_ITERATIONS=${1:-10}
+SLEEP_SECONDS=${2:-3}
+
+# ============================================================================
+# INITIALIZATION
+# ============================================================================
+init() {
+    show_nexus_banner "Claude Code" "$BLUE"
+
+    log_info "Checking dependencies..."
+    check_all_deps || exit 1
+
+    if [ ! -f "$PRD_FILE" ]; then
+        log_error "PRD file not found: $PRD_FILE"
+        echo "Create with: nexus-init <feature-name> or /prd skill"
+        exit 1
+    fi
+
+    # Init progress file if missing
+    if [ ! -f "$PROGRESS_FILE" ]; then
+        local feature=$(prd_get_feature_name)
+        create_progress_file "$feature" > "$PROGRESS_FILE"
+        log_success "Created $PROGRESS_FILE"
+    fi
+
+    # Init AGENTS.md if missing
+    if [ ! -f "$AGENTS_FILE" ]; then
+        create_agents_file > "$AGENTS_FILE"
+        log_success "Created $AGENTS_FILE"
+    fi
+
+    log_success "All dependencies OK"
+}
+
+# ============================================================================
+# MAIN LOOP
+# ============================================================================
+main() {
+    init
+
+    local pending=$(prd_count_pending)
+    local total=$(prd_count_total)
+    local feature_name=$(prd_get_feature_name)
+
+    if [ "$pending" = "0" ]; then
+        log_success "All stories already complete!"
+        exit 0
+    fi
+
+    log_info "Starting loop: $pending/$total stories remaining"
+    log_info "Feature: ${YELLOW}$feature_name${NC}"
+    log_info "Max iterations: $MAX_ITERATIONS"
+    log_info "${CYAN}Unit tests are MANDATORY - story won't complete until test passes${NC}"
+    echo ""
+
+    for ((i=1; i<=MAX_ITERATIONS; i++)); do
+        pending=$(prd_count_pending)
+        total=$(prd_count_total)
+        local complete=$((total - pending))
+
+        show_iteration_header "$i" "$MAX_ITERATIONS" "$complete" "$total"
+
+        # Build prompt with unit test requirement
+        local prompt="You are Nexus, an autonomous coding agent. Do exactly ONE task per iteration.
+
+## Steps
+
+1. Read $PRD_FILE and find the first user story that is NOT complete (status != \"complete\").
+2. Read $PROGRESS_FILE - check the Learnings section first for patterns from previous iterations.
+3. Read $AGENTS_FILE if it exists for codebase patterns.
+4. Check if the story has a \`unit_test\` field defined - THIS IS MANDATORY.
+5. Implement that ONE story only.
+6. Write the unit test file specified in the story's \`unit_test.file\` field.
+7. Run the unit test and ensure it PASSES.
+
+## Completion Criteria (ALL must be true)
+
+To mark a story as complete, ALL of these must pass:
+1. Implementation done
+2. Build passes: npm run build (or equivalent)
+3. Typecheck passes: npm run typecheck (if applicable)
+4. UNIT TEST PASSES (MANDATORY)
+
+## If Checks PASS:
+
+- Update $PRD_FILE:
+  - Set story status to \"complete\"
+  - Set story's unit_test.status to \"passing\"
+  - Add \"completed_at\" timestamp
+- Commit your changes with message: feat(scope): US-XXX description
+- Append what worked to $PROGRESS_FILE
+
+## If Checks FAIL:
+
+- Do NOT mark the story complete
+- Do NOT commit broken code
+- Append what went wrong to $PROGRESS_FILE
+- The loop will retry in the next iteration
+
+## End Condition
+
+After completing your task, check $PRD_FILE:
+- If ALL stories have status \"complete\", output exactly: <nexus-complete>ALL DONE</nexus-complete>
+- If stories remain incomplete, just end your response"
+
+        # Run Claude
+        echo -e "${DIM}─────────────────────────────────────────────${NC}"
+        echo -e "${BLUE}Claude working...${NC}"
+        echo ""
+
+        set +e
+        result=$(claude --dangerously-skip-permissions -p "$prompt" 2>&1 | tee /dev/stderr)
+        local exit_code=$?
+        set -e
+
+        echo ""
+        echo -e "${DIM}─────────────────────────────────────────────${NC}"
+
+        if [ $exit_code -ne 0 ]; then
+            log_warn "Claude exited with code $exit_code (continuing...)"
+        fi
+
+        # Check for completion
+        if [[ "$result" == *"<nexus-complete>"* ]]; then
+            show_completion_banner "$i" "$feature_name"
+            echo -e "${GREEN}All stories complete with passing unit tests!${NC}"
+            exit 0
+        fi
+
+        # Check remaining
+        pending=$(prd_count_pending)
+        if [ "$pending" = "0" ]; then
+            show_completion_banner "$i" "$feature_name"
+            echo -e "${GREEN}All stories complete with passing unit tests!${NC}"
+            exit 0
+        fi
+
+        log_info "${YELLOW}$feature_name${NC} - $pending stories remaining. Next in ${SLEEP_SECONDS}s..."
+        sleep $SLEEP_SECONDS
+    done
+
+    # Max iterations reached
+    show_timeout_banner "$MAX_ITERATIONS" "$pending"
+    exit 1
+}
+
+main

@@ -241,6 +241,50 @@ actor GitService {
         try await runGit(arguments: ["add", file], currentDirectory: repoPath)
     }
 
+    // MARK: - Repository Initialization
+
+    /// Initializes a new git repository at the specified path
+    /// - Parameter path: Path where the repository should be created
+    /// - Throws: GitError if the operation fails
+    func initializeRepository(path: String) async throws {
+        // Create directory if it doesn't exist
+        if !FileManager.default.fileExists(atPath: path) {
+            try FileManager.default.createDirectory(
+                atPath: path,
+                withIntermediateDirectories: true,
+                attributes: nil
+            )
+        }
+
+        // Initialize the repository
+        try await runGit(arguments: ["init"], currentDirectory: path)
+
+        // Create initial commit with .gitkeep
+        let gitkeepPath = (path as NSString).appendingPathComponent(".gitkeep")
+        FileManager.default.createFile(atPath: gitkeepPath, contents: nil, attributes: nil)
+
+        try await runGit(arguments: ["add", ".gitkeep"], currentDirectory: path)
+        try await runGit(
+            arguments: ["commit", "-m", "Initial commit"],
+            currentDirectory: path
+        )
+    }
+
+    /// Checks if a path is inside a git repository
+    /// - Parameter path: Path to check
+    /// - Returns: true if the path is in a git repository
+    func isGitRepository(path: String) async -> Bool {
+        do {
+            _ = try await runGit(
+                arguments: ["rev-parse", "--is-inside-work-tree"],
+                currentDirectory: path
+            )
+            return true
+        } catch {
+            return false
+        }
+    }
+
     // MARK: - Quick Start / Dashboard Operations
 
     /// Information about a commit for display

@@ -1,0 +1,180 @@
+#!/bin/bash
+#
+# Nexus Loop - Autonomous AI Agent for Feature Implementation (Gemini CLI)
+# Part of XRoads / Nexus Scripts
+#
+# Usage: gemini-loop [max_iterations] [sleep_seconds]
+#
+
+set -e
+
+# Find script directory and load common library
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Try bundled lib first, then fallback to ~/.nexus
+if [[ -f "${SCRIPT_DIR}/lib/common.sh" ]]; then
+    source "${SCRIPT_DIR}/lib/common.sh"
+elif [[ -f "${HOME}/.nexus/lib/common.sh" ]]; then
+    source "${HOME}/.nexus/lib/common.sh"
+else
+    echo "Error: common.sh not found"
+    exit 1
+fi
+
+# Configuration
+MAX_ITERATIONS=${1:-10}
+SLEEP_SECONDS=${2:-3}
+LOG_DIR="logs"
+mkdir -p "$LOG_DIR"
+
+# ============================================================================
+# INITIALIZATION
+# ============================================================================
+init() {
+    show_nexus_banner "Gemini" "$YELLOW"
+
+    log_info "Checking dependencies..."
+    check_gemini_deps || exit 1
+
+    if [ ! -f "$PRD_FILE" ]; then
+        log_error "PRD file not found: $PRD_FILE"
+        echo "Create with: nexus-init <feature-name> or /prd skill"
+        exit 1
+    fi
+
+    # Init progress file if missing
+    if [ ! -f "$PROGRESS_FILE" ]; then
+        local feature=$(prd_get_feature_name)
+        create_progress_file "$feature" > "$PROGRESS_FILE"
+        log_success "Created $PROGRESS_FILE"
+    fi
+
+    # Init AGENTS.md if missing
+    if [ ! -f "$AGENTS_FILE" ]; then
+        create_agents_file > "$AGENTS_FILE"
+        log_success "Created $AGENTS_FILE"
+    fi
+
+    log_success "All dependencies OK"
+}
+
+# ============================================================================
+# MAIN LOOP
+# ============================================================================
+main() {
+    init
+
+    local pending=$(prd_count_pending)
+    local total=$(prd_count_total)
+    local feature_name=$(prd_get_feature_name)
+
+    if [ "$pending" = "0" ]; then
+        log_success "All stories already complete!"
+        exit 0
+    fi
+
+    log_info "Starting loop: $pending/$total stories remaining"
+    log_info "Feature: ${YELLOW}$feature_name${NC}"
+    log_info "Max iterations: $MAX_ITERATIONS"
+    log_info "${CYAN}Unit tests are MANDATORY - story won't complete until test passes${NC}"
+    echo ""
+
+    for ((i=1; i<=MAX_ITERATIONS; i++)); do
+        pending=$(prd_count_pending)
+        total=$(prd_count_total)
+        local complete=$((total - pending))
+
+        show_iteration_header "$i" "$MAX_ITERATIONS" "$complete" "$total"
+
+        # Build prompt
+        local prompt="You are Gemini Nexus, an autonomous coding agent. Do exactly ONE task per iteration.
+
+## Available Tools
+
+You have access to MCP tools:
+- **filesystem**: read_file, write_file, list_directory, create_directory
+- **shell**: run shell commands (ls, cat, npm, git, etc.)
+- **memory**: store and retrieve information
+- **vibetape**: mark_moment for tracking progress
+
+Use these tools to accomplish your tasks.
+
+## Steps
+
+1. Read $PRD_FILE using read_file and find the first user story that is NOT complete.
+2. Read $PROGRESS_FILE for patterns from previous iterations.
+3. Read $AGENTS_FILE if it exists for codebase patterns.
+4. Implement that ONE story only.
+5. Write unit tests and ensure they PASS.
+6. Update files using write_file tool.
+
+## Completion Criteria
+
+To mark a story as complete:
+1. Implementation done
+2. Build passes
+3. Tests pass
+
+## If Checks PASS:
+
+- Update $PRD_FILE: set story status to \"complete\"
+- Commit changes using shell tool: git commit -am 'feat(scope): US-XXX description'
+- Append learnings to $PROGRESS_FILE
+
+## If Checks FAIL:
+
+- Do NOT mark complete
+- Do NOT commit
+- Log what went wrong to $PROGRESS_FILE
+
+## End Condition
+
+After completing your task, check $PRD_FILE:
+- If ALL stories complete, output: <nexus-complete>ALL DONE</nexus-complete>
+- Otherwise just end your response"
+
+        # Run Gemini
+        echo -e "${DIM}─────────────────────────────────────────────${NC}"
+        echo -e "${YELLOW}Gemini working...${NC}"
+        echo ""
+
+        local timestamp=$(date '+%Y%m%d_%H%M%S')
+        local iter_log="$LOG_DIR/gemini_loop_iter_${i}_$timestamp.log"
+
+        set +e
+        result=$(gemini --sandbox=false -p "$prompt" 2>&1 | tee "$iter_log" | tee /dev/stderr)
+        local exit_code=$?
+        set -e
+
+        echo ""
+        echo -e "${DIM}─────────────────────────────────────────────${NC}"
+
+        if [ $exit_code -ne 0 ]; then
+            log_warn "Gemini exited with code $exit_code (continuing...)"
+        fi
+
+        # Check for completion
+        if [[ "$result" == *"<nexus-complete>"* ]]; then
+            show_completion_banner "$i" "$feature_name"
+            echo -e "${GREEN}All stories complete!${NC}"
+            exit 0
+        fi
+
+        # Check remaining
+        pending=$(prd_count_pending)
+        if [ "$pending" = "0" ]; then
+            show_completion_banner "$i" "$feature_name"
+            echo -e "${GREEN}All stories complete!${NC}"
+            exit 0
+        fi
+
+        log_info "${YELLOW}$feature_name${NC} - $pending stories remaining. Next in ${SLEEP_SECONDS}s..."
+        sleep $SLEEP_SECONDS
+    done
+
+    # Max iterations reached
+    show_timeout_banner "$MAX_ITERATIONS" "$pending"
+    exit 1
+}
+
+main

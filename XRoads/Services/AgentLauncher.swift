@@ -88,16 +88,16 @@ struct AGENTFileGenerator {
 
 actor AgentLauncher {
 
-    private let processRunner: ProcessRunner
+    private let ptyRunner: PTYProcessRunner
     private var adapterRegistry: CLIAdapterRegistry
     private let agentFileGenerator = AGENTFileGenerator()
     private let fileManager: FileManager = .default
 
     init(
-        processRunner: ProcessRunner = ProcessRunner(),
+        ptyRunner: PTYProcessRunner = PTYProcessRunner(),
         adapterRegistry: CLIAdapterRegistry = CLIAdapterRegistry()
     ) {
-        self.processRunner = processRunner
+        self.ptyRunner = ptyRunner
         self.adapterRegistry = adapterRegistry
     }
 
@@ -110,7 +110,7 @@ actor AgentLauncher {
         prd: PRDDocument,
         sessionID: UUID,
         instructions: String,
-        onOutput: @escaping ProcessRunner.OutputHandler
+        onOutput: @escaping PTYProcessRunner.OutputHandler
     ) async throws -> AgentSession {
         try prepareWorktreeArtifacts(assignment: assignment, prd: prd, instructions: instructions)
 
@@ -126,15 +126,21 @@ actor AgentLauncher {
         environment["CROSSROADS_ASSIGNED_STORIES"] = assignment.taskGroup.storyIds.joined(separator: ",")
         environment["CROSSROADS_ASSIGNMENT_ID"] = assignment.id.uuidString
 
-        let processId = try await processRunner.launch(
+        let processId = try await ptyRunner.launch(
             executable: adapter.executablePath,
             arguments: adapter.launchArguments(worktreePath: assignment.worktreePath.path),
             workingDirectory: assignment.worktreePath.path,
             environment: environment,
-            onOutput: onOutput
+            onOutput: onOutput,
+            onTermination: { exitCode in
+                print("[AgentLauncher] Process terminated with exit code: \(exitCode)")
+            }
         )
 
-        try await processRunner.sendInput(
+        // Wait a bit for PTY to initialize
+        try await Task.sleep(nanoseconds: 500_000_000)  // 500ms
+
+        try await ptyRunner.sendInput(
             id: processId,
             text: adapter.formatCommand(instructions)
         )

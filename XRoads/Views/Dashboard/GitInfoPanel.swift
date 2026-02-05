@@ -18,6 +18,10 @@ struct GitInfoPanel: View {
     @State private var commits: [GitService.CommitInfo] = []
     @State private var isLoading: Bool = true
     @State private var isRefreshing: Bool = false
+    @State private var isGitRepo: Bool = true
+    @State private var isInitializingGit: Bool = false
+    @State private var showNewFolderSheet: Bool = false
+    @State private var newFolderName: String = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -29,6 +33,9 @@ struct GitInfoPanel: View {
 
             if isLoading {
                 loadingView
+            } else if !isGitRepo {
+                // Not a git repo - show setup options
+                noGitRepoView
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: Theme.Spacing.lg) {
@@ -412,6 +419,220 @@ struct GitInfoPanel: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    // MARK: - No Git Repo View
+
+    private var noGitRepoView: some View {
+        ScrollView {
+            VStack(spacing: Theme.Spacing.lg) {
+                // Warning icon
+                VStack(spacing: Theme.Spacing.md) {
+                    Image(systemName: "folder.badge.questionmark")
+                        .font(.system(size: 36))
+                        .foregroundStyle(Color.statusWarning)
+
+                    Text("No Git Repository")
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(Color.textPrimary)
+
+                    Text("Initialize a git repo to start working with branches and agents.")
+                        .font(.system(size: 11))
+                        .foregroundStyle(Color.textSecondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, Theme.Spacing.sm)
+                }
+                .padding(.top, Theme.Spacing.lg)
+
+                // Current path
+                if let projectPath = appState.projectPath {
+                    VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                        Text("CURRENT PATH")
+                            .font(.system(size: 9, weight: .semibold))
+                            .foregroundStyle(Color.textTertiary)
+                            .tracking(0.5)
+
+                        Text(formatRepoPath(projectPath))
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundStyle(Color.textSecondary)
+                            .lineLimit(2)
+                            .truncationMode(.middle)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(Theme.Spacing.sm)
+                    .background(Color.bgCanvas.opacity(0.5))
+                    .cornerRadius(Theme.Radius.sm)
+                }
+
+                // Action buttons
+                VStack(spacing: Theme.Spacing.sm) {
+                    // Initialize Git
+                    Button {
+                        initializeGitRepo()
+                    } label: {
+                        HStack {
+                            if isInitializingGit {
+                                ProgressView()
+                                    .scaleEffect(0.6)
+                                    .frame(width: 14, height: 14)
+                            } else {
+                                Image(systemName: "plus.square.fill")
+                                    .font(.system(size: 12))
+                            }
+                            Text(isInitializingGit ? "Initializing..." : "Initialize Git Here")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, Theme.Spacing.sm)
+                        .background(Color.statusSuccess)
+                        .foregroundStyle(Color.white)
+                        .cornerRadius(Theme.Radius.sm)
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isInitializingGit || appState.projectPath == nil)
+
+                    // Create new folder
+                    Button {
+                        showNewFolderSheet = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "folder.badge.plus")
+                                .font(.system(size: 12))
+                            Text("Create New Project Folder")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, Theme.Spacing.sm)
+                        .background(Color.accentPrimary)
+                        .foregroundStyle(Color.white)
+                        .cornerRadius(Theme.Radius.sm)
+                    }
+                    .buttonStyle(.plain)
+
+                    // Open different folder
+                    Button {
+                        openProjectPicker()
+                    } label: {
+                        HStack {
+                            Image(systemName: "folder")
+                                .font(.system(size: 12))
+                            Text("Open Different Folder")
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, Theme.Spacing.sm)
+                        .background(Color.bgElevated)
+                        .foregroundStyle(Color.textPrimary)
+                        .cornerRadius(Theme.Radius.sm)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                                .stroke(Color.borderDefault, lineWidth: 1)
+                        )
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                Spacer()
+            }
+            .padding(Theme.Spacing.md)
+        }
+        .sheet(isPresented: $showNewFolderSheet) {
+            NewProjectFolderSheet(
+                folderName: $newFolderName,
+                onCreate: createNewProjectFolder
+            )
+        }
+    }
+
+    // MARK: - Git Actions
+
+    private func initializeGitRepo() {
+        guard let projectPath = appState.projectPath else { return }
+
+        isInitializingGit = true
+
+        Task {
+            do {
+                // Initialize git repository
+                let initProcess = Process()
+                initProcess.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+                initProcess.arguments = ["init"]
+                initProcess.currentDirectoryURL = URL(fileURLWithPath: projectPath)
+                try initProcess.run()
+                initProcess.waitUntilExit()
+
+                if initProcess.terminationStatus == 0 {
+                    // Create initial commit
+                    let addProcess = Process()
+                    addProcess.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+                    addProcess.arguments = ["add", "-A"]
+                    addProcess.currentDirectoryURL = URL(fileURLWithPath: projectPath)
+                    try addProcess.run()
+                    addProcess.waitUntilExit()
+
+                    let commitProcess = Process()
+                    commitProcess.executableURL = URL(fileURLWithPath: "/usr/bin/git")
+                    commitProcess.arguments = ["commit", "-m", "Initial commit", "--allow-empty"]
+                    commitProcess.currentDirectoryURL = URL(fileURLWithPath: projectPath)
+                    try commitProcess.run()
+                    commitProcess.waitUntilExit()
+
+                    await MainActor.run {
+                        isGitRepo = true
+                        isInitializingGit = false
+                        // Reload git info
+                        Task { await loadGitInfo() }
+                    }
+                } else {
+                    await MainActor.run {
+                        isInitializingGit = false
+                    }
+                }
+            } catch {
+                await MainActor.run {
+                    isInitializingGit = false
+                }
+            }
+        }
+    }
+
+    private func openProjectPicker() {
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.message = "Select a project folder"
+        panel.prompt = "Open"
+
+        if panel.runModal() == .OK, let url = panel.url {
+            appState.projectPath = url.path
+            Task { await loadGitInfo() }
+        }
+    }
+
+    private func createNewProjectFolder() {
+        guard !newFolderName.isEmpty else { return }
+
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.message = "Choose where to create '\(newFolderName)'"
+        panel.prompt = "Create Here"
+
+        if panel.runModal() == .OK, let parentURL = panel.url {
+            let newFolderURL = parentURL.appendingPathComponent(newFolderName)
+
+            do {
+                try FileManager.default.createDirectory(at: newFolderURL, withIntermediateDirectories: true)
+                appState.projectPath = newFolderURL.path
+                newFolderName = ""
+                showNewFolderSheet = false
+                Task { await loadGitInfo() }
+            } catch {
+                // Handle error
+            }
+        }
+    }
+
     // MARK: - Helpers
 
     private func formatRepoPath(_ path: String) -> String {
@@ -429,6 +650,25 @@ struct GitInfoPanel: View {
         isLoading = true
 
         let projectPath = appState.projectPath ?? FileManager.default.currentDirectoryPath
+
+        // First check if it's a git repo
+        let gitPath = (projectPath as NSString).appendingPathComponent(".git")
+        let isRepo = FileManager.default.fileExists(atPath: gitPath)
+
+        await MainActor.run {
+            isGitRepo = isRepo
+        }
+
+        if !isRepo {
+            await MainActor.run {
+                isLoading = false
+                repoPath = projectPath
+                currentBranch = ""
+                commits = []
+            }
+            return
+        }
+
         let gitService = appState.services.gitService
 
         do {
@@ -640,6 +880,86 @@ private struct WorktreeListRow: View {
         .background(isHovered ? Color.bgElevated : Color.bgCanvas.opacity(0.5))
         .cornerRadius(Theme.Radius.sm)
         .onHover { isHovered = $0 }
+    }
+}
+
+// MARK: - New Project Folder Sheet
+
+private struct NewProjectFolderSheet: View {
+    @Environment(\.dismiss) private var dismiss
+    @Binding var folderName: String
+    let onCreate: () -> Void
+
+    @State private var initGit: Bool = true
+
+    var body: some View {
+        VStack(spacing: Theme.Spacing.lg) {
+            // Header
+            HStack {
+                Text("Create New Project")
+                    .font(.system(size: 16, weight: .semibold))
+                    .foregroundStyle(Color.textPrimary)
+
+                Spacer()
+
+                Button {
+                    dismiss()
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.textTertiary)
+                }
+                .buttonStyle(.plain)
+            }
+
+            Divider()
+                .background(Color.borderMuted)
+
+            // Folder name input
+            VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
+                Text("Project Name")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundStyle(Color.textSecondary)
+
+                TextField("my-awesome-project", text: $folderName)
+                    .textFieldStyle(.roundedBorder)
+                    .font(.system(size: 13))
+            }
+
+            // Initialize git toggle
+            Toggle(isOn: $initGit) {
+                HStack {
+                    Image(systemName: "arrow.triangle.branch")
+                        .foregroundStyle(Color.statusSuccess)
+                    Text("Initialize Git repository")
+                        .font(.system(size: 12))
+                        .foregroundStyle(Color.textPrimary)
+                }
+            }
+            .toggleStyle(.checkbox)
+
+            Spacer()
+
+            // Actions
+            HStack {
+                Button("Cancel") {
+                    dismiss()
+                }
+                .buttonStyle(.bordered)
+
+                Spacer()
+
+                Button("Create") {
+                    onCreate()
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(Color.accentPrimary)
+                .disabled(folderName.trimmingCharacters(in: .whitespaces).isEmpty)
+            }
+        }
+        .padding(Theme.Spacing.lg)
+        .frame(width: 350, height: 280)
+        .background(Color.bgSurface)
     }
 }
 
