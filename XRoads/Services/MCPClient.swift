@@ -528,6 +528,22 @@ actor MCPClient {
 
         // Candidate paths to check
         let candidates: [String] = [
+            // 0. Search up from executable path (most reliable — independent of CWD)
+            {
+                guard let execPath = Bundle.main.executablePath else { return "" }
+                var path = (execPath as NSString).deletingLastPathComponent
+                for _ in 0..<10 {
+                    let mcpPath = (path as NSString).appendingPathComponent("xroads-mcp")
+                    let script = (mcpPath as NSString).appendingPathComponent("dist/index.js")
+                    if fileManager.fileExists(atPath: script) {
+                        return mcpPath
+                    }
+                    let parent = (path as NSString).deletingLastPathComponent
+                    if parent == path { break }
+                    path = parent
+                }
+                return ""
+            }(),
             // 1. Relative to source file (best for Xcode development)
             {
                 // Try to find the project root by looking for Package.swift or .git
