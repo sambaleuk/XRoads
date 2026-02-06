@@ -22,8 +22,8 @@ final class DispatchState {
 
     // MARK: - Logs
 
-    /// Global logs from all dispatch sources
-    var globalLogs: [LogEntry] = []
+    /// Global logs from all dispatch sources (CR-001: bounded at 5000 with FIFO eviction)
+    var globalLogs = BoundedBuffer<LogEntry>(capacity: 5000)
 
     // MARK: - Layer Tracking
 

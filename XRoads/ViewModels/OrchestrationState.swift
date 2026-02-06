@@ -31,8 +31,8 @@ final class OrchestrationSubState {
     /// Latest agent status snapshots keyed by assignment/agent id
     var agentStatusSnapshots: [String: AgentStatusSnapshot] = [:]
 
-    /// Timeline of recent agent events for the dashboard
-    var agentTimelineEvents: [AgentTimelineEvent] = []
+    /// Timeline of recent agent events for the dashboard (CR-001: bounded at 1000 with FIFO eviction)
+    var agentTimelineEvents = BoundedBuffer<AgentTimelineEvent>(capacity: 1000)
 
     /// Health metrics per agent
     var agentHealthMetrics: [String: AgentHealthMetrics] = [:]

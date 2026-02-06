@@ -50,8 +50,8 @@ final class AppState {
     /// All agents indexed by their ID
     var agents: [UUID: Agent] = [:]
 
-    /// Log entries for display
-    var logs: [LogEntry] = []
+    /// Log entries for display (CR-001: bounded at 5000 with FIFO eviction)
+    var logs = BoundedBuffer<LogEntry>(capacity: 5000)
 
     /// Loading state indicator
     var isLoading: Bool = false
@@ -132,7 +132,7 @@ final class AppState {
         set { dispatch.dispatchMessage = newValue }
     }
 
-    var globalLogs: [LogEntry] {
+    var globalLogs: BoundedBuffer<LogEntry> {
         get { dispatch.globalLogs }
         set { dispatch.globalLogs = newValue }
     }
@@ -183,7 +183,7 @@ final class AppState {
         set { orchestration.agentStatusSnapshots = newValue }
     }
 
-    var agentTimelineEvents: [AgentTimelineEvent] {
+    var agentTimelineEvents: BoundedBuffer<AgentTimelineEvent> {
         get { orchestration.agentTimelineEvents }
         set { orchestration.agentTimelineEvents = newValue }
     }
@@ -290,8 +290,8 @@ final class AppState {
 
     /// Logs filtered for the selected worktree
     var filteredLogs: [LogEntry] {
-        guard let worktree = selectedWorktree else { return logs }
-        return logs.filter { $0.worktree == worktree.path }
+        guard let worktree = selectedWorktree else { return logs.elements }
+        return logs.elements.filter { $0.worktree == worktree.path }
     }
 
     // MARK: - Initialization
@@ -1344,22 +1344,14 @@ final class AppState {
 
     // MARK: - Log Management
 
-    /// Adds a log entry
+    /// Adds a log entry (CR-001: eviction handled by BoundedBuffer)
     func addLog(_ log: LogEntry) {
         logs.append(log)
-        // Limit to last 500 logs for performance
-        if logs.count > 500 {
-            logs.removeFirst(logs.count - 500)
-        }
     }
 
-    /// Adds multiple log entries
+    /// Adds multiple log entries (CR-001: eviction handled by BoundedBuffer)
     func addLogs(_ newLogs: [LogEntry]) {
         logs.append(contentsOf: newLogs)
-        // Limit to last 500 logs for performance
-        if logs.count > 500 {
-            logs.removeFirst(logs.count - 500)
-        }
     }
 
     // MARK: - Agent Dashboard Management
@@ -1405,9 +1397,6 @@ final class AppState {
             timestamp: snapshot.timestamp
         )
         orchestration.agentTimelineEvents.insert(event, at: 0)
-        if orchestration.agentTimelineEvents.count > 100 {
-            orchestration.agentTimelineEvents.removeLast(orchestration.agentTimelineEvents.count - 100)
-        }
     }
 
     func handleAgentEvent(_ event: AgentEvent) {
@@ -1447,9 +1436,6 @@ final class AppState {
         )
 
         orchestration.agentTimelineEvents.insert(timelineEvent, at: 0)
-        if orchestration.agentTimelineEvents.count > 100 {
-            orchestration.agentTimelineEvents.removeLast(orchestration.agentTimelineEvents.count - 100)
-        }
     }
 
     func setOrchestrationRepoPath(_ url: URL) {

@@ -1098,12 +1098,12 @@ struct MainWindowView_Previews: PreviewProvider {
         ]
 
         // Add sample logs
-        state.logs = [
+        for log in [
             LogEntry(level: .info, source: "claude", worktree: nil, message: "Starting agent..."),
             LogEntry(level: .debug, source: "git", worktree: nil, message: "Creating worktree at /Users/dev/project/wt-feature-1"),
             LogEntry(level: .warn, source: "mcp", worktree: nil, message: "Connection retry in 5s"),
             LogEntry(level: .error, source: "process", worktree: nil, message: "Process terminated unexpectedly")
-        ]
+        ] { state.addLog(log) }
 
         return state
     }

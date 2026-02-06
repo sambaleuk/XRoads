@@ -9,6 +9,8 @@
 - SwiftUI macOS apps need minimum deployment target macOS 14.0 for @Observable and latest APIs
 - os.Logger string interpolation creates autoclosures; inside actors, assign properties to locals before interpolation to avoid `self` capture errors
 - os.Logger debug level is not recorded by default, so it replaces `#if DEBUG print()` without preprocessor directives
+- @Observable tracks struct mutations correctly; BoundedBuffer<T> as a stored property works seamlessly with SwiftUI observation
+- When changing array types to BoundedBuffer, delegation properties need type updates and views accessing .filter/.map need .elements first
 
 ---
 
@@ -2508,3 +2510,29 @@ Acceptance Criteria Met:
   - Swift actors can't be subclassed, so protocol-based mocking requires changing the ServiceContainer protocol and all callers — a testMode flag is a more contained approach
   - MCPClient init does expensive path resolution (findNodePath, findMCPServerPath) — testMode should short-circuit in init too, not just in start()
   - Default parameter values (testMode: Bool = false) ensure zero impact on production code paths
+
+### Iteration 9 - CR-001 (Bounded growth for unbounded collections)
+- Implemented BoundedBuffer<Element> struct with configurable capacity and FIFO eviction
+- Applied BoundedBuffer to:
+  - AppState.logs: capped at 5000 (was 500 with inline eviction)
+  - DispatchState.globalLogs: capped at 5000 (was unbounded)
+  - OrchestrationSubState.agentTimelineEvents: capped at 1000 (was 100 with inline eviction)
+- Removed inline eviction code from AppState.addLog/addLogs and agentTimelineEvents insertion
+- Verified TerminalSlot.logs already capped at 50 (unchanged)
+- Updated MainWindowView preview to use addLog() instead of direct array assignment
+- Unit test: XRoadsTests/Models/BoundedBufferTests.swift - PASS (16/16)
+- Files changed:
+  - XRoads/Models/BoundedBuffer.swift (NEW - BoundedBuffer struct)
+  - XRoads/ViewModels/AppState.swift (logs type changed, inline eviction removed)
+  - XRoads/ViewModels/DispatchState.swift (globalLogs type changed)
+  - XRoads/ViewModels/OrchestrationState.swift (agentTimelineEvents type changed)
+  - XRoads/Views/MainWindowView.swift (preview uses addLog)
+  - XRoadsTests/Models/BoundedBufferTests.swift (NEW - 16 tests)
+  - prd.json (CR-001 marked complete, unit_test added and status=passing)
+- Build: swift build PASS
+- Tests: swift test --filter BoundedBufferTests PASS (16/16), no regressions
+- Learnings:
+  - @Observable tracks BoundedBuffer mutations correctly since it's a value type (struct)
+  - When changing stored property types, delegation properties in AppState need matching type updates
+  - #filePath in XCTest resolves to actual source path, not .build directory — go up N levels from test file to find project root
+  - CLISettingsTests failures are pre-existing (environment-specific paths), not related to CR-001

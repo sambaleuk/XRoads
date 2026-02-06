@@ -345,7 +345,8 @@
       "title": "Add bounded growth to unbounded collections in AppState",
       "description": "Several collections in AppState grow without bounds: logs, globalLogs, agentTimelineEvents, historyRecords. These can cause memory issues during long orchestration sessions.",
       "priority": "high",
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-06T18:04:00Z",
       "acceptance_criteria": [
         "logs array: cap at 5000 entries with FIFO eviction",
         "globalLogs array: cap at 5000 entries with FIFO eviction",
@@ -355,8 +356,32 @@
       ],
       "technical_notes": "AppState.swift has multiple unbounded arrays. TerminalSlot already caps at 50 (line 200). MCP server already caps at 1000 logs. But AppState.logs, globalLogs, and agentTimelineEvents have no bounds. During a 6-agent orchestration, logs accumulate rapidly.",
       "files_affected": [
-        "XRoads/ViewModels/AppState.swift"
-      ]
+        "XRoads/Models/BoundedBuffer.swift",
+        "XRoads/ViewModels/AppState.swift",
+        "XRoads/ViewModels/DispatchState.swift",
+        "XRoads/ViewModels/OrchestrationState.swift",
+        "XRoads/Views/MainWindowView.swift"
+      ],
+      "unit_test": {
+        "file": "XRoadsTests/Models/BoundedBufferTests.swift",
+        "name": "BoundedBufferTests",
+        "description": "Verifies BoundedBuffer FIFO eviction, capacity enforcement, and integration with AppState/sub-state collections",
+        "assertions": [
+          "BoundedBuffer enforces capacity limit on append",
+          "BoundedBuffer evicts oldest elements (FIFO) when capacity exceeded",
+          "BoundedBuffer append(contentsOf:) respects capacity",
+          "BoundedBuffer insert(at:) respects capacity",
+          "BoundedBuffer removeAll clears all elements",
+          "BoundedBuffer init(capacity:elements:) truncates to capacity",
+          "AppState.logs uses BoundedBuffer with capacity 5000",
+          "DispatchState.globalLogs uses BoundedBuffer with capacity 5000",
+          "OrchestrationSubState.agentTimelineEvents uses BoundedBuffer with capacity 1000",
+          "TerminalSlot.addLog caps at 50 entries",
+          "AppState.addLog delegates to BoundedBuffer without inline eviction",
+          "No inline eviction code remains for agentTimelineEvents in AppState"
+        ],
+        "status": "passing"
+      }
     },
     {
       "id": "CR-202",
