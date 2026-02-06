@@ -174,6 +174,11 @@ final class AppState {
     /// Total layers in dispatch
     var totalDispatchLayers: Int = 0
 
+    // MARK: - GitMaster State
+
+    /// State of the GitMaster intelligent resolver
+    var gitMasterState: GitMasterState = GitMasterState()
+
     // MARK: - Private Properties
 
     /// Task for log streaming

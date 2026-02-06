@@ -51,8 +51,8 @@ struct GitInfoPanel: View {
                         // Recent Commits
                         recentCommitsSection
 
-                        // Worktrees
-                        worktreesSection
+                        // GitMaster Panel (replaces Worktrees)
+                        GitMasterPanel()
                     }
                     .padding(Theme.Spacing.md)
                 }
@@ -321,72 +321,6 @@ struct GitInfoPanel: View {
         .cornerRadius(Theme.Radius.sm)
     }
 
-    // MARK: - Worktrees Section
-
-    private var worktreesSection: some View {
-        VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
-            // Section header
-            SectionHeader(
-                title: "WORKTREES",
-                count: appState.worktrees.isEmpty ? nil : appState.worktrees.count,
-                actionIcon: "plus",
-                onAction: {
-                    NotificationCenter.default.post(name: .showNewWorktreeSheet, object: nil)
-                }
-            )
-
-            // Worktrees list or empty state
-            if appState.worktrees.isEmpty {
-                emptyWorktreesView
-            } else {
-                VStack(spacing: 4) {
-                    ForEach(appState.worktrees) { worktree in
-                        WorktreeListRow(worktree: worktree)
-                    }
-                }
-            }
-        }
-    }
-
-    private var emptyWorktreesView: some View {
-        VStack(spacing: Theme.Spacing.md) {
-            Image(systemName: "folder.badge.questionmark")
-                .font(.system(size: 28))
-                .foregroundStyle(Color.textTertiary.opacity(0.5))
-
-            VStack(spacing: Theme.Spacing.xs) {
-                Text("No active worktrees.")
-                    .font(.system(size: 11))
-                    .foregroundStyle(Color.textTertiary)
-
-                Text("Create one to start working with agents.")
-                    .font(.system(size: 10))
-                    .foregroundStyle(Color.textTertiary.opacity(0.7))
-                    .multilineTextAlignment(.center)
-            }
-
-            Button {
-                NotificationCenter.default.post(name: .showNewWorktreeSheet, object: nil)
-            } label: {
-                Text("Create Worktree")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Color.textPrimary)
-                    .padding(.horizontal, Theme.Spacing.md)
-                    .padding(.vertical, Theme.Spacing.sm)
-                    .background(Color.accentPrimary.opacity(0.2))
-                    .cornerRadius(Theme.Radius.sm)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Theme.Radius.sm)
-                            .stroke(Color.accentPrimary.opacity(0.5), lineWidth: 1)
-                    )
-            }
-            .buttonStyle(.plain)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, Theme.Spacing.lg)
-        .background(Color.bgCanvas.opacity(0.3))
-        .cornerRadius(Theme.Radius.sm)
-    }
 
     // MARK: - Loading View
 
@@ -890,39 +824,6 @@ private struct CommitRow: View {
     }
 }
 
-// MARK: - Worktree List Row
-
-private struct WorktreeListRow: View {
-    let worktree: Worktree
-    @State private var isHovered: Bool = false
-
-    var body: some View {
-        HStack(spacing: Theme.Spacing.sm) {
-            Image(systemName: "arrow.triangle.branch")
-                .font(.system(size: 10))
-                .foregroundStyle(Color.accentPrimary)
-
-            VStack(alignment: .leading, spacing: 2) {
-                Text(worktree.branch)
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundStyle(Color.textPrimary)
-                    .lineLimit(1)
-
-                Text(worktree.name)
-                    .font(.system(size: 9))
-                    .foregroundStyle(Color.textTertiary)
-                    .lineLimit(1)
-            }
-
-            Spacer()
-        }
-        .padding(.horizontal, Theme.Spacing.sm)
-        .padding(.vertical, Theme.Spacing.xs)
-        .background(isHovered ? Color.bgElevated : Color.bgCanvas.opacity(0.5))
-        .cornerRadius(Theme.Radius.sm)
-        .onHover { isHovered = $0 }
-    }
-}
 
 // MARK: - New Project Folder Sheet
 

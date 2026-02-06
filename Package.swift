@@ -77,6 +77,8 @@ let package = Package(
                 "Views/Dashboard/OrchestratorCreatureView.swift",
                 "Views/Dashboard/NeonBrainView.swift",
                 "Views/Dashboard/GitInfoPanel.swift",
+                // GitMaster Panel
+                "Views/Dashboard/GitMasterPanel.swift",
                 // US-V4-013: Orchestrator Chat Views
                 "Views/Orchestrator/OrchestratorChatView.swift",
                 "Views/Orchestrator/ChatMessageView.swift",
@@ -119,6 +121,9 @@ let package = Package(
                 "Models/GitCommit.swift",
                 // US-V4-019: App Settings Model
                 "Models/AppSettings.swift",
+                // GitMaster Models
+                "Models/GitMasterState.swift",
+                "Models/GitConflict.swift",
                 "Services/GitService.swift",
                 "Services/ProcessRunner.swift",
                 "Services/PTYProcess.swift",
@@ -131,6 +136,8 @@ let package = Package(
                 "Services/AgentStatusMonitor.swift",
                 "Services/NotesSyncService.swift",
                 "Services/MergeCoordinator.swift",
+                // GitMaster Intelligent Resolver
+                "Services/GitMaster.swift",
                 "Services/WorktreeFactory.swift",
                 "Services/PRDParser.swift",
                 // US-V4-025: Asset PRD Generator

@@ -164,15 +164,22 @@ struct MergePlan: Sendable {
     let createdAt: Date
 }
 
-struct MergeConflict: Identifiable, Sendable {
-    let id = UUID()
+struct MergeConflict: Identifiable, Sendable, Codable {
+    let id: UUID
     let branch: String
     var files: [String]
     let message: String
+
+    init(id: UUID = UUID(), branch: String, files: [String], message: String) {
+        self.id = id
+        self.branch = branch
+        self.files = files
+        self.message = message
+    }
 }
 
 /// Outcome of coordinating merges across generated worktrees.
-struct MergeResult: Sendable {
+struct MergeResult: Sendable, Codable {
     let baseBranch: String
     let mergedBranches: [String]
     let conflicts: [MergeConflict]

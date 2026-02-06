@@ -22,6 +22,9 @@ protocol ServiceContainer: Sendable {
     /// Merge coordinator for orchestrated merges
     var mergeCoordinator: MergeCoordinator { get }
 
+    /// GitMaster intelligent resolver
+    var gitMaster: GitMaster { get }
+
     /// Notes sync service
     var notesSyncService: NotesSyncService { get }
     var historyService: OrchestrationHistoryService { get }
@@ -56,6 +59,7 @@ final class DefaultServiceContainer: ServiceContainer, @unchecked Sendable {
     let mcpClient: MCPClient
     let agentEventBus: AgentEventBus
     let mergeCoordinator: MergeCoordinator
+    let gitMaster: GitMaster
     let notesSyncService: NotesSyncService
     let historyService: OrchestrationHistoryService
     let agentLauncher: AgentLauncher
@@ -81,6 +85,7 @@ final class DefaultServiceContainer: ServiceContainer, @unchecked Sendable {
         self.mcpClient = mcpClient
         self.agentEventBus = agentEventBus
         self.mergeCoordinator = mergeCoordinator
+        self.gitMaster = GitMaster(gitService: gitService)
         self.notesSyncService = notesSyncService
         self.historyService = historyService
         self.agentLauncher = AgentLauncher(ptyRunner: ptyRunner)
@@ -112,6 +117,7 @@ final class MockServiceContainer: ServiceContainer, @unchecked Sendable {
     let mcpClient: MCPClient
     let agentEventBus: AgentEventBus
     let mergeCoordinator: MergeCoordinator
+    let gitMaster: GitMaster
     let notesSyncService: NotesSyncService
     let historyService: OrchestrationHistoryService
     let agentLauncher: AgentLauncher
@@ -129,6 +135,7 @@ final class MockServiceContainer: ServiceContainer, @unchecked Sendable {
         self.mcpClient = MCPClient()
         self.agentEventBus = AgentEventBus()
         self.mergeCoordinator = MergeCoordinator()
+        self.gitMaster = GitMaster(gitService: gitService)
         self.notesSyncService = NotesSyncService()
         self.historyService = OrchestrationHistoryService()
         self.agentLauncher = AgentLauncher(ptyRunner: ptyRunner)

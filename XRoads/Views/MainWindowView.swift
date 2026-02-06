@@ -360,7 +360,7 @@ private struct ContentColumn: View {
     }
 }
 
-// MARK: - Right Side Panel (Git Recent, Worktrees, Logs - Stacked)
+// MARK: - Right Side Panel (Git Recent, GitMaster, Logs - Stacked)
 
 private struct RightSidePanel: View {
     @Environment(\.appState) private var appState
@@ -382,9 +382,9 @@ private struct RightSidePanel: View {
                     .background(Color.borderMuted)
             }
 
-            // Section 2: Git Worktrees
-            GitWorktreesSection()
-                .frame(height: 180)
+            // Section 2: GitMaster Panel (intelligent merge agent)
+            GitMasterPanel()
+                .frame(height: 200)
 
             Divider()
                 .background(Color.borderMuted)
@@ -713,123 +713,6 @@ private struct GitCommitRow: View {
         .padding(.vertical, 3)
         .background(Color.bgApp.opacity(0.5))
         .cornerRadius(Theme.Radius.xs)
-    }
-}
-
-// MARK: - Git Worktrees Section
-
-private struct GitWorktreesSection: View {
-    @Environment(\.appState) private var appState
-
-    var body: some View {
-        VStack(spacing: 0) {
-            // Header
-            HStack {
-                Image(systemName: "arrow.triangle.branch")
-                    .foregroundStyle(Color.statusSuccess)
-                    .font(.system(size: 12))
-
-                Text("WORKTREES")
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .foregroundStyle(Color.textSecondary)
-
-                Spacer()
-
-                Text("\(appState.worktrees.count)")
-                    .font(.system(size: 10, weight: .medium, design: .monospaced))
-                    .foregroundStyle(Color.textTertiary)
-                    .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
-                    .background(Color.bgElevated)
-                    .cornerRadius(Theme.Radius.xs)
-            }
-            .padding(.horizontal, Theme.Spacing.sm)
-            .padding(.vertical, Theme.Spacing.xs)
-            .background(Color.bgSurface)
-
-            // Worktrees list
-            ScrollView {
-                LazyVStack(spacing: 2) {
-                    ForEach(appState.worktrees) { worktree in
-                        WorktreeRow(worktree: worktree)
-                    }
-
-                    if appState.worktrees.isEmpty {
-                        VStack(spacing: Theme.Spacing.xs) {
-                            Text("No worktrees")
-                                .font(.caption)
-                                .foregroundStyle(Color.textTertiary)
-
-                            Button {
-                                NotificationCenter.default.post(name: .showNewWorktreeSheet, object: nil)
-                            } label: {
-                                Label("Create", systemImage: "plus")
-                                    .font(.caption)
-                            }
-                            .buttonStyle(.bordered)
-                            .controlSize(.small)
-                        }
-                        .padding()
-                    }
-                }
-                .padding(.horizontal, Theme.Spacing.xs)
-                .padding(.vertical, Theme.Spacing.xs)
-            }
-        }
-    }
-}
-
-// MARK: - Worktree Row
-
-private struct WorktreeRow: View {
-    @Environment(\.appState) private var appState
-    let worktree: Worktree
-
-    private var agent: Agent? {
-        appState.agent(for: worktree)
-    }
-
-    var body: some View {
-        HStack(spacing: Theme.Spacing.xs) {
-            // Status indicator
-            Circle()
-                .fill(statusColor)
-                .frame(width: 6, height: 6)
-
-            // Branch name
-            Text(worktree.branch)
-                .font(.system(size: 11, weight: .medium))
-                .foregroundStyle(Color.textPrimary)
-                .lineLimit(1)
-
-            Spacer()
-
-            // Agent badge
-            if let agent = agent {
-                Text(agent.type.shortName)
-                    .font(.system(size: 9, weight: .bold, design: .monospaced))
-                    .foregroundStyle(agent.type.neonColor)
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 2)
-                    .background(agent.type.neonColor.opacity(0.15))
-                    .cornerRadius(Theme.Radius.xs)
-            }
-        }
-        .padding(.horizontal, Theme.Spacing.xs)
-        .padding(.vertical, 4)
-        .background(Color.bgApp.opacity(0.5))
-        .cornerRadius(Theme.Radius.xs)
-    }
-
-    private var statusColor: Color {
-        if let agent = agent {
-            switch agent.status {
-            case .running: return Color.statusSuccess
-            case .error: return Color.statusError
-            default: return Color.textTertiary
-            }
-        }
-        return Color.textTertiary
     }
 }
 
