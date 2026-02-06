@@ -302,28 +302,31 @@ struct PRDProposalView: View {
                 .buttonStyle(.plain)
             }
 
-            // Multi-agent configure button (only when complexity recommends it)
-            if detectedPRD.complexity.recommendsMultiAgent {
-                Button(action: onConfigureMultiAgent) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "square.stack.3d.up.fill")
-                        Text("Configurer Multi-Agent")
-                        Image(systemName: "arrow.right")
-                            .font(.system(size: 10))
-                    }
-                    .font(.system(size: 12, weight: .semibold))
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .background(Color.statusWarning.opacity(0.15))
-                    .foregroundColor(Color.statusWarning)
-                    .cornerRadius(8)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(Color.statusWarning.opacity(0.5), lineWidth: 1)
-                    )
+            // Slot assignment / dispatcher button — always available
+            Button(action: onConfigureMultiAgent) {
+                HStack(spacing: 6) {
+                    Image(systemName: detectedPRD.complexity.recommendsMultiAgent
+                          ? "square.stack.3d.up.fill" : "slider.horizontal.3")
+                    Text(detectedPRD.complexity.recommendsMultiAgent
+                         ? "Configurer Multi-Agent" : "Assigner les Slots")
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 10))
                 }
-                .buttonStyle(.plain)
+                .font(.system(size: 12, weight: .semibold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+                .background(detectedPRD.complexity.recommendsMultiAgent
+                            ? Color.statusWarning.opacity(0.15) : Color.bgSurface)
+                .foregroundColor(detectedPRD.complexity.recommendsMultiAgent
+                                ? Color.statusWarning : Color.textSecondary)
+                .cornerRadius(8)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(detectedPRD.complexity.recommendsMultiAgent
+                                ? Color.statusWarning.opacity(0.5) : Color.borderDefault, lineWidth: 1)
+                )
             }
+            .buttonStyle(.plain)
         }
     }
 }
