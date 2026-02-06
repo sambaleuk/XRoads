@@ -514,11 +514,20 @@ final class OrchestratorChatViewModel: ObservableObject {
             branch = try? await gitService.getCurrentBranch(path: projectPath)
         }
 
+        // Load available skills from registry
+        let registry = SkillRegistry.shared
+        await registry.initialize()
+        let allSkillIds = await registry.allSkillIDs()
+
+        // Combine with universal skills (always available in Claude)
+        var skillIds = Set(allSkillIds)
+        skillIds.formUnion(ActionType.universalSkills)
+
         context = ChatContext(
             projectPath: appState.projectPath,
             currentBranch: branch,
             worktrees: worktreeNames,
-            availableSkills: [], // TODO: Load from SkillRegistry
+            availableSkills: Array(skillIds).sorted(),
             mcpServers: ["xroads-mcp"],
             dashboardMode: appState.dashboardMode == .single ? "single" : "agentic"
         )

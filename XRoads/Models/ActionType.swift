@@ -55,12 +55,17 @@ enum ActionType: String, Codable, Hashable, Sendable, CaseIterable {
         case .review:
             return ["code-reviewer", "lint"]
         case .integrationTest:
-            return ["integration-test", "e2e-test", "perf-test"]
+            return ["integration-test", "e2e-test", "perf-test", "agent-browser"]
         case .write:
             return ["doc-generator"]
         case .custom:
             return [] // Custom actions have user-defined skills
         }
+    }
+
+    /// Additional skills available for all actions (research, automation)
+    static var universalSkills: [String] {
+        return ["agent-browser", "find-skills"]
     }
 
     /// Category for grouping actions in UI
