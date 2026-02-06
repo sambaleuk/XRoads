@@ -184,6 +184,17 @@ actor ProcessRunner {
 
         // Close stdin immediately if requested (for tools expecting EOF to start processing)
         if closeStdinImmediately {
+            // Log to file for debugging
+            let logMsg = "[\(Date())] Closing stdin for process \(processId)\n"
+            if let data = logMsg.data(using: .utf8) {
+                if FileManager.default.fileExists(atPath: "/tmp/xroads_orchestrator.log") {
+                    if let handle = FileHandle(forWritingAtPath: "/tmp/xroads_orchestrator.log") {
+                        handle.seekToEndOfFile()
+                        handle.write(data)
+                        handle.closeFile()
+                    }
+                }
+            }
             stdinPipe.fileHandleForWriting.closeFile()
         }
 

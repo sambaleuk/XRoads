@@ -48,7 +48,10 @@ struct MainWindowView: View {
     /// Chat panel width (US-V4-015)
     @AppStorage(UserDefaults.Keys.chatPanelWidth) private var chatPanelWidth: Double = 360
 
+    // Legacy toggle - always true now, kept for migration
+    // TODO: Remove after confirming no regressions
     @AppStorage(UserDefaults.Keys.fullAgenticMode) private var isFullAgenticMode: Bool = true
+    private let forcedAgenticMode: Bool = true  // Override for cleanup phase
 
     var body: some View {
         mainContent
@@ -101,26 +104,34 @@ struct MainWindowView: View {
 
     @ViewBuilder
     private var navigationContent: some View {
-        if isFullAgenticMode {
+        // Phase 1: Force agentic mode, legacy code kept but unreachable
+        if forcedAgenticMode {
             // Full agentic mode: Custom layout without NavigationSplitView
             agenticModeLayout
                 .toolbar { toolbarContent }
         } else {
-            // Standard mode: NavigationSplitView with sidebar
-            NavigationSplitView(columnVisibility: $columnVisibility) {
-                SidebarView(showNewWorktreeSheet: $showNewWorktreeSheet)
-                    .navigationSplitViewColumnWidth(min: 200, ideal: Theme.Layout.sidebarWidth, max: 300)
-            } content: {
-                ContentColumn(isFullAgenticMode: isFullAgenticMode)
-            } detail: {
-                if showInspector {
-                    InspectorColumn()
-                        .navigationSplitViewColumnWidth(min: 280, ideal: Theme.Layout.inspectorWidth, max: 400)
-                }
-            }
-            .navigationSplitViewStyle(.balanced)
-            .toolbar { toolbarContent }
+            // LEGACY: Standard mode with NavigationSplitView
+            // TODO: Remove this branch after Phase 2 cleanup
+            legacyNavigationLayout
+                .toolbar { toolbarContent }
         }
+    }
+
+    // MARK: - Legacy Navigation Layout (to be removed)
+    @ViewBuilder
+    private var legacyNavigationLayout: some View {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
+            SidebarView(showNewWorktreeSheet: $showNewWorktreeSheet)
+                .navigationSplitViewColumnWidth(min: 200, ideal: Theme.Layout.sidebarWidth, max: 300)
+        } content: {
+            ContentColumn(isFullAgenticMode: isFullAgenticMode)
+        } detail: {
+            if showInspector {
+                InspectorColumn()
+                    .navigationSplitViewColumnWidth(min: 280, ideal: Theme.Layout.inspectorWidth, max: 400)
+            }
+        }
+        .navigationSplitViewStyle(.balanced)
     }
 
     /// Agentic mode layout: Chat Panel | Dashboard (max space) | Right Panel (Git + Logs stacked)
@@ -227,13 +238,15 @@ struct MainWindowView: View {
 
         Divider()
 
-        Toggle(isOn: $isFullAgenticMode) {
-            Label("Full Agentic Mode", systemImage: "chart.bar.doc.horizontal")
-        }
-        .toggleStyle(.switch)
-        .help("Switch between manual worktree view and orchestration dashboard")
+        // LEGACY: Toggle hidden - agentic mode is now the default
+        // TODO: Remove after Phase 2 cleanup
+        // Toggle(isOn: $isFullAgenticMode) {
+        //     Label("Full Agentic Mode", systemImage: "chart.bar.doc.horizontal")
+        // }
+        // .toggleStyle(.switch)
+        // .help("Switch between manual worktree view and orchestration dashboard")
 
-        Divider()
+        // Divider()
 
         Button { showPRDLoaderSheet = true } label: {
             Label("Load PRD", systemImage: "doc.text")
