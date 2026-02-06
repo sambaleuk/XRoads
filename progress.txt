@@ -2418,3 +2418,23 @@ Acceptance Criteria Met:
   - In Swift 5.9, `final class` with all `let` Sendable properties still needs `@unchecked Sendable` — the compiler can't auto-infer Sendable for classes
   - For @unchecked Sendable, always add a `Safety:` comment block explaining WHY — this makes future audits trivial
   - NotesSyncService struct with ISO8601DateFormatter wasn't automatically Sendable due to NSObject reference type
+
+### Iteration - CR-302 (Eliminate Package.swift manual source enumeration)
+- Removed the explicit `sources:` array from both XRoadsLib (131 files) and XRoadsTests (21 files) targets in Package.swift
+- SPM auto-discovers all .swift files under each target's path by default
+- Package.swift went from 252 lines to 43 lines — biggest maintainability win in the codebase
+- Kept `exclude:` (entitlements, xcassets) and `resources:` (.copy Skills) arrays
+- Kept explicit `sources: ["main.swift"]` for XRoadsMain executable target (single file)
+- Updated AGENTS.md to reflect new auto-discovery behavior (was previously telling agents to add files manually)
+- Build passes: `swift build` succeeds
+- Tests: 362 tests, 3 pre-existing failures in CLISettingsTests (NVM/Homebrew path detection, unrelated)
+- Unit test: XRoadsTests/Build/PackageAutoDiscoveryTests.swift — PASS (8/8 tests)
+- Files changed:
+  - Package.swift (removed sources arrays, 252→43 lines)
+  - AGENTS.md (updated Package.swift guidance)
+  - XRoadsTests/Build/PackageAutoDiscoveryTests.swift (NEW - 8 tests)
+  - prd.json (CR-302 marked complete, unit_test added and status=passing)
+- Learnings:
+  - SPM auto-discovers .swift files when no `sources:` is specified — `exclude:` and `resources:` still work independently
+  - The test target also benefits from auto-discovery, picking up previously unlisted test files (OrchestratorChatViewTests.swift was on disk but not in Package.swift)
+  - `#filePath` in tests returns full absolute path, and `NSString.deletingLastPathComponent` can navigate to project root reliably

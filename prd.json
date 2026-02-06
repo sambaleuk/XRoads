@@ -187,17 +187,36 @@
       "title": "Eliminate Package.swift manual source enumeration",
       "description": "Package.swift manually lists all 127 source files. This is error-prone (missing a file = build failure) and tedious to maintain. SPM auto-discovers sources by default when no explicit sources are specified.",
       "priority": "medium",
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-06T17:38:00Z",
       "acceptance_criteria": [
         "Remove the explicit `sources:` array from XRoadsLib target in Package.swift",
+        "Remove the explicit `sources:` array from XRoadsTests target in Package.swift",
         "Ensure directory structure follows SPM conventions (no conflicts)",
         "swift build succeeds with auto-discovery",
         "swift test succeeds"
       ],
       "technical_notes": "Package.swift lists 127 files manually in the `sources:` array. SPM auto-discovers all .swift files in the target path by default. Only the `exclude:` and `resources:` arrays need to remain. This is the biggest maintainability win in the whole codebase.",
       "files_affected": [
-        "Package.swift"
-      ]
+        "Package.swift",
+        "AGENTS.md"
+      ],
+      "unit_test": {
+        "file": "XRoadsTests/Package/PackageAutoDiscoveryTests.swift",
+        "name": "PackageAutoDiscoveryTests",
+        "description": "Verifies Package.swift uses SPM auto-discovery with no manual sources arrays, retains exclude/resources, and all source directories exist",
+        "assertions": [
+          "Package.swift exists and is readable",
+          "XRoadsLib target has no explicit sources: array",
+          "XRoadsTests target has no explicit sources: array",
+          "Package.swift retains exclude for XRoads.entitlements and Assets.xcassets",
+          "Package.swift retains .copy(Resources/Skills) resource rule",
+          "Package.swift is under 80 lines (was 252)",
+          "All 7 source directories exist (App, Models, Views, ViewModels, Services, Actions, Resources)",
+          "SPM auto-discovers at least 120 .swift files in XRoads/"
+        ],
+        "status": "passing"
+      }
     },
     {
       "id": "CR-303",
