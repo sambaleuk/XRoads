@@ -157,7 +157,8 @@ actor SkillRegistry {
         "prd",
         "art-director",
         "integration-test",
-        "code-reviewer"
+        "code-reviewer",
+        "context-handoff"
     ]
 
     // MARK: - Private Loading Methods
@@ -613,6 +614,42 @@ actor SkillRegistry {
                 compatibleCLIs: Set(AgentType.allCases),
                 category: .custom,
                 author: "XRoads"
+            ),
+            Skill(
+                id: "context-handoff",
+                name: "Context Handoff",
+                description: "Generate a compact context handoff when session context is getting large or before ending a session. Captures key decisions, current state, and next steps for seamless continuation.",
+                promptTemplate: """
+                    You are a context handoff specialist. Your job is to create a compact summary that allows \
+                    a new session to continue exactly where this one left off.
+
+                    ## When to Trigger
+                    - Context window is approaching capacity
+                    - User requests a session handoff
+                    - Major milestone completed, good point for a checkpoint
+
+                    ## What to Capture
+                    1. **Current State** - What was being worked on, what's done, what's pending
+                    2. **Key Decisions** - Architectural choices, trade-offs made, reasons why
+                    3. **Problems Solved** - Issues encountered and how they were resolved
+                    4. **Next Steps** - Clear action items for the next session
+
+                    ## Process
+                    1. Call the `generate_handoff` MCP tool with the current session ID
+                    2. Review the generated handoff for completeness
+                    3. Store it via the MCP session persistence
+
+                    ## Output Format
+                    The handoff should be a concise markdown document (under 500 tokens by default) \
+                    that can be injected into the next session's AGENT.md.
+
+                    {{context}}
+                    """,
+                requiredTools: ["file-read"],
+                version: "1.0.0",
+                compatibleCLIs: Set(AgentType.allCases),
+                category: .custom,
+                author: "XRoads Team"
             )
         ]
     }

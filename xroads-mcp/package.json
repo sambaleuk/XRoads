@@ -1,7 +1,7 @@
 {
   "name": "crossroads-mcp",
-  "version": "1.0.0",
-  "description": "Minimal MCP server for CrossRoads - streaming logs and status updates",
+  "version": "1.1.0",
+  "description": "MCP server for CrossRoads - streaming logs, status updates, and session/handoff management",
   "type": "module",
   "main": "dist/index.js",
   "scripts": {

@@ -46,6 +46,9 @@ protocol ServiceContainer: Sendable {
 
     /// Claude orchestrator for Full Agentic Mode
     var orchestrator: ClaudeOrchestrator { get }
+
+    /// Session persistence for repo-level session storage
+    var sessionPersistence: SessionPersistenceService { get }
 }
 
 // MARK: - DefaultServiceContainer
@@ -72,6 +75,7 @@ final class DefaultServiceContainer: ServiceContainer, @unchecked Sendable {
     let actionRunner: ActionRunner
     let unifiedDispatcher: UnifiedDispatcher
     let orchestrator: ClaudeOrchestrator
+    let sessionPersistence: SessionPersistenceService
 
     init(
         gitService: GitService = GitService(),
@@ -81,7 +85,8 @@ final class DefaultServiceContainer: ServiceContainer, @unchecked Sendable {
         agentEventBus: AgentEventBus = AgentEventBus(),
         mergeCoordinator: MergeCoordinator = MergeCoordinator(),
         notesSyncService: NotesSyncService = NotesSyncService(),
-        historyService: OrchestrationHistoryService = OrchestrationHistoryService()
+        historyService: OrchestrationHistoryService = OrchestrationHistoryService(),
+        sessionPersistence: SessionPersistenceService = SessionPersistenceService()
     ) {
         self.gitService = gitService
         self.processRunner = processRunner
@@ -92,8 +97,9 @@ final class DefaultServiceContainer: ServiceContainer, @unchecked Sendable {
         self.gitMaster = GitMaster(gitService: gitService)
         self.notesSyncService = notesSyncService
         self.historyService = historyService
+        self.sessionPersistence = sessionPersistence
         self.agentLauncher = AgentLauncher(ptyRunner: ptyRunner)
-        self.loopLauncher = LoopLauncher(ptyRunner: ptyRunner, gitService: gitService)
+        self.loopLauncher = LoopLauncher(ptyRunner: ptyRunner, gitService: gitService, sessionPersistence: sessionPersistence)
         self.layeredDispatcher = LayeredDispatcher(loopLauncher: loopLauncher, gitService: gitService)
         self.actionRunner = ActionRunner(ptyRunner: ptyRunner)
         self.unifiedDispatcher = UnifiedDispatcher(
@@ -139,6 +145,7 @@ final class MockServiceContainer: ServiceContainer, @unchecked Sendable {
     let actionRunner: ActionRunner
     let unifiedDispatcher: UnifiedDispatcher
     let orchestrator: ClaudeOrchestrator
+    let sessionPersistence: SessionPersistenceService
 
     init() {
         // Critical services initialized with testMode to prevent real I/O
@@ -150,13 +157,14 @@ final class MockServiceContainer: ServiceContainer, @unchecked Sendable {
         // Pure in-memory services — safe without testMode
         self.agentEventBus = AgentEventBus()
         self.notesSyncService = NotesSyncService()
+        self.sessionPersistence = SessionPersistenceService()
 
         // Services composed from test-mode dependencies — inherit safety
         self.mergeCoordinator = MergeCoordinator(gitService: gitService)
         self.gitMaster = GitMaster(gitService: gitService)
         self.historyService = OrchestrationHistoryService()
         self.agentLauncher = AgentLauncher(ptyRunner: ptyRunner)
-        self.loopLauncher = LoopLauncher(ptyRunner: ptyRunner, gitService: gitService)
+        self.loopLauncher = LoopLauncher(ptyRunner: ptyRunner, gitService: gitService, sessionPersistence: sessionPersistence)
         self.layeredDispatcher = LayeredDispatcher(loopLauncher: loopLauncher, gitService: gitService)
         self.actionRunner = ActionRunner(ptyRunner: ptyRunner)
         self.unifiedDispatcher = UnifiedDispatcher(

@@ -73,10 +73,14 @@ struct ClaudeAdapter: CLIAdapter {
     /// Configurable path, auto-detected or custom
     var executablePath: String
 
+    /// Optional conversation ID for `--resume` support (context handoff)
+    var resumeConversationId: String?
+
     var displayName: String { "Claude Code" }
 
-    init(executablePath: String? = nil) {
+    init(executablePath: String? = nil, resumeConversationId: String? = nil) {
         self.executablePath = executablePath ?? Self.detectClaudePath()
+        self.resumeConversationId = resumeConversationId
     }
 
     /// Attempts to find claude CLI in common locations
@@ -121,8 +125,14 @@ struct ClaudeAdapter: CLIAdapter {
     func launchArguments(worktreePath: String) -> [String] {
         // Claude Code CLI in interactive mode
         // Working directory is set by ProcessRunner
-        // Use minimal flags - let it run interactively
-        return []  // No flags needed for interactive mode
+        var args: [String] = []
+
+        // If we have a conversation ID from a previous session, resume it
+        if let conversationId = resumeConversationId, !conversationId.isEmpty {
+            args.append(contentsOf: ["--resume", conversationId])
+        }
+
+        return args
     }
 
     func formatCommand(_ command: String) -> String {
@@ -272,15 +282,17 @@ struct CodexAdapter: CLIAdapter {
 
 extension AgentType {
     /// Creates the appropriate CLI adapter for this agent type
-    /// - Parameter customPath: Optional custom executable path
+    /// - Parameters:
+    ///   - customPath: Optional custom executable path
+    ///   - resumeConversationId: Optional conversation ID for Claude Code `--resume`
     /// - Returns: A CLIAdapter configured for this agent type
-    func adapter(customPath: String? = nil) -> any CLIAdapter {
+    func adapter(customPath: String? = nil, resumeConversationId: String? = nil) -> any CLIAdapter {
         switch self {
         case .claude:
-            if let path = customPath {
-                return ClaudeAdapter(executablePath: path)
-            }
-            return ClaudeAdapter()
+            return ClaudeAdapter(
+                executablePath: customPath,
+                resumeConversationId: resumeConversationId
+            )
 
         case .gemini:
             if let path = customPath {

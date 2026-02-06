@@ -328,11 +328,20 @@ final class AppState {
 
     // MARK: - Session Management
 
-    /// Creates a new session
-    func createSession(name: String) {
-        let session = Session(name: name)
+    /// Creates a new session, optionally linked to a repo and previous session
+    func createSession(name: String, repoPath: String? = nil, parentSessionId: UUID? = nil) {
+        let session = Session(
+            name: name,
+            repoPath: repoPath ?? projectPath,
+            parentSessionId: parentSessionId
+        )
         sessions.append(session)
         selectedSession = session
+
+        // Persist asynchronously
+        if session.repoPath != nil {
+            Task { try? await services.sessionPersistence.saveSession(session) }
+        }
     }
 
     /// Selects a session
@@ -347,6 +356,60 @@ final class AppState {
         if selectedSession?.id == session.id {
             selectedSession = sessions.first
         }
+    }
+
+    /// Persist the current session state (call after significant changes)
+    func persistCurrentSession() {
+        guard var session = selectedSession, session.repoPath != nil else { return }
+        session.updatedAt = Date()
+        if let index = sessions.firstIndex(where: { $0.id == session.id }) {
+            sessions[index] = session
+            selectedSession = session
+        }
+        Task { try? await services.sessionPersistence.saveSession(session) }
+    }
+
+    /// Store a handoff payload on the current session
+    func storeHandoff(_ payload: String) {
+        guard var session = selectedSession else { return }
+        session.handoffPayload = payload
+        session.updatedAt = Date()
+        if let index = sessions.firstIndex(where: { $0.id == session.id }) {
+            sessions[index] = session
+            selectedSession = session
+        }
+        if let repoPath = session.repoPath {
+            Task {
+                try? await services.sessionPersistence.updateHandoff(
+                    sessionId: session.id, repoPath: repoPath, payload: payload
+                )
+            }
+        }
+    }
+
+    /// Store a conversation ID for resume support
+    func storeConversationId(agent: String, conversationId: String) {
+        guard var session = selectedSession else { return }
+        session.conversationIds[agent] = conversationId
+        session.updatedAt = Date()
+        if let index = sessions.firstIndex(where: { $0.id == session.id }) {
+            sessions[index] = session
+            selectedSession = session
+        }
+        if let repoPath = session.repoPath {
+            Task {
+                try? await services.sessionPersistence.updateConversationId(
+                    sessionId: session.id, repoPath: repoPath,
+                    agent: agent, conversationId: conversationId
+                )
+            }
+        }
+    }
+
+    /// Load the last session for the current repo (for handoff injection)
+    func loadLastSession() async -> Session? {
+        guard let repoPath = projectPath else { return nil }
+        return try? await services.sessionPersistence.lastSession(for: repoPath)
     }
 
     // MARK: - Worktree Management
