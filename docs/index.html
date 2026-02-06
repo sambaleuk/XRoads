@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XRoads — Multi-Agent AI Orchestration for macOS</title>
+    <meta name="description" content="Run Claude, Gemini, and Codex in parallel on isolated git worktrees. Native macOS app with GitMaster intelligent merge resolution.">
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="XRoads — Multi-Agent AI Orchestration">
+    <meta property="og:description" content="Run 6 AI coding agents in parallel. GitMaster resolves conflicts. Nexus Loops guarantee robustness.">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="./assets/xroads-hero.png">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            /* XRoads Dark Pro Theme */
+            --bg-app: #0d1117;
+            --bg-canvas: #010409;
+            --bg-surface: #161b22;
+            --bg-elevated: #21262d;
+
+            --text-primary: #e6edf3;
+            --text-secondary: #7d8590;
+            --text-tertiary: #484f58;
+
+            --accent-primary: #388bfd;
+            --accent-secondary: #1f6feb;
+
+            --status-success: #3fb950;
+            --status-warning: #d29922;
+            --status-error: #f85149;
+
+            --terminal-cyan: #39c5cf;
+            --terminal-magenta: #bc8cff;
+            --terminal-yellow: #e3b341;
+
+            --border-default: #30363d;
+            --border-muted: #21262d;
+
+            --neon-claude: #388bfd;
+            --neon-gemini: #d29922;
+            --neon-codex: #3fb950;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-canvas);
+            color: var(--text-primary);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Animated background */
+        .bg-grid {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-image:
+                linear-gradient(rgba(56, 139, 253, 0.03) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(56, 139, 253, 0.03) 1px, transparent 1px);
+            background-size: 50px 50px;
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        .bg-glow {
+            position: fixed;
+            top: -50%;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 150%;
+            height: 100%;
+            background: radial-gradient(ellipse at center, rgba(56, 139, 253, 0.08) 0%, transparent 60%);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Navigation */
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            z-index: 100;
+            padding: 1rem 2rem;
+            background: rgba(1, 4, 9, 0.8);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border-muted);
+        }
+
+        nav .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            text-decoration: none;
+            color: var(--text-primary);
+        }
+
+        .logo-icon {
+            width: 32px;
+            height: 32px;
+            background: linear-gradient(135deg, var(--accent-primary), var(--terminal-magenta));
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        .logo-text {
+            font-weight: 700;
+            font-size: 1.25rem;
+            letter-spacing: -0.02em;
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 2rem;
+            align-items: center;
+        }
+
+        .nav-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            font-weight: 500;
+            transition: color 0.2s;
+        }
+
+        .nav-links a:hover {
+            color: var(--text-primary);
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.625rem 1.25rem;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            text-decoration: none;
+            transition: all 0.2s;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background: var(--accent-primary);
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background: var(--accent-secondary);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 20px rgba(56, 139, 253, 0.3);
+        }
+
+        .btn-secondary {
+            background: var(--bg-elevated);
+            color: var(--text-primary);
+            border: 1px solid var(--border-default);
+        }
+
+        .btn-secondary:hover {
+            background: var(--bg-surface);
+            border-color: var(--text-tertiary);
+        }
+
+        /* Hero Section */
+        .hero {
+            position: relative;
+            z-index: 1;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 8rem 2rem 4rem;
+            text-align: center;
+        }
+
+        .hero-content {
+            max-width: 900px;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-default);
+            border-radius: 50px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 2rem;
+        }
+
+        .badge-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--status-success);
+            border-radius: 50%;
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+
+        h1 {
+            font-size: clamp(2.5rem, 6vw, 4rem);
+            font-weight: 700;
+            letter-spacing: -0.03em;
+            line-height: 1.1;
+            margin-bottom: 1.5rem;
+        }
+
+        h1 .gradient {
+            background: linear-gradient(135deg, var(--accent-primary), var(--terminal-cyan), var(--terminal-magenta));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-description {
+            font-size: 1.25rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto 2.5rem;
+        }
+
+        .hero-buttons {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        /* Agent Pills */
+        .agent-pills {
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 3rem;
+        }
+
+        .agent-pill {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            background: var(--bg-surface);
+            border-radius: 50px;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+        }
+
+        .agent-pill.claude { border: 1px solid var(--neon-claude); color: var(--neon-claude); }
+        .agent-pill.gemini { border: 1px solid var(--neon-gemini); color: var(--neon-gemini); }
+        .agent-pill.codex { border: 1px solid var(--neon-codex); color: var(--neon-codex); }
+
+        /* Features Section */
+        .features {
+            position: relative;
+            z-index: 1;
+            padding: 6rem 2rem;
+            background: var(--bg-app);
+        }
+
+        .features .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .section-header {
+            text-align: center;
+            margin-bottom: 4rem;
+        }
+
+        .section-header h2 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            letter-spacing: -0.02em;
+            margin-bottom: 1rem;
+        }
+
+        .section-header p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .feature-card {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-default);
+            border-radius: 16px;
+            padding: 2rem;
+            transition: all 0.3s;
+        }
+
+        .feature-card:hover {
+            border-color: var(--accent-primary);
+            transform: translateY(-4px);
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+        }
+
+        .feature-icon {
+            width: 48px;
+            height: 48px;
+            background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .feature-card h3 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+
+        .feature-card p {
+            color: var(--text-secondary);
+            font-size: 0.95rem;
+        }
+
+        /* Terminal Preview */
+        .terminal-section {
+            position: relative;
+            z-index: 1;
+            padding: 6rem 2rem;
+        }
+
+        .terminal-preview {
+            max-width: 1000px;
+            margin: 0 auto;
+            background: var(--bg-surface);
+            border: 1px solid var(--border-default);
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 40px 80px rgba(0, 0, 0, 0.5);
+        }
+
+        .terminal-header {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 1rem 1.5rem;
+            background: var(--bg-elevated);
+            border-bottom: 1px solid var(--border-default);
+        }
+
+        .terminal-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+        }
+
+        .terminal-dot.red { background: #ff5f56; }
+        .terminal-dot.yellow { background: #ffbd2e; }
+        .terminal-dot.green { background: #27c93f; }
+
+        .terminal-title {
+            flex: 1;
+            text-align: center;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+        }
+
+        .terminal-body {
+            padding: 1.5rem;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            line-height: 1.8;
+        }
+
+        .terminal-line {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .terminal-prompt {
+            color: var(--terminal-cyan);
+        }
+
+        .terminal-command {
+            color: var(--text-primary);
+        }
+
+        .terminal-output {
+            color: var(--text-secondary);
+            padding-left: 2rem;
+        }
+
+        .terminal-success { color: var(--status-success); }
+        .terminal-info { color: var(--terminal-cyan); }
+        .terminal-agent-claude { color: var(--neon-claude); }
+        .terminal-agent-gemini { color: var(--neon-gemini); }
+        .terminal-agent-codex { color: var(--neon-codex); }
+
+        /* CTA Section */
+        .cta {
+            position: relative;
+            z-index: 1;
+            padding: 6rem 2rem;
+            text-align: center;
+            background: linear-gradient(180deg, var(--bg-app) 0%, var(--bg-canvas) 100%);
+        }
+
+        .cta h2 {
+            font-size: 2.5rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+
+        .cta p {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            margin-bottom: 2rem;
+        }
+
+        /* Footer */
+        footer {
+            position: relative;
+            z-index: 1;
+            padding: 3rem 2rem;
+            border-top: 1px solid var(--border-muted);
+            text-align: center;
+        }
+
+        footer .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 1rem;
+        }
+
+        .footer-brand {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .footer-brand img {
+            height: 24px;
+        }
+
+        .footer-links {
+            display: flex;
+            gap: 2rem;
+        }
+
+        .footer-links a {
+            color: var(--text-secondary);
+            text-decoration: none;
+            font-size: 0.9rem;
+            transition: color 0.2s;
+        }
+
+        .footer-links a:hover {
+            color: var(--text-primary);
+        }
+
+        .footer-copy {
+            color: var(--text-tertiary);
+            font-size: 0.85rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            nav .nav-links {
+                display: none;
+            }
+
+            .hero {
+                padding: 6rem 1.5rem 3rem;
+            }
+
+            .agent-pills {
+                flex-direction: column;
+                align-items: center;
+            }
+
+            .feature-grid {
+                grid-template-columns: 1fr;
+            }
+
+            footer .container {
+                flex-direction: column;
+                text-align: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="bg-grid"></div>
+    <div class="bg-glow"></div>
+
+    <!-- Navigation -->
+    <nav>
+        <div class="container">
+            <a href="/" class="logo">
+                <div class="logo-icon">X</div>
+                <span class="logo-text">XRoads</span>
+            </a>
+            <div class="nav-links">
+                <a href="#features">Features</a>
+                <a href="https://github.com/sambaleuk/XRoads" target="_blank">GitHub</a>
+                <a href="https://github.com/sambaleuk/XRoads/releases" class="btn btn-primary">
+                    Download
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section class="hero">
+        <div class="hero-content">
+            <div class="badge">
+                <span class="badge-dot"></span>
+                v1.0.0 — Now Available
+            </div>
+
+            <h1>
+                <span class="gradient">6 AI Agents.</span><br>
+                One Codebase.<br>
+                Zero Conflicts.
+            </h1>
+
+            <p class="hero-description">
+                XRoads orchestrates Claude, Gemini, and Codex working in parallel on isolated git worktrees.
+                GitMaster intelligently resolves merge conflicts so you ship faster.
+            </p>
+
+            <div class="hero-buttons">
+                <a href="https://github.com/sambaleuk/XRoads/releases/latest" class="btn btn-primary">
+                    ⬇ Download for macOS
+                </a>
+                <a href="https://github.com/sambaleuk/XRoads" class="btn btn-secondary">
+                    View on GitHub
+                </a>
+            </div>
+
+            <div class="agent-pills">
+                <span class="agent-pill claude">● Claude</span>
+                <span class="agent-pill gemini">● Gemini</span>
+                <span class="agent-pill codex">● Codex</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features" id="features">
+        <div class="container">
+            <div class="section-header">
+                <h2>Built for Serious Developers</h2>
+                <p>Stop waiting for one agent to finish. Run them all at once.</p>
+            </div>
+
+            <div class="feature-grid">
+                <div class="feature-card">
+                    <div class="feature-icon">🎯</div>
+                    <h3>6-Slot Terminal Grid</h3>
+                    <p>Run up to 6 agents simultaneously with real-time output streaming. Each slot is independently configurable with agent type, branch, and action.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🧠</div>
+                    <h3>GitMaster Resolution</h3>
+                    <p>Intelligent conflict detection that distinguishes trivial changes from semantic ones. Auto-resolve what's safe, flag what needs attention.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🔄</div>
+                    <h3>Nexus Loops</h3>
+                    <p>Battle-tested agentic patterns with structured prompting, error recovery, and session persistence. Not just terminals — production-grade orchestration.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">📋</div>
+                    <h3>PRD-Driven Dispatch</h3>
+                    <p>Load a Product Requirements Document and XRoads automatically distributes stories to available agents based on complexity and dependencies.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🔌</div>
+                    <h3>MCP Integration</h3>
+                    <p>Model Context Protocol for structured agent communication. Real-time logs, status updates, and cross-agent coordination.</p>
+                </div>
+
+                <div class="feature-card">
+                    <div class="feature-icon">🖥️</div>
+                    <h3>Native macOS</h3>
+                    <p>Built with SwiftUI and Swift Actors for a responsive, native experience. PTY integration for true terminal emulation.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Terminal Preview -->
+    <section class="terminal-section">
+        <div class="terminal-preview">
+            <div class="terminal-header">
+                <span class="terminal-dot red"></span>
+                <span class="terminal-dot yellow"></span>
+                <span class="terminal-dot green"></span>
+                <span class="terminal-title">XRoads — Multi-Agent Session</span>
+            </div>
+            <div class="terminal-body">
+                <div class="terminal-line">
+                    <span class="terminal-prompt">$</span>
+                    <span class="terminal-command">xroads dispatch --prd feature.json</span>
+                </div>
+                <div class="terminal-output terminal-info">→ Analyzing PRD: 12 user stories detected</div>
+                <div class="terminal-output terminal-info">→ Creating worktrees: wt/auth, wt/api, wt/ui</div>
+                <div class="terminal-output">&nbsp;</div>
+                <div class="terminal-output terminal-agent-claude">[Slot 1] Claude → feature/auth (4 stories)</div>
+                <div class="terminal-output terminal-agent-gemini">[Slot 2] Gemini → feature/api (5 stories)</div>
+                <div class="terminal-output terminal-agent-codex">[Slot 3] Codex  → feature/ui (3 stories)</div>
+                <div class="terminal-output">&nbsp;</div>
+                <div class="terminal-output terminal-success">✓ All agents running in parallel</div>
+                <div class="terminal-output terminal-success">✓ GitMaster monitoring for conflicts</div>
+                <div class="terminal-output terminal-info">→ Progress: ████████░░ 78% (9/12 stories)</div>
+            </div>
+        </div>
+    </section>
+
+    <!-- CTA Section -->
+    <section class="cta">
+        <h2>Ready to 6x Your Development?</h2>
+        <p>Open source. Apache 2.0. Free forever.</p>
+        <div class="hero-buttons">
+            <a href="https://github.com/sambaleuk/XRoads/releases/latest" class="btn btn-primary">
+                ⬇ Download v1.0.0
+            </a>
+            <a href="https://github.com/sambaleuk/XRoads" class="btn btn-secondary">
+                ⭐ Star on GitHub
+            </a>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-brand">
+                <span style="font-weight: 600;">XRoads</span>
+                <span style="color: var(--text-tertiary);">by</span>
+                <a href="https://neurogrid.me" style="color: var(--accent-primary); text-decoration: none; font-weight: 600;">Neurogrid</a>
+            </div>
+            <div class="footer-links">
+                <a href="https://github.com/sambaleuk/XRoads">GitHub</a>
+                <a href="https://github.com/sambaleuk/XRoads/releases">Releases</a>
+                <a href="https://github.com/sambaleuk/XRoads/blob/main/LICENSE">License</a>
+            </div>
+            <div class="footer-copy">
+                © 2026 Neurogrid. Apache 2.0 License.
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
