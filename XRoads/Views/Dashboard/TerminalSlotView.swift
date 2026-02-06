@@ -28,51 +28,91 @@ struct TerminalSlotView: View {
     private let neonCyan = Color(red: 0.0, green: 0.9, blue: 1.0)
 
     var body: some View {
-        VStack(spacing: 0) {
-            // Header bar
-            slotHeader
+        ZStack {
+            VStack(spacing: 0) {
+                // Header bar
+                slotHeader
 
-            // Main content area
-            if slot.isConfigured {
-                terminalOutputArea
-            } else {
-                emptySlotContent
+                // Main content area
+                if slot.isConfigured {
+                    terminalOutputArea
+                } else {
+                    emptySlotContent
+                }
             }
+            .frame(width: Theme.Component.slotCardWidth, height: Theme.Component.slotCardHeight)
+            .background(Theme.SlotCard.background)
+            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md))
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.md)
+                    .stroke(
+                        borderColor,
+                        lineWidth: slot.status.isActive ? 1.5 : 1
+                    )
+            )
+
+            // State Overlays
+            NeedsInputOverlay(isVisible: slot.status.isWaitingForInput)
+            ErrorOverlay(isVisible: slot.status == .error, errorMessage: nil)
+            CompletedOverlay(isVisible: slot.status == .completed)
         }
-        .frame(width: Theme.Component.slotCardWidth, height: Theme.Component.slotCardHeight)
-        .background(Theme.SlotCard.background)
-        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md))
-        .overlay(
-            RoundedRectangle(cornerRadius: Theme.Radius.md)
-                .stroke(
-                    slot.status.isActive ? agentColor.opacity(0.8) : Theme.SlotCard.borderInactive,
-                    lineWidth: slot.status.isActive ? 1.5 : 1
-                )
-        )
         .shadow(
-            color: slot.status.isActive ? agentColor.opacity(0.4) : .clear,
+            color: shadowColor,
             radius: slot.status.isActive ? 12 : 0
         )
         .scaleEffect(isHovered ? 1.02 : 1.0)
         .animation(.easeInOut(duration: Theme.Animation.normal), value: isHovered)
+        .animation(.easeInOut(duration: Theme.Animation.normal), value: slot.status)
         .onHover { isHovered = $0 }
+    }
+
+    // MARK: - Computed Colors
+
+    private var borderColor: Color {
+        if slot.status.isWaitingForInput {
+            return Color.terminalMagenta.opacity(0.8)
+        } else if slot.status == .error {
+            return Color.statusError.opacity(0.8)
+        } else if slot.status == .completed {
+            return Color.accentPrimary.opacity(0.6)
+        } else if slot.status.isActive {
+            return agentColor.opacity(0.8)
+        } else {
+            return Theme.SlotCard.borderInactive
+        }
+    }
+
+    private var shadowColor: Color {
+        if slot.status.isWaitingForInput {
+            return Color.terminalMagenta.opacity(0.4)
+        } else if slot.status == .error {
+            return Color.statusError.opacity(0.3)
+        } else if slot.status.isActive {
+            return agentColor.opacity(0.4)
+        } else {
+            return .clear
+        }
     }
 
     // MARK: - Header
 
     private var slotHeader: some View {
         HStack(spacing: Theme.Spacing.sm) {
+            // Status indicator (replaces static slot label when configured)
+            if slot.isConfigured {
+                SlotStatusIndicator(status: slot.status, size: 6)
+                    .frame(width: 16)
+            }
+
             // Slot label
             Text("SLOT \(slot.slotNumber)")
-                .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                .foregroundStyle(Color.textPrimary.opacity(0.9))
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundStyle(Color.textSecondary)
 
             // Agent indicator (colored dot + name)
             if let agent = slot.agentType {
-                Circle()
-                    .fill(agentColor)
-                    .frame(width: 6, height: 6)
-                    .shadow(color: agentColor, radius: 3)
+                Text("•")
+                    .foregroundStyle(agentColor)
 
                 Text(agent.cliDisplayName)
                     .font(.system(size: 10, weight: .medium, design: .monospaced))

@@ -309,6 +309,33 @@ enum Theme {
         static let terminalBackground = Color(hex: "#0d0f12")
         static let borderInactive = Color(hex: "#333840")
     }
+
+    // MARK: - Status Colors (for TerminalSlotStatus)
+
+    enum Status {
+        static func color(for status: String) -> Color {
+            switch status {
+            case "empty": return Color.textTertiary
+            case "configuring": return Color.statusInfo
+            case "ready": return Color.statusInfo
+            case "starting": return Color.statusWarning
+            case "running": return Color.statusSuccess
+            case "paused": return Color.statusWarning
+            case "completed": return Color.accentPrimary
+            case "error": return Color.statusError
+            case "needsInput", "waitingForInput": return Color.terminalMagenta
+            default: return Color.textTertiary
+            }
+        }
+
+        static func backgroundColor(for status: String) -> Color {
+            color(for: status).opacity(0.15)
+        }
+
+        static func borderColor(for status: String) -> Color {
+            color(for: status).opacity(0.4)
+        }
+    }
 }
 
 // MARK: - View Modifiers

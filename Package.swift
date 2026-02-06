@@ -64,6 +64,8 @@ let package = Package(
                 "Views/Components/CollapsiblePanel.swift",
                 // US-V4-018: Skills Badge
                 "Views/Components/SkillsBadge.swift",
+                // Slot Status Badge Component
+                "Views/Components/SlotStatusBadge.swift",
                 // Loop Configuration Panel
                 "Views/Components/LoopConfigurationPanel.swift",
                 // Dashboard v3 Views
