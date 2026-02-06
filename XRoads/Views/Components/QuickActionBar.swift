@@ -146,7 +146,8 @@ struct QuickActionBar: View {
         isLoadingAction = action
 
         // Delay to show loading state briefly
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(200))
             onActionSelected(action, repoInfo)
             isLoadingAction = nil
         }

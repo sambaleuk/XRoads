@@ -123,13 +123,15 @@ struct TypingIndicator: View {
             dot1Opacity = 1.0
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(150))
             withAnimation(.easeInOut(duration: 0.4).repeatForever()) {
                 dot2Opacity = 1.0
             }
         }
 
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(300))
             withAnimation(.easeInOut(duration: 0.4).repeatForever()) {
                 dot3Opacity = 1.0
             }

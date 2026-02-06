@@ -92,6 +92,7 @@ class FloatingInputWindowController: NSObject, NSWindowDelegate {
         window.makeKeyAndOrderFront(nil)
 
         // Focus the text field
+        // AppKit timing: DispatchQueue required for makeFirstResponder after window show animation
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             guard let self = self, let window = self.window, let textField = self.textField else { return }
             window.makeFirstResponder(textField)
@@ -229,6 +230,7 @@ class WorktreeInputWindow: NSObject, NSWindowDelegate {
         window.makeKeyAndOrderFront(nil)
 
         // Focus name field
+        // AppKit timing: DispatchQueue required for makeFirstResponder after window show animation
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             self?.window?.makeFirstResponder(self?.nameField)
         }

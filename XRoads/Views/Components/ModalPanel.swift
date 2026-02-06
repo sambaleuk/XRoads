@@ -130,7 +130,7 @@ class WindowSheetPresenter: ObservableObject {
         }
 
         // CRITICAL FIX: After sheet is presented, ensure it can receive keyboard input
-        // The delay allows the sheet animation to complete
+        // AppKit timing: DispatchQueue required for sheet animation to complete before focus
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) { [weak self] in
             guard let sheetWindow = self?.sheetWindow else { return }
 
@@ -301,7 +301,7 @@ struct SimpleTextField: NSViewRepresentable {
         // Handle auto-focus on first update
         if autoFocus, let field = nsView as? FocusableNSTextField, !field.hasFocusedOnce {
             field.hasFocusedOnce = true
-            // Use delay to allow sheet animation to complete
+            // AppKit timing: DispatchQueue required in updateNSView for sheet animation to complete before focus
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 field.activateForKeyboardInput()
             }

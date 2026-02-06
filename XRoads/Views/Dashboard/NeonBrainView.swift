@@ -540,7 +540,8 @@ struct AnimatedFilament: View {
 
     private func startAnimation() {
         // Staggered start
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(Int(delay * 1000)))
             withAnimation(.linear(duration: 1.5).repeatForever(autoreverses: false)) {
                 progress = 1.3
             }
@@ -643,7 +644,8 @@ struct NeuralSpark: View {
 
     private func startAnimation() {
         // Delay based on index
-        DispatchQueue.main.asyncAfter(deadline: .now() + Double(index) * 0.2) {
+        Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(index * 200))
             // Flicker animation
             withAnimation(.easeInOut(duration: 0.3).repeatForever(autoreverses: true)) {
                 opacity = Double.random(in: 0.5...1.0)

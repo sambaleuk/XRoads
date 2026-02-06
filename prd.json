@@ -259,7 +259,8 @@
       "title": "Replace DispatchQueue.main.asyncAfter with Task.sleep in @MainActor context",
       "description": "13 usages of DispatchQueue.main.asyncAfter across views and AppState. In a Swift Concurrency codebase using @MainActor, prefer Task { try await Task.sleep(...) } for consistency and cancellability.",
       "priority": "medium",
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-06T17:49:00Z",
       "acceptance_criteria": [
         "Replace DispatchQueue.main.asyncAfter in AppState.swift:600 with Task.sleep + weak self",
         "Replace in FloatingInputWindow.swift (2 usages) - these may need to stay for AppKit timing",
@@ -270,13 +271,34 @@
       ],
       "technical_notes": "Some DispatchQueue.main.asyncAfter usages in AppKit wrappers (FloatingInputWindow, MacTextField, ModalPanel) may be intentional for focus/animation timing. AppState and pure SwiftUI views should use Task.sleep. NeonBrainView uses it for staggered animations.",
       "files_affected": [
-        "XRoads/ViewModels/AppState.swift",
         "XRoads/Views/Components/FloatingInputWindow.swift",
         "XRoads/Views/Components/MacTextField.swift",
         "XRoads/Views/Components/LoadingIndicators.swift",
         "XRoads/Views/Components/ModalPanel.swift",
+        "XRoads/Views/Components/QuickActionBar.swift",
+        "XRoads/Views/ArtDirection/ArtDirectionView.swift",
         "XRoads/Views/Dashboard/NeonBrainView.swift"
-      ]
+      ],
+      "unit_test": {
+        "file": "XRoadsTests/Views/AsyncAfterMigrationTests.swift",
+        "name": "AsyncAfterMigrationTests",
+        "description": "Verifies that DispatchQueue.main.asyncAfter is replaced with Task.sleep in SwiftUI contexts and documented in AppKit contexts",
+        "assertions": [
+          "LoadingIndicators.swift has no DispatchQueue.main.asyncAfter calls",
+          "QuickActionBar.swift has no DispatchQueue.main.asyncAfter calls",
+          "ArtDirectionView.swift has no DispatchQueue.main.asyncAfter calls",
+          "NeonBrainView.swift has no DispatchQueue.main.asyncAfter calls",
+          "LoadingIndicators.swift uses Task.sleep for staggered animation",
+          "QuickActionBar.swift uses Task.sleep for loading feedback",
+          "ArtDirectionView.swift uses Task.sleep for auto-clear",
+          "NeonBrainView.swift uses Task.sleep for staggered animations",
+          "FloatingInputWindow.swift retains DispatchQueue with 'AppKit timing' comment",
+          "MacTextField.swift retains DispatchQueue with 'AppKit timing' comment",
+          "ModalPanel.swift retains DispatchQueue with 'AppKit timing' comment",
+          "AppState.swift has no DispatchQueue.main.asyncAfter calls"
+        ],
+        "status": "passing"
+      }
     },
     {
       "id": "CR-305",

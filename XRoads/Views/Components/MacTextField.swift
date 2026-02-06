@@ -88,7 +88,7 @@ class FocusableTextField: NSTextField {
         configureWindowForKeyboardInput(window)
 
         if needsFocus {
-            // Use longer delay to ensure sheet animation is complete
+            // AppKit timing: DispatchQueue required for sheet animation to complete before focus
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { [weak self] in
                 self?.attemptFocus()
             }
@@ -267,7 +267,7 @@ struct MacTextField: NSViewRepresentable {
         if isFirstResponder && !context.coordinator.hasFocused {
             context.coordinator.hasFocused = true
             nsView.needsFocus = true
-            // Trigger focus on next run loop with delay for sheet animation
+            // AppKit timing: DispatchQueue required in updateNSView for sheet animation to complete before focus
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                 nsView.attemptFocus()
             }
