@@ -23,6 +23,8 @@ struct TerminalSlotView: View {
     @State private var isHovered: Bool = false
     @State private var showConfigPopover: Bool = false
     @State private var selectedAction: ActionType? = nil
+    /// Guard to prevent re-entrant popover dismissal races
+    @State private var isStartingSlot: Bool = false
 
     // Neon colors matching the brain
     private let neonCyan = Color(red: 0.0, green: 0.9, blue: 1.0)
@@ -141,33 +143,65 @@ struct TerminalSlotView: View {
 
     // MARK: - Header Action Button
 
+    /// Dismisses the config popover **without animation** so that AppKit's
+    /// NSPopover is torn down synchronously rather than via an async animation
+    /// callback.  This prevents the SIGSEGV (EXC_BAD_ACCESS at 0x0) that
+    /// occurs when the hosting view hierarchy changes while the popover's
+    /// dismissal animation is still in-flight.
+    private func dismissPopoverImmediately() {
+        guard showConfigPopover else { return }
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            showConfigPopover = false
+        }
+    }
+
     @ViewBuilder
     private var headerActionButton: some View {
         HStack(spacing: Theme.Spacing.xs) {
-            // Config/gear button - always visible until running
-            // IMPORTANT: The popover is attached to a persistent view to avoid
-            // crash when slot status changes while the popover is animating.
-            // See: EXC_BAD_ACCESS in PopoverHostingView.updateAnimatedWindowSize
-            if !slot.status.isActive {
-                Button {
-                    showConfigPopover = true
-                } label: {
-                    Image(systemName: slot.isConfigured ? "gearshape" : "plus.circle")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(slot.isConfigured ? Color.textTertiary : Color.accentPrimary.opacity(0.8))
-                        .frame(width: 20, height: 20)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
+            // Config/gear button -- always visible until running.
+            // Wrapped in `.opacity(0)` when inactive rather than removed from
+            // the tree so the popover's anchor view always exists in the
+            // hierarchy and can never be pulled out from under NSPopover.
+            Button {
+                showConfigPopover = true
+            } label: {
+                Image(systemName: slot.isConfigured ? "gearshape" : "plus.circle")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundStyle(slot.isConfigured ? Color.textTertiary : Color.accentPrimary.opacity(0.8))
+                    .frame(width: 20, height: 20)
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .opacity(slot.status.isActive ? 0 : 1)
+            .allowsHitTesting(!slot.status.isActive)
+            // Popover is attached to this persistent Button so its anchor
+            // never disappears from the view tree during status transitions.
+            .popover(isPresented: $showConfigPopover, arrowEdge: .bottom) {
+                SlotConfigPopover(
+                    slot: $slot,
+                    selectedAction: $selectedAction,
+                    worktrees: appState.worktrees
+                )
             }
 
             // Play button - only when ready
             if slot.status.canStart {
                 Button(action: {
-                    // Dismiss any open popover before starting to prevent
-                    // the popover from being torn down mid-animation
-                    showConfigPopover = false
-                    onStart()
+                    guard !isStartingSlot else { return }
+                    isStartingSlot = true
+
+                    // 1. Tear down the popover synchronously (no animation).
+                    dismissPopoverImmediately()
+
+                    // 2. Wait one run-loop tick for AppKit to finish removing
+                    //    the NSPopover window before mutating slot state, which
+                    //    triggers view-hierarchy changes.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        onStart()
+                        isStartingSlot = false
+                    }
                 }) {
                     Image(systemName: "play.fill")
                         .font(.system(size: 10))
@@ -192,20 +226,13 @@ struct TerminalSlotView: View {
                 .buttonStyle(.plain)
             }
         }
-        // Popover attached to a persistent parent (HStack) instead of the
-        // conditional Button, so it survives status transitions gracefully.
-        .popover(isPresented: $showConfigPopover, arrowEdge: .bottom) {
-            SlotConfigPopover(
-                slot: $slot,
-                selectedAction: $selectedAction,
-                worktrees: appState.worktrees
-            )
-        }
         .onChange(of: slot.status) { _, newStatus in
-            // Force-dismiss the popover when the slot becomes active
-            // to prevent the NSPopover from outliving its hosting view
-            if newStatus.isActive && showConfigPopover {
-                showConfigPopover = false
+            // Force-dismiss the popover (without animation) when the slot
+            // becomes active.  Using `dismissPopoverImmediately()` avoids the
+            // race between the NSPopover animation callback and the view
+            // hierarchy mutation.
+            if newStatus.isActive {
+                dismissPopoverImmediately()
             }
         }
     }
