@@ -8,9 +8,4 @@
 import SwiftUI
 import XRoadsLib
 
-@main
-struct XRoadsAppLauncher {
-    static func main() {
-        XRoadsApp.main()
-    }
-}
+XRoadsApp.main()
