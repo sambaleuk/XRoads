@@ -1,38 +1,149 @@
-# Build
+# =============================================================================
+# XRoads .gitignore - Comprehensive exclusions for loop-based development
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Build & Swift
+# -----------------------------------------------------------------------------
 .build/
 .swiftpm/
 DerivedData/
 *.xcodeproj/xcuserdata/
 *.xcworkspace/xcuserdata/
-
-# macOS
-.DS_Store
 *.dSYM
+build/
+*.o
+*.a
+*.dylib
 
-# Node.js
+# -----------------------------------------------------------------------------
+# macOS
+# -----------------------------------------------------------------------------
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+.Spotlight-V100
+.Trashes
+
+# -----------------------------------------------------------------------------
+# Node.js (MCP Server)
+# -----------------------------------------------------------------------------
 node_modules/
 xroads-mcp/dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.npm
+.yarn
 
-# IDE
+# -----------------------------------------------------------------------------
+# IDE & Editors
+# -----------------------------------------------------------------------------
 .idea/
 .vscode/
 *.swp
 *.swo
+*~
+*.sublime-project
+*.sublime-workspace
 
-# Environment
+# -----------------------------------------------------------------------------
+# Environment & Secrets
+# -----------------------------------------------------------------------------
 .env
-.env.local
+.env.*
+!.env.example
+*.pem
+*.key
+credentials.json
 
-# Temporary
-*.tmp
+# -----------------------------------------------------------------------------
+# Loop Artifacts (CRITICAL - loops generate many files)
+# -----------------------------------------------------------------------------
+logs/
 *.log
+*_loop_*.log
+*_loop_*.txt
+loop_output/
+.nexus/
+notes/
+scratch/
 
-# Screenshots (don't commit to root)
+# -----------------------------------------------------------------------------
+# Screenshots & Images (don't commit to root)
+# -----------------------------------------------------------------------------
 Screenshot*.png
 *.jpeg
+*.jpg
+# Keep docs/assets for intentional documentation images
+!docs/assets/
 
-# Build artifacts
-build/
+# AI-generated images
+*-create-a-*.svg
+*-create-a-*.png
+create-a-*.svg
+create-a-*.png
 
-# Claude Code
+# -----------------------------------------------------------------------------
+# Development Notes (keep these local)
+# -----------------------------------------------------------------------------
+AGENTS.md
+EMERGENCY*.md
+GAP_ANALYSIS.md
+HANDOFF.md
+NEXUS_ART_DIRECTION.md
+codex-playbook.md
+context.md
+TODO.md
+SCRATCH.md
+NOTES.md
+*.draft.md
+
+# PRD files (user-specific, don't track)
+prd.json
+prd-*.json
+!prd.example.json
+
+# -----------------------------------------------------------------------------
+# Session & State Files
+# -----------------------------------------------------------------------------
 .claude/
+.cursor/
+.aider/
+.continue/
+*.session
+*.state
+
+# -----------------------------------------------------------------------------
+# Temporary & Cache
+# -----------------------------------------------------------------------------
+*.tmp
+*.temp
+*.cache
+.cache/
+tmp/
+temp/
+*.bak
+*.backup
+
+# -----------------------------------------------------------------------------
+# Archives (don't commit release zips)
+# -----------------------------------------------------------------------------
+*.zip
+*.tar.gz
+*.dmg
+*.pkg
+
+# -----------------------------------------------------------------------------
+# Test artifacts
+# -----------------------------------------------------------------------------
+coverage/
+.nyc_output/
+test-results/
+*.lcov
+
+# -----------------------------------------------------------------------------
+# External/Unrelated projects (accidentally added)
+# -----------------------------------------------------------------------------
+ios-swift-skills/
