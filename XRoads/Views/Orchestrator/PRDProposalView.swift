@@ -16,6 +16,7 @@ struct PRDProposalView: View {
     let onDismiss: () -> Void
     let onViewPRD: () -> Void
     let onLaunch: (AgentType, String) -> Void
+    let onConfigureMultiAgent: () -> Void
 
     @State private var selectedAgent: AgentType
     @State private var branchName: String
@@ -25,12 +26,14 @@ struct PRDProposalView: View {
         detectedPRD: DetectedPRD,
         onDismiss: @escaping () -> Void,
         onViewPRD: @escaping () -> Void,
-        onLaunch: @escaping (AgentType, String) -> Void
+        onLaunch: @escaping (AgentType, String) -> Void,
+        onConfigureMultiAgent: @escaping () -> Void = {}
     ) {
         self.detectedPRD = detectedPRD
         self.onDismiss = onDismiss
         self.onViewPRD = onViewPRD
         self.onLaunch = onLaunch
+        self.onConfigureMultiAgent = onConfigureMultiAgent
         self._selectedAgent = State(initialValue: detectedPRD.suggestedAgent)
         self._branchName = State(initialValue: detectedPRD.suggestedBranch)
     }
@@ -260,42 +263,67 @@ struct PRDProposalView: View {
     // MARK: - Action Buttons
 
     private var actionButtons: some View {
-        HStack(spacing: 12) {
-            // View PRD
-            Button(action: onViewPRD) {
-                HStack(spacing: 6) {
-                    Image(systemName: "eye")
-                    Text("Voir PRD")
+        VStack(spacing: 10) {
+            HStack(spacing: 12) {
+                // View PRD
+                Button(action: onViewPRD) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "eye")
+                        Text("Voir PRD")
+                    }
+                    .font(.system(size: 12, weight: .medium))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(Color.bgSurface)
+                    .foregroundColor(Color.textSecondary)
+                    .cornerRadius(8)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.borderDefault, lineWidth: 1)
+                    )
                 }
-                .font(.system(size: 12, weight: .medium))
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background(Color.bgSurface)
-                .foregroundColor(Color.textSecondary)
-                .cornerRadius(8)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(Color.borderDefault, lineWidth: 1)
-                )
-            }
-            .buttonStyle(.plain)
+                .buttonStyle(.plain)
 
-            Spacer()
+                Spacer()
 
-            // Launch button
-            Button(action: { onLaunch(selectedAgent, branchName) }) {
-                HStack(spacing: 6) {
-                    Image(systemName: "play.fill")
-                    Text("Lancer l'implémentation")
+                // Single-agent launch button
+                Button(action: { onLaunch(selectedAgent, branchName) }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "play.fill")
+                        Text("Lancer l'implémentation")
+                    }
+                    .font(.system(size: 12, weight: .semibold))
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(Color.accentPrimary)
+                    .foregroundColor(.white)
+                    .cornerRadius(8)
                 }
-                .font(.system(size: 12, weight: .semibold))
-                .padding(.horizontal, 16)
-                .padding(.vertical, 8)
-                .background(Color.accentPrimary)
-                .foregroundColor(.white)
-                .cornerRadius(8)
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
+
+            // Multi-agent configure button (only when complexity recommends it)
+            if detectedPRD.complexity.recommendsMultiAgent {
+                Button(action: onConfigureMultiAgent) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "square.stack.3d.up.fill")
+                        Text("Configurer Multi-Agent")
+                        Image(systemName: "arrow.right")
+                            .font(.system(size: 10))
+                    }
+                    .font(.system(size: 12, weight: .semibold))
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(Color.statusWarning.opacity(0.15))
+                    .foregroundColor(Color.statusWarning)
+                    .cornerRadius(8)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(Color.statusWarning.opacity(0.5), lineWidth: 1)
+                    )
+                }
+                .buttonStyle(.plain)
+            }
         }
     }
 }
@@ -308,6 +336,21 @@ struct PRDProposalOverlay: View {
     let onDismiss: () -> Void
     let onViewPRD: (DetectedPRD) -> Void
     let onLaunch: (DetectedPRD, AgentType, String) -> Void
+    let onConfigureMultiAgent: (DetectedPRD) -> Void
+
+    init(
+        detectedPRD: DetectedPRD?,
+        onDismiss: @escaping () -> Void,
+        onViewPRD: @escaping (DetectedPRD) -> Void,
+        onLaunch: @escaping (DetectedPRD, AgentType, String) -> Void,
+        onConfigureMultiAgent: @escaping (DetectedPRD) -> Void = { _ in }
+    ) {
+        self.detectedPRD = detectedPRD
+        self.onDismiss = onDismiss
+        self.onViewPRD = onViewPRD
+        self.onLaunch = onLaunch
+        self.onConfigureMultiAgent = onConfigureMultiAgent
+    }
 
     var body: some View {
         if let prd = detectedPRD {
@@ -318,7 +361,8 @@ struct PRDProposalOverlay: View {
                     detectedPRD: prd,
                     onDismiss: onDismiss,
                     onViewPRD: { onViewPRD(prd) },
-                    onLaunch: { agent, branch in onLaunch(prd, agent, branch) }
+                    onLaunch: { agent, branch in onLaunch(prd, agent, branch) },
+                    onConfigureMultiAgent: { onConfigureMultiAgent(prd) }
                 )
                 .padding(24)
             }
@@ -340,8 +384,8 @@ struct PRDProposalOverlay: View {
                 id: UUID(),
                 title: "Share Button Feature",
                 description: "Ajouter un bouton de partage sur les articles du blog",
-                complexity: .simple,
-                storyCount: 2,
+                complexity: .complex,
+                storyCount: 8,
                 suggestedAgent: .claude,
                 suggestedBranch: "feat/share-button",
                 rawJSON: "{}",
@@ -349,9 +393,10 @@ struct PRDProposalOverlay: View {
             ),
             onDismiss: {},
             onViewPRD: {},
-            onLaunch: { _, _ in }
+            onLaunch: { _, _ in },
+            onConfigureMultiAgent: {}
         )
         .padding(40)
     }
-    .frame(width: 500, height: 400)
+    .frame(width: 500, height: 500)
 }

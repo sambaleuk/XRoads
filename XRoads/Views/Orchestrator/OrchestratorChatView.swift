@@ -17,6 +17,8 @@ struct OrchestratorChatView: View {
     @StateObject private var viewModel = OrchestratorChatViewModel()
     @State private var showPRDFullView = false
     @State private var selectedPRDForView: DetectedPRD?
+    @State private var showSlotAssignment = false
+    @State private var prdDocumentForSlotAssignment: PRDDocument?
 
     // Phase 2: Chat dispatch integration
     private let dispatchParser = ChatDispatchParser()
@@ -63,6 +65,9 @@ struct OrchestratorChatView: View {
                 },
                 onLaunch: { prd, agent, branch in
                     launchImplementation(prd: prd, agent: agent, branch: branch)
+                },
+                onConfigureMultiAgent: { prd in
+                    openSlotAssignment(for: prd)
                 }
             )
         }
@@ -73,6 +78,14 @@ struct OrchestratorChatView: View {
         .sheet(isPresented: $showPRDFullView) {
             if let prd = selectedPRDForView {
                 PRDPreviewSheet(prd: prd)
+            }
+        }
+        .sheet(isPresented: $showSlotAssignment) {
+            if let doc = prdDocumentForSlotAssignment,
+               let projectPath = appState.projectPath {
+                SlotAssignmentSheet(prd: doc, repoPath: URL(fileURLWithPath: projectPath)) {
+                    showSlotAssignment = false
+                }
             }
         }
     }
@@ -417,6 +430,52 @@ struct OrchestratorChatView: View {
                 await viewModel.loadContext(from: appState)
             }
         }
+    }
+
+    private func openSlotAssignment(for prd: DetectedPRD) {
+        guard appState.projectPath != nil else {
+            viewModel.addSystemMessage("Veuillez d'abord sélectionner un projet.")
+            return
+        }
+
+        // Convert DetectedPRD → PRDDocument for SlotAssignmentSheet
+        let stories: [PRDUserStory] = (prd.prdData?.user_stories ?? []).enumerated().map { index, story in
+            var prdStory = PRDUserStory(
+                id: story.id ?? "US-\(String(format: "%03d", index + 1))",
+                title: story.title ?? "Story \(index + 1)",
+                description: story.description ?? "",
+                priority: PRDPriority(rawValue: story.priority ?? "medium") ?? .medium,
+                status: PRDStoryStatus(rawValue: story.status ?? "pending") ?? .pending,
+                acceptanceCriteria: story.acceptance_criteria ?? [],
+                dependsOn: story.depends_on ?? [],
+                estimatedComplexity: story.estimated_complexity ?? 3
+            )
+
+            // Map unit_test if present
+            if let ut = story.unit_test {
+                prdStory.unitTest = PRDUnitTest(
+                    file: ut.file ?? "tests/\(prdStory.id.lowercased().replacingOccurrences(of: "-", with: "_"))_test.swift",
+                    name: ut.name ?? "test_\(prdStory.id.lowercased().replacingOccurrences(of: "-", with: "_"))",
+                    description: ut.description ?? "Test for \(prdStory.title)",
+                    assertions: ut.assertions ?? [],
+                    status: PRDTestStatus(rawValue: ut.status ?? "pending") ?? .pending
+                )
+            } else {
+                prdStory.generateDefaultUnitTest()
+            }
+
+            return prdStory
+        }
+
+        let document = PRDDocument(
+            featureName: prd.prdData?.feature_name ?? prd.title,
+            description: prd.prdData?.description ?? prd.description,
+            userStories: stories
+        )
+
+        withAnimation { viewModel.dismissPRDProposal() }
+        prdDocumentForSlotAssignment = document
+        showSlotAssignment = true
     }
 
     private func launchImplementation(prd: DetectedPRD, agent: AgentType, branch: String) {

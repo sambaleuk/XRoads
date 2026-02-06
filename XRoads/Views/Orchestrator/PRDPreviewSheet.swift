@@ -265,12 +265,14 @@ struct PRDPreviewSheet: View {
         }
         """,
         prdData: DetectedPRD.PRDData(
+            version: "1.0",
             project_name: "Blog",
             feature_name: "Share Button Feature",
             description: "Ajouter un bouton de partage",
+            author: "Nexus",
             user_stories: [
-                DetectedPRD.PRDData.UserStory(id: "US-001", title: "Créer le composant", priority: "high", description: "Créer le bouton réutilisable"),
-                DetectedPRD.PRDData.UserStory(id: "US-002", title: "Intégrer le partage", priority: "medium", description: "Connecter l'API de partage")
+                DetectedPRD.PRDData.UserStory(id: "US-001", title: "Créer le composant", priority: "high", description: "Créer le bouton réutilisable", status: "pending", acceptance_criteria: nil, depends_on: nil, estimated_complexity: nil, unit_test: nil),
+                DetectedPRD.PRDData.UserStory(id: "US-002", title: "Intégrer le partage", priority: "medium", description: "Connecter l'API de partage", status: "pending", acceptance_criteria: nil, depends_on: nil, estimated_complexity: nil, unit_test: nil)
             ]
         )
     ))

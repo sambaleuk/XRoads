@@ -22,11 +22,13 @@ struct DetectedPRD: Identifiable, Sendable {
     let rawJSON: String
     let prdData: PRDData?
 
-    /// Parsed PRD data structure
+    /// Parsed PRD data structure (Nexus format)
     struct PRDData: Codable, Sendable {
+        let version: String?
         let project_name: String?
         let feature_name: String?
         let description: String?
+        let author: String?
         let user_stories: [UserStory]?
 
         struct UserStory: Codable, Sendable {
@@ -34,6 +36,19 @@ struct DetectedPRD: Identifiable, Sendable {
             let title: String?
             let priority: String?
             let description: String?
+            let status: String?
+            let acceptance_criteria: [String]?
+            let depends_on: [String]?
+            let estimated_complexity: Int?
+            let unit_test: UnitTest?
+        }
+
+        struct UnitTest: Codable, Sendable {
+            let file: String?
+            let name: String?
+            let description: String?
+            let assertions: [String]?
+            let status: String?
         }
     }
 }
