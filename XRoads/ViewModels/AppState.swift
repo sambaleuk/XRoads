@@ -19,7 +19,18 @@ final class AppState {
         }
     }
 
-    // MARK: - State Properties
+    // MARK: - Sub-States (CR-301: Decomposed from God Object)
+
+    /// Dashboard visual state: terminal slots, orchestrator visualization, git info
+    let dashboard = DashboardState()
+
+    /// Dispatch progress state: phase, progress, messages, layers
+    let dispatch = DispatchState()
+
+    /// Orchestration session state: agents, health, merge, history
+    let orchestration = OrchestrationSubState()
+
+    // MARK: - Core State Properties
 
     /// All sessions in the application
     var sessions: [Session] = []
@@ -51,133 +62,203 @@ final class AppState {
     /// Indicates if log streaming is active
     var isStreamingLogs: Bool = false
 
-    /// Active task assignments tracked for Full Agentic Mode
-    var agentAssignments: [String: TaskAssignment] = [:]
-
-    /// Latest agent status snapshots keyed by assignment/agent id
-    var agentStatusSnapshots: [String: AgentStatusSnapshot] = [:]
-
-    /// Timeline of recent agent events for the dashboard
-    var agentTimelineEvents: [AgentTimelineEvent] = []
-
-    /// Health metrics per agent (avg durations, success rate, issue counters)
-    var agentHealthMetrics: [String: AgentHealthMetrics] = [:]
-
-    /// Active health issues detected for agents
-    var agentHealthIssues: [AgentHealthIssue] = []
-    var presentedHealthIssue: AgentHealthIssue?
-
-    /// Internal trackers for responsiveness and repeated messages
-    private var lastStatusTimestamps: [String: Date] = [:]
-    private var repeatedMessageTracker: [String: (message: String, count: Int)] = [:]
-    private var storyStartTimestamps: [String: [String: Date]] = [:]
-
     /// Current project/repository path for Git Dashboard
     var projectPath: String?
-
-    /// Latest merge plan/result for Full Agentic Mode
-    var mergePlan: MergePlan?
-    var mergeResult: MergeResult?
-    var orchestrationRepoPath: URL?
-    var conflictFiles: [String] = []
-    var unresolvedConflicts: [MergeConflict] = []
-    var selectedConflictFile: String?
-    var isConflictSheetPresented: Bool = false
-
-    var historyRecords: [OrchestrationRecord] = []
-    var showHistorySheet: Bool = false
-    var pendingPRDURL: URL?
-    private(set) var activePRDURL: URL?
-    private(set) var activePRDName: String?
-    private var assignmentStartTimes: [String: Date] = [:]
-    private var assignmentFinishTimes: [String: Date] = [:]
-    private var agentCompletedStories: [String: Set<String>] = [:]
-    private var agentErrorMessages: [String: [String]] = [:]
-
-    // MARK: - Dashboard v3 State
-
-    /// Current dashboard display mode (Single/Agentic)
-    var dashboardMode: DashboardMode = .agentic
-
-    /// Terminal slots for the hexagonal dashboard (6 slots)
-    var terminalSlots: [TerminalSlot] = (1...6).map { TerminalSlot(slotNumber: $0) }
-
-    /// Visual state of the central orchestrator creature
-    var orchestratorVisualState: OrchestratorVisualState = .sleeping
-
-    /// Available MCP tools for checking skill dependencies (US-V4-018)
-    var availableMCPTools: Set<String> = Set(["git", "file-read", "file-edit", "bash", "web-search"])
-
-    /// Recent git commits for the right side panel
-    var recentCommits: [GitCommit] = []
-
-    /// Whether the current project path is a git repository
-    var isGitRepository: Bool = false
-
-    /// Whether git initialization is in progress
-    var isInitializingGit: Bool = false
-
-    // MARK: - Orchestration State
-
-    /// Current orchestration session ID
-    private(set) var orchestrationSessionID: UUID?
-
-    /// Current orchestration state
-    var orchestrationState: OrchestratorState = .idle
-
-    /// Active worktree assignments for current orchestration
-    var activeWorktreeAssignments: [WorktreeAssignment] = []
-
-    /// Active agent sessions
-    var activeAgentSessions: [AgentSession] = []
-
-    /// Whether orchestration is in progress
-    var isOrchestrating: Bool {
-        switch orchestrationState {
-        case .idle, .complete, .error:
-            return false
-        default:
-            return true
-        }
-    }
-
-    // MARK: - Dispatch Progress State (LayeredDispatcher)
-
-    /// Current dispatch phase
-    var dispatchPhase: DispatchPhase = .idle
-
-    /// Dispatch progress info
-    var dispatchProgress: DispatchProgress?
-
-    /// Current dispatch message
-    var dispatchMessage: String = ""
-
-    /// Global logs from all dispatch sources (Phase 2)
-    var globalLogs: [LogEntry] = []
-
-    /// Whether a layered dispatch is active
-    var isDispatching: Bool {
-        switch dispatchPhase {
-        case .idle, .completed, .failed:
-            return false
-        default:
-            return true
-        }
-    }
-
-    /// PRD being dispatched
-    var currentPRD: PRDDocument?
-
-    /// Current layer being executed
-    var currentDispatchLayer: Int = 0
-
-    /// Total layers in dispatch
-    var totalDispatchLayers: Int = 0
 
     // MARK: - GitMaster State
 
     /// State of the GitMaster intelligent resolver
     var gitMasterState: GitMasterState = GitMasterState()
+
+    // MARK: - Delegating Properties (backward compatibility)
+    // These forward to sub-states so existing view code continues to work.
+    // Views should migrate to appState.dashboard.*, appState.dispatch.*, appState.orchestration.* over time.
+
+    var dashboardMode: DashboardMode {
+        get { dashboard.dashboardMode }
+        set { dashboard.dashboardMode = newValue }
+    }
+
+    var terminalSlots: [TerminalSlot] {
+        get { dashboard.terminalSlots }
+        set { dashboard.terminalSlots = newValue }
+    }
+
+    var orchestratorVisualState: OrchestratorVisualState {
+        get { dashboard.orchestratorVisualState }
+        set { dashboard.orchestratorVisualState = newValue }
+    }
+
+    var availableMCPTools: Set<String> {
+        get { dashboard.availableMCPTools }
+        set { dashboard.availableMCPTools = newValue }
+    }
+
+    var recentCommits: [GitCommit] {
+        get { dashboard.recentCommits }
+        set { dashboard.recentCommits = newValue }
+    }
+
+    var isGitRepository: Bool {
+        get { dashboard.isGitRepository }
+        set { dashboard.isGitRepository = newValue }
+    }
+
+    var isInitializingGit: Bool {
+        get { dashboard.isInitializingGit }
+        set { dashboard.isInitializingGit = newValue }
+    }
+
+    var activeSlots: [TerminalSlot] { dashboard.activeSlots }
+    var configuredSlots: [TerminalSlot] { dashboard.configuredSlots }
+    var activeSlotAngles: [Double] { dashboard.activeSlotAngles }
+    var terminalSlotsProgress: Double { dashboard.terminalSlotsProgress }
+
+    var dispatchPhase: DispatchPhase {
+        get { dispatch.dispatchPhase }
+        set { dispatch.dispatchPhase = newValue }
+    }
+
+    var dispatchProgress: DispatchProgress? {
+        get { dispatch.dispatchProgress }
+        set { dispatch.dispatchProgress = newValue }
+    }
+
+    var dispatchMessage: String {
+        get { dispatch.dispatchMessage }
+        set { dispatch.dispatchMessage = newValue }
+    }
+
+    var globalLogs: [LogEntry] {
+        get { dispatch.globalLogs }
+        set { dispatch.globalLogs = newValue }
+    }
+
+    var isDispatching: Bool { dispatch.isDispatching }
+
+    var currentPRD: PRDDocument? {
+        get { dispatch.currentPRD }
+        set { dispatch.currentPRD = newValue }
+    }
+
+    var currentDispatchLayer: Int {
+        get { dispatch.currentDispatchLayer }
+        set { dispatch.currentDispatchLayer = newValue }
+    }
+
+    var totalDispatchLayers: Int {
+        get { dispatch.totalDispatchLayers }
+        set { dispatch.totalDispatchLayers = newValue }
+    }
+
+    var orchestrationSessionID: UUID? { orchestration.orchestrationSessionID }
+
+    var orchestrationState: OrchestratorState {
+        get { orchestration.orchestrationState }
+        set { orchestration.orchestrationState = newValue }
+    }
+
+    var activeWorktreeAssignments: [WorktreeAssignment] {
+        get { orchestration.activeWorktreeAssignments }
+        set { orchestration.activeWorktreeAssignments = newValue }
+    }
+
+    var activeAgentSessions: [AgentSession] {
+        get { orchestration.activeAgentSessions }
+        set { orchestration.activeAgentSessions = newValue }
+    }
+
+    var isOrchestrating: Bool { orchestration.isOrchestrating }
+
+    var agentAssignments: [String: TaskAssignment] {
+        get { orchestration.agentAssignments }
+        set { orchestration.agentAssignments = newValue }
+    }
+
+    var agentStatusSnapshots: [String: AgentStatusSnapshot] {
+        get { orchestration.agentStatusSnapshots }
+        set { orchestration.agentStatusSnapshots = newValue }
+    }
+
+    var agentTimelineEvents: [AgentTimelineEvent] {
+        get { orchestration.agentTimelineEvents }
+        set { orchestration.agentTimelineEvents = newValue }
+    }
+
+    var agentHealthMetrics: [String: AgentHealthMetrics] {
+        get { orchestration.agentHealthMetrics }
+        set { orchestration.agentHealthMetrics = newValue }
+    }
+
+    var agentHealthIssues: [AgentHealthIssue] {
+        get { orchestration.agentHealthIssues }
+        set { orchestration.agentHealthIssues = newValue }
+    }
+
+    var presentedHealthIssue: AgentHealthIssue? {
+        get { orchestration.presentedHealthIssue }
+        set { orchestration.presentedHealthIssue = newValue }
+    }
+
+    var mergePlan: MergePlan? {
+        get { orchestration.mergePlan }
+        set { orchestration.mergePlan = newValue }
+    }
+
+    var mergeResult: MergeResult? {
+        get { orchestration.mergeResult }
+        set { orchestration.mergeResult = newValue }
+    }
+
+    var orchestrationRepoPath: URL? {
+        get { orchestration.orchestrationRepoPath }
+        set { orchestration.orchestrationRepoPath = newValue }
+    }
+
+    var conflictFiles: [String] {
+        get { orchestration.conflictFiles }
+        set { orchestration.conflictFiles = newValue }
+    }
+
+    var unresolvedConflicts: [MergeConflict] {
+        get { orchestration.unresolvedConflicts }
+        set { orchestration.unresolvedConflicts = newValue }
+    }
+
+    var selectedConflictFile: String? {
+        get { orchestration.selectedConflictFile }
+        set { orchestration.selectedConflictFile = newValue }
+    }
+
+    var isConflictSheetPresented: Bool {
+        get { orchestration.isConflictSheetPresented }
+        set { orchestration.isConflictSheetPresented = newValue }
+    }
+
+    var historyRecords: [OrchestrationRecord] {
+        get { orchestration.historyRecords }
+        set { orchestration.historyRecords = newValue }
+    }
+
+    var showHistorySheet: Bool {
+        get { orchestration.showHistorySheet }
+        set { orchestration.showHistorySheet = newValue }
+    }
+
+    var pendingPRDURL: URL? {
+        get { orchestration.pendingPRDURL }
+        set { orchestration.pendingPRDURL = newValue }
+    }
+
+    var activePRDURL: URL? { orchestration.activePRDURL }
+    var activePRDName: String? { orchestration.activePRDName }
+
+    var dashboardEntries: [AgentDashboardEntry] { orchestration.dashboardEntries }
+    var globalDashboardProgress: Double { orchestration.globalDashboardProgress }
+
+    var isAgenticPulseActive: Bool {
+        dashboard.dashboardMode == .agentic && orchestration.isOrchestrating
+    }
 
     // MARK: - Private Properties
 
@@ -187,7 +268,6 @@ final class AppState {
     private var agentEventTask: Task<Void, Never>?
     private let statusMonitor = AgentStatusMonitor()
     private var healthMonitorTask: Task<Void, Never>?
-    private var healthAlertQueue: [AgentHealthIssue] = []
     private let healthCheckInterval: TimeInterval = 30
     private let nonResponsiveThreshold: TimeInterval = 120
     private let repeatedMessageThreshold = 5
@@ -209,80 +289,6 @@ final class AppState {
     var filteredLogs: [LogEntry] {
         guard let worktree = selectedWorktree else { return logs }
         return logs.filter { $0.worktree == worktree.path }
-    }
-
-    /// Dashboard entries mirroring latest agent statuses
-    var dashboardEntries: [AgentDashboardEntry] {
-        agentStatusSnapshots.values.map { snapshot in
-            let assignment = agentAssignments[snapshot.agentId]
-            let metrics = agentHealthMetrics[snapshot.agentId]
-            let healthIssue = agentHealthIssues.first { issue in
-                issue.agentId == snapshot.agentId && issue.state == .active
-            }
-            return AgentDashboardEntry(
-                id: snapshot.agentId,
-                agentType: snapshot.agentType ?? assignment?.agentType,
-                stories: assignment?.storyIds ?? [],
-                currentStoryId: snapshot.currentStoryId,
-                progress: min(max(snapshot.progress, 0), 1),
-                state: snapshot.state,
-                message: snapshot.message,
-                lastUpdate: snapshot.timestamp,
-                averageStoryTime: metrics?.averageStoryTime,
-                successRate: metrics?.successRate,
-                activeHealthIssue: healthIssue
-            )
-        }
-        .sorted { $0.lastUpdate > $1.lastUpdate }
-    }
-
-    /// Percentage of completed stories across all tracked assignments
-    var globalDashboardProgress: Double {
-        let totalStories = agentAssignments.values
-            .reduce(0) { $0 + $1.storyIds.count }
-        guard totalStories > 0 else { return 0 }
-
-        let completedStories = dashboardEntries.reduce(0) { partial, entry in
-            let weight = entry.stories.count
-            switch entry.state {
-            case .finished:
-                return partial + weight
-            default:
-                return partial + Int(Double(weight) * entry.progress)
-            }
-        }
-
-        return Double(completedStories) / Double(totalStories)
-    }
-
-    /// Whether the dashboard should display the animated agentic pulse
-    var isAgenticPulseActive: Bool {
-        dashboardMode == .agentic && isOrchestrating
-    }
-
-    // MARK: - Dashboard v3 Computed Properties
-
-    /// Active terminal slots (slots that are currently running)
-    var activeSlots: [TerminalSlot] {
-        terminalSlots.filter { $0.status.isActive }
-    }
-
-    /// Configured terminal slots (slots with worktree and agent assigned)
-    var configuredSlots: [TerminalSlot] {
-        terminalSlots.filter { $0.isConfigured }
-    }
-
-    /// Angles of active slots for orchestrator visualization
-    var activeSlotAngles: [Double] {
-        activeSlots.map { $0.positionAngle }
-    }
-
-    /// Global progress across all configured terminal slots
-    var terminalSlotsProgress: Double {
-        let configured = configuredSlots
-        guard !configured.isEmpty else { return 0 }
-        let totalProgress = configured.reduce(0.0) { $0 + $1.progress }
-        return totalProgress / Double(configured.count)
     }
 
     // MARK: - Initialization
@@ -584,28 +590,7 @@ final class AppState {
 
     /// Update orchestrator visual state after a slot terminates
     private func updateOrchestratorStateAfterTermination() {
-        let runningSlots = terminalSlots.filter { $0.status == .running }
-        let completedSlots = terminalSlots.filter { $0.status == .completed }
-        let failedSlots = terminalSlots.filter { $0.status == .error }
-        let configuredSlots = terminalSlots.filter { $0.isConfigured }
-
-        if runningSlots.isEmpty {
-            if !failedSlots.isEmpty {
-                // Some slots failed
-                orchestratorVisualState = .concerned
-            } else if completedSlots.count == configuredSlots.count && !configuredSlots.isEmpty {
-                // All configured slots completed successfully
-                orchestratorVisualState = .celebrating
-                // Reset to idle after celebration
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
-                    self?.orchestratorVisualState = .idle
-                }
-            } else {
-                // No running, no failures, not all complete - idle
-                orchestratorVisualState = .idle
-            }
-        }
-        // If still running, keep current state (monitoring/distributing)
+        dashboard.updateOrchestratorStateAfterTermination()
     }
 
     // MARK: - Input Bridge (US-V3-013)
@@ -721,23 +706,7 @@ final class AppState {
 
     /// Updates the orchestrator visual state based on slot states
     func updateOrchestratorVisualState() {
-        let activeCount = activeSlots.count
-        let configuredCount = configuredSlots.count
-        let hasErrors = terminalSlots.contains { $0.status == .error }
-        let hasNeedsInput = terminalSlots.contains { $0.status == .needsInput }
-        let allCompleted = configuredCount > 0 && configuredSlots.allSatisfy { $0.status == .completed }
-
-        if allCompleted {
-            orchestratorVisualState = .celebrating
-        } else if hasErrors || hasNeedsInput {
-            orchestratorVisualState = .concerned
-        } else if activeCount > 0 {
-            orchestratorVisualState = .monitoring
-        } else if configuredCount > 0 {
-            orchestratorVisualState = .idle
-        } else {
-            orchestratorVisualState = .sleeping
-        }
+        dashboard.updateOrchestratorVisualState()
     }
 
     // MARK: - Unified Action Flow (US-V3-014)
@@ -1398,63 +1367,37 @@ final class AppState {
 
     /// Registers task assignments so the dashboard can determine total scope
     func registerAssignments(_ assignments: [TaskAssignment]) {
-        for assignment in assignments {
-            let key = assignment.id.uuidString
-            agentAssignments[key] = assignment
-            assignmentStartTimes[key] = Date()
-            assignmentFinishTimes[key] = nil
-            agentCompletedStories[key] = Set<String>()
-            agentErrorMessages[key] = []
-            agentHealthMetrics[key] = AgentHealthMetrics(
-                agentId: key,
-                agentType: assignment.agentType,
-                totalStories: assignment.storyIds.count
-            )
-            storyStartTimestamps[key] = [:]
-        }
+        orchestration.registerAssignments(assignments)
     }
 
     /// Clears tracked assignments
     func clearAssignments() {
-        agentAssignments.removeAll()
-        agentStatusSnapshots.removeAll()
-        agentTimelineEvents.removeAll()
-        assignmentStartTimes.removeAll()
-        assignmentFinishTimes.removeAll()
-        agentCompletedStories.removeAll()
-        agentErrorMessages.removeAll()
-        agentHealthMetrics.removeAll()
-        agentHealthIssues.removeAll()
-        presentedHealthIssue = nil
-        healthAlertQueue.removeAll()
-        lastStatusTimestamps.removeAll()
-        repeatedMessageTracker.removeAll()
-        storyStartTimestamps.removeAll()
+        orchestration.clearAssignments()
         healthMonitorTask?.cancel()
         healthMonitorTask = nil
     }
 
     /// Handles an incoming agent status snapshot
     func handleAgentStatusSnapshot(_ snapshot: AgentStatusSnapshot) {
-        lastStatusTimestamps[snapshot.agentId] = snapshot.timestamp
+        orchestration.lastStatusTimestamps[snapshot.agentId] = snapshot.timestamp
         if snapshot.state != .error && snapshot.state != .blocked {
-            resolveHealthIssue(for: snapshot.agentId, type: .nonResponsive)
+            orchestration.resolveHealthIssue(for: snapshot.agentId, type: .nonResponsive)
         }
         evaluateRepeatedMessage(for: snapshot)
 
-        if assignmentStartTimes[snapshot.agentId] == nil {
-            assignmentStartTimes[snapshot.agentId] = snapshot.timestamp
+        if orchestration.assignmentStartTimes[snapshot.agentId] == nil {
+            orchestration.assignmentStartTimes[snapshot.agentId] = snapshot.timestamp
         }
         if snapshot.state == .finished || snapshot.state == .error {
-            assignmentFinishTimes[snapshot.agentId] = snapshot.timestamp
+            orchestration.assignmentFinishTimes[snapshot.agentId] = snapshot.timestamp
         }
         if snapshot.state == .error || snapshot.state == .blocked {
-            var errors = agentErrorMessages[snapshot.agentId] ?? []
+            var errors = orchestration.agentErrorMessages[snapshot.agentId] ?? []
             errors.append(snapshot.message)
-            agentErrorMessages[snapshot.agentId] = errors
+            orchestration.agentErrorMessages[snapshot.agentId] = errors
         }
 
-        agentStatusSnapshots[snapshot.agentId] = snapshot
+        orchestration.agentStatusSnapshots[snapshot.agentId] = snapshot
         let event = AgentTimelineEvent(
             agentId: snapshot.agentId,
             agentType: snapshot.agentType,
@@ -1462,26 +1405,26 @@ final class AppState {
             message: snapshot.message,
             timestamp: snapshot.timestamp
         )
-        agentTimelineEvents.insert(event, at: 0)
-        if agentTimelineEvents.count > 100 {
-            agentTimelineEvents.removeLast(agentTimelineEvents.count - 100)
+        orchestration.agentTimelineEvents.insert(event, at: 0)
+        if orchestration.agentTimelineEvents.count > 100 {
+            orchestration.agentTimelineEvents.removeLast(orchestration.agentTimelineEvents.count - 100)
         }
     }
 
     func handleAgentEvent(_ event: AgentEvent) {
         if event.kind == .storyStarted, let storyId = event.storyId {
-            recordStoryStart(agentId: event.agentId, storyId: storyId, timestamp: event.timestamp)
+            orchestration.recordStoryStart(agentId: event.agentId, storyId: storyId, timestamp: event.timestamp)
         }
         if event.kind == .storyCompleted, let storyId = event.storyId {
-            var stories = agentCompletedStories[event.agentId] ?? []
+            var stories = orchestration.agentCompletedStories[event.agentId] ?? []
             stories.insert(storyId)
-            agentCompletedStories[event.agentId] = stories
-            completeStory(agentId: event.agentId, storyId: storyId, completedAt: event.timestamp)
+            orchestration.agentCompletedStories[event.agentId] = stories
+            orchestration.completeStory(agentId: event.agentId, storyId: storyId, completedAt: event.timestamp)
         }
         if event.kind == .blocked || event.kind == .needsHelp {
-            var errors = agentErrorMessages[event.agentId] ?? []
+            var errors = orchestration.agentErrorMessages[event.agentId] ?? []
             errors.append(event.message)
-            agentErrorMessages[event.agentId] = errors
+            orchestration.agentErrorMessages[event.agentId] = errors
         }
 
         let state: AgentRunState
@@ -1504,31 +1447,26 @@ final class AppState {
             timestamp: event.timestamp
         )
 
-        agentTimelineEvents.insert(timelineEvent, at: 0)
-        if agentTimelineEvents.count > 100 {
-            agentTimelineEvents.removeLast(agentTimelineEvents.count - 100)
+        orchestration.agentTimelineEvents.insert(timelineEvent, at: 0)
+        if orchestration.agentTimelineEvents.count > 100 {
+            orchestration.agentTimelineEvents.removeLast(orchestration.agentTimelineEvents.count - 100)
         }
     }
 
     func setOrchestrationRepoPath(_ url: URL) {
-        orchestrationRepoPath = url
+        orchestration.orchestrationRepoPath = url
     }
 
     func setActivePRD(url: URL?, name: String?) {
-        activePRDURL = url
-        activePRDName = name
+        orchestration.setActivePRD(url: url, name: name)
     }
 
     func clearPendingPRDURL() {
-        pendingPRDURL = nil
+        orchestration.clearPendingPRDURL()
     }
 
     func presentConflicts(from result: MergeResult, repoPath: URL) {
-        orchestrationRepoPath = repoPath
-        unresolvedConflicts = result.conflicts
-        conflictFiles = result.conflicts.flatMap(\.files)
-        selectedConflictFile = conflictFiles.first
-        isConflictSheetPresented = !conflictFiles.isEmpty
+        orchestration.presentConflicts(from: result, repoPath: repoPath)
     }
 
     func keepOurs(for file: String) async {
@@ -1540,11 +1478,11 @@ final class AppState {
     }
 
     func markResolved(file: String) async {
-        guard let repo = orchestrationRepoPath else { return }
+        guard let repo = orchestration.orchestrationRepoPath else { return }
         do {
             try await services.gitService.stageFile(repoPath: repo.path, file: file)
             await MainActor.run {
-                self.removeConflict(file: file)
+                self.orchestration.removeConflict(file: file)
             }
         } catch {
             setError(.processError("Failed to mark resolved: \(error.localizedDescription)"))
@@ -1552,12 +1490,12 @@ final class AppState {
     }
 
     func abortMerge() async {
-        guard let repo = orchestrationRepoPath else { return }
+        guard let repo = orchestration.orchestrationRepoPath else { return }
         do {
             try await services.gitService.abortMerge(repoPath: repo.path)
             try await services.gitService.resetHard(repoPath: repo.path)
             await MainActor.run {
-                self.clearConflicts()
+                self.orchestration.clearConflicts()
             }
         } catch {
             setError(.processError("Failed to abort merge: \(error.localizedDescription)"))
@@ -1565,11 +1503,11 @@ final class AppState {
     }
 
     func dismissConflictSheet() {
-        clearConflicts()
+        orchestration.dismissConflictSheet()
     }
 
     private func resolveConflict(file: String, keepOurs: Bool) async {
-        guard let repo = orchestrationRepoPath else { return }
+        guard let repo = orchestration.orchestrationRepoPath else { return }
         do {
             try await services.gitService.resolveConflict(
                 repoPath: repo.path,
@@ -1578,31 +1516,11 @@ final class AppState {
             )
             try await services.gitService.stageFile(repoPath: repo.path, file: file)
             await MainActor.run {
-                self.removeConflict(file: file)
+                self.orchestration.removeConflict(file: file)
             }
         } catch {
             setError(.processError("Failed to resolve conflict for \(file): \(error.localizedDescription)"))
         }
-    }
-
-    private func removeConflict(file: String) {
-        conflictFiles.removeAll { $0 == file }
-        for index in unresolvedConflicts.indices {
-            unresolvedConflicts[index].files = unresolvedConflicts[index].files.filter { $0 != file }
-        }
-        unresolvedConflicts.removeAll { $0.files.isEmpty }
-        if conflictFiles.isEmpty {
-            isConflictSheetPresented = false
-        } else {
-            selectedConflictFile = conflictFiles.first
-        }
-    }
-
-    private func clearConflicts() {
-        conflictFiles.removeAll()
-        unresolvedConflicts.removeAll()
-        selectedConflictFile = nil
-        isConflictSheetPresented = false
     }
 
     private func syncNotesBack(result: MergeResult, repoPath: URL) throws {
@@ -1890,7 +1808,7 @@ final class AppState {
 
     private func buildOrchestrationRecord(plan: MergePlan, result: MergeResult) -> OrchestrationRecord {
         let finishedAt = Date()
-        let metrics = makeAgentMetrics(completedAt: finishedAt)
+        let metrics = orchestration.makeAgentMetrics(completedAt: finishedAt)
         let totalStories = metrics.reduce(0) { $0 + $1.storiesTotal }
         let completedStories = metrics.reduce(0) { $0 + $1.storiesCompleted }
         let errors = metrics.flatMap(\.errors)
@@ -1899,8 +1817,8 @@ final class AppState {
             id: UUID(),
             startedAt: plan.createdAt,
             finishedAt: finishedAt,
-            prdName: activePRDName ?? plan.baseBranch,
-            prdPath: activePRDURL?.path,
+            prdName: orchestration.activePRDName ?? plan.baseBranch,
+            prdPath: orchestration.activePRDURL?.path,
             resultSummary: result.success ? "Merged" : (result.conflicts.isEmpty ? "Partial" : "Conflicts"),
             mergedBranches: result.mergedBranches,
             conflicts: result.conflicts.flatMap(\.files),
@@ -1911,51 +1829,10 @@ final class AppState {
         )
     }
 
-    private func makeAgentMetrics(completedAt: Date) -> [AgentRunMetric] {
-        agentAssignments.map { key, assignment in
-            let start = assignmentStartTimes[key] ?? mergePlan?.createdAt ?? completedAt
-            let finish = assignmentFinishTimes[key] ?? completedAt
-            let duration = max(finish.timeIntervalSince(start), 0)
-            let snapshot = agentStatusSnapshots[key]
-            let state = snapshot?.state ?? .idle
-            let totalStories = assignment.storyIds.count
-            let completedCount: Int
-            let recordedCompletions = agentCompletedStories[key]?.count ?? 0
-
-            if state == .finished {
-                completedCount = totalStories
-            } else if recordedCompletions > 0 {
-                completedCount = min(totalStories, recordedCompletions)
-            } else {
-                let progress = snapshot?.progress ?? 0
-                let approximate = Int((progress * Double(totalStories)).rounded())
-                completedCount = max(0, min(totalStories, approximate))
-            }
-
-            let errors = agentErrorMessages[key] ?? []
-
-            return AgentRunMetric(
-                agentId: key,
-                agentType: assignment.agentType,
-                storiesTotal: totalStories,
-                storiesCompleted: completedCount,
-                state: state,
-                durationSeconds: duration,
-                lastMessage: snapshot?.message,
-                errors: errors
-            )
-        }
-        .sorted { lhs, rhs in
-            let leftName = lhs.agentType?.displayName ?? lhs.agentId
-            let rightName = rhs.agentType?.displayName ?? rhs.agentId
-            return leftName < rightName
-        }
-    }
-
     func loadHistory() async {
         let records = await services.historyService.load()
         await MainActor.run {
-            self.historyRecords = records
+            self.orchestration.historyRecords = records
         }
     }
 
@@ -1972,7 +1849,7 @@ final class AppState {
         }
 
         let sessionID = UUID()
-        orchestrationSessionID = sessionID
+        orchestration.setOrchestrationSessionID(sessionID)
         orchestrationRepoPath = repoPath
         orchestrationState = .analyzing
 
@@ -2094,7 +1971,7 @@ final class AppState {
         // Clear state
         activeAgentSessions.removeAll()
         orchestrationState = .idle
-        orchestrationSessionID = nil
+        orchestration.setOrchestrationSessionID(nil)
 
         addLog(LogEntry(level: .info, source: "orchestrator", worktree: nil, message: "Orchestration stopped"))
     }
@@ -2182,29 +2059,6 @@ final class AppState {
 
     // MARK: - Health Monitoring Helpers
 
-    private func recordStoryStart(agentId: String, storyId: String, timestamp: Date) {
-        var stories = storyStartTimestamps[agentId] ?? [:]
-        stories[storyId] = timestamp
-        storyStartTimestamps[agentId] = stories
-    }
-
-    private func completeStory(agentId: String, storyId: String, completedAt: Date) {
-        var stories = storyStartTimestamps[agentId] ?? [:]
-        let start = stories.removeValue(forKey: storyId)
-        storyStartTimestamps[agentId] = stories
-        let duration = start.map { max(completedAt.timeIntervalSince($0), 0) } ?? 0
-        updateMetricsForStoryCompletion(agentId: agentId, duration: duration)
-    }
-
-    private func updateMetricsForStoryCompletion(agentId: String, duration: TimeInterval) {
-        guard var metrics = agentHealthMetrics[agentId] else { return }
-        if duration > 0 {
-            metrics.storyDurations.append(duration)
-        }
-        metrics.completedStories = min(metrics.totalStories, metrics.completedStories + 1)
-        agentHealthMetrics[agentId] = metrics
-    }
-
     private func startHealthMonitorLoop() {
         healthMonitorTask?.cancel()
         healthMonitorTask = Task { [weak self] in
@@ -2220,16 +2074,16 @@ final class AppState {
 
     private func evaluateAgentHealthTimers() {
         let now = Date()
-        for (agentId, lastUpdate) in lastStatusTimestamps {
+        for (agentId, lastUpdate) in orchestration.lastStatusTimestamps {
             guard now.timeIntervalSince(lastUpdate) >= nonResponsiveThreshold else { continue }
-            let agentType = agentAssignments[agentId]?.agentType
-            if let issue = recordHealthIssue(
+            let agentType = orchestration.agentAssignments[agentId]?.agentType
+            if let issue = orchestration.recordHealthIssue(
                 agentId: agentId,
                 agentType: agentType,
                 type: .nonResponsive,
                 message: "No status update for over 2 minutes."
             ) {
-                incrementHealthMetric(for: agentId, type: .nonResponsive)
+                orchestration.incrementHealthMetric(for: agentId, type: .nonResponsive)
                 logHealthIssue(issue)
             }
         }
@@ -2238,111 +2092,32 @@ final class AppState {
     private func evaluateRepeatedMessage(for snapshot: AgentStatusSnapshot) {
         let trimmed = snapshot.message.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
-            repeatedMessageTracker[snapshot.agentId] = nil
-            resolveHealthIssue(for: snapshot.agentId, type: .repeatedMessage)
+            orchestration.repeatedMessageTracker[snapshot.agentId] = nil
+            orchestration.resolveHealthIssue(for: snapshot.agentId, type: .repeatedMessage)
             return
         }
 
-        var tracker = repeatedMessageTracker[snapshot.agentId] ?? (message: trimmed, count: 0)
+        var tracker = orchestration.repeatedMessageTracker[snapshot.agentId] ?? (message: trimmed, count: 0)
         if tracker.message == trimmed {
             tracker.count += 1
         } else {
             tracker = (trimmed, 1)
-            resolveHealthIssue(for: snapshot.agentId, type: .repeatedMessage)
+            orchestration.resolveHealthIssue(for: snapshot.agentId, type: .repeatedMessage)
         }
-        repeatedMessageTracker[snapshot.agentId] = tracker
+        orchestration.repeatedMessageTracker[snapshot.agentId] = tracker
 
         if tracker.count >= repeatedMessageThreshold, tracker.count % repeatedMessageThreshold == 0 {
-            let agentType = snapshot.agentType ?? agentAssignments[snapshot.agentId]?.agentType
-            if let issue = recordHealthIssue(
+            let agentType = snapshot.agentType ?? orchestration.agentAssignments[snapshot.agentId]?.agentType
+            if let issue = orchestration.recordHealthIssue(
                 agentId: snapshot.agentId,
                 agentType: agentType,
                 type: .repeatedMessage,
                 message: "Status repeated \(tracker.count)x: \(trimmed)"
             ) {
-                incrementHealthMetric(for: snapshot.agentId, type: .repeatedMessage)
+                orchestration.incrementHealthMetric(for: snapshot.agentId, type: .repeatedMessage)
                 logHealthIssue(issue)
             }
         }
-    }
-
-    @discardableResult
-    private func recordHealthIssue(
-        agentId: String,
-        agentType: AgentType?,
-        type: AgentHealthIssueType,
-        message: String
-    ) -> AgentHealthIssue? {
-        let now = Date()
-        if let index = agentHealthIssues.firstIndex(where: { $0.agentId == agentId && $0.type == type && $0.state != .resolved }) {
-            var issue = agentHealthIssues[index]
-            if issue.state == .snoozed, let snoozedUntil = issue.snoozedUntil, snoozedUntil > now {
-                return nil
-            }
-            issue.state = .active
-            issue.occurrences += 1
-            issue.message = message
-            issue.snoozedUntil = nil
-            agentHealthIssues[index] = issue
-            displayHealthIssue(issue)
-            return issue
-        } else {
-            let issue = AgentHealthIssue(
-                agentId: agentId,
-                agentType: agentType,
-                type: type,
-                message: message
-            )
-            agentHealthIssues.append(issue)
-            displayHealthIssue(issue)
-            return issue
-        }
-    }
-
-    private func resolveHealthIssue(for agentId: String, type: AgentHealthIssueType) {
-        guard let index = agentHealthIssues.firstIndex(where: { $0.agentId == agentId && $0.type == type && $0.state != .resolved }) else {
-            return
-        }
-        agentHealthIssues[index].state = .resolved
-        agentHealthIssues[index].snoozedUntil = nil
-
-        if presentedHealthIssue?.id == agentHealthIssues[index].id {
-            presentedHealthIssue = nil
-            dequeueNextHealthIssue()
-        } else {
-            healthAlertQueue.removeAll { $0.id == agentHealthIssues[index].id }
-        }
-    }
-
-    private func displayHealthIssue(_ issue: AgentHealthIssue) {
-        if presentedHealthIssue?.id == issue.id {
-            presentedHealthIssue = issue
-        } else if presentedHealthIssue == nil {
-            presentedHealthIssue = issue
-        } else if !healthAlertQueue.contains(where: { $0.id == issue.id }) {
-            healthAlertQueue.append(issue)
-        }
-    }
-
-    private func dequeueNextHealthIssue() {
-        while !healthAlertQueue.isEmpty {
-            let next = healthAlertQueue.removeFirst()
-            if let index = agentHealthIssues.firstIndex(where: { $0.id == next.id && $0.state == .active }) {
-                presentedHealthIssue = agentHealthIssues[index]
-                return
-            }
-        }
-    }
-
-    private func incrementHealthMetric(for agentId: String, type: AgentHealthIssueType) {
-        guard var metrics = agentHealthMetrics[agentId] else { return }
-        switch type {
-        case .nonResponsive:
-            metrics.nonResponsiveHits += 1
-        case .repeatedMessage:
-            metrics.repeatedMessageHits += 1
-        }
-        agentHealthMetrics[agentId] = metrics
     }
 
     private func logHealthIssue(_ issue: AgentHealthIssue) {
@@ -2370,28 +2145,22 @@ final class AppState {
     }
 
     func handleHealthAction(_ action: AgentHealthAction) {
-        guard var issue = presentedHealthIssue else { return }
+        guard var issue = orchestration.presentedHealthIssue else { return }
         logUserHealthAction(action, issue: issue)
 
         switch action {
         case .wait:
             issue.state = .snoozed
             issue.snoozedUntil = Date().addingTimeInterval(nonResponsiveThreshold)
-            updateStoredIssue(issue)
+            orchestration.updateStoredIssue(issue)
         case .restart, .reassign, .abort:
             issue.state = .resolved
             issue.snoozedUntil = nil
-            updateStoredIssue(issue)
+            orchestration.updateStoredIssue(issue)
         }
 
-        presentedHealthIssue = nil
-        dequeueNextHealthIssue()
-    }
-
-    private func updateStoredIssue(_ issue: AgentHealthIssue) {
-        if let index = agentHealthIssues.firstIndex(where: { $0.id == issue.id }) {
-            agentHealthIssues[index] = issue
-        }
+        orchestration.presentedHealthIssue = nil
+        orchestration.dequeueNextHealthIssue()
     }
 
     private func logUserHealthAction(_ action: AgentHealthAction, issue: AgentHealthIssue) {

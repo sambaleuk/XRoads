@@ -176,6 +176,9 @@ let package = Package(
                 "Actions/ReviewAction.swift",
                 "Actions/IntegrationTestAction.swift",
                 "ViewModels/AppState.swift",
+                "ViewModels/DashboardState.swift",
+                "ViewModels/DispatchState.swift",
+                "ViewModels/OrchestrationState.swift",
                 "ViewModels/SessionViewModel.swift",
                 "ViewModels/PRDLoaderViewModel.swift",
                 // US-V4-016: Skills ViewModel
@@ -205,6 +208,8 @@ let package = Package(
                 "Services/AnthropicClientTests.swift",
                 // CR-201: Path Resolution Tests
                 "Services/PathResolutionTests.swift",
+                // CR-301: AppState Decomposition Tests
+                "ViewModels/AppStateDecompositionTests.swift",
                 // US-V4-015: Dashboard Layout Tests
                 "Dashboard/DashboardLayoutTests.swift",
                 // US-V4-016: Skills Browser Tests
