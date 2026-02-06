@@ -451,10 +451,12 @@ actor OrchestratorService {
         // Build arguments for Claude CLI in print mode
         // --dangerously-skip-permissions: Required for non-interactive mode
         // --output-format text: Get plain text output (not JSON)
+        // --system-prompt: Inject the same orchestrator system prompt as API mode
         // -p: Print mode - execute prompt and exit
         let arguments = [
             "--dangerously-skip-permissions",
             "--output-format", "text",
+            "--system-prompt", systemPrompt,
             "-p", content
         ]
 
