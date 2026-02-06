@@ -203,6 +203,8 @@ let package = Package(
             path: "XRoadsTests",
             sources: [
                 "Services/AnthropicClientTests.swift",
+                // CR-201: Path Resolution Tests
+                "Services/PathResolutionTests.swift",
                 // US-V4-015: Dashboard Layout Tests
                 "Dashboard/DashboardLayoutTests.swift",
                 // US-V4-016: Skills Browser Tests

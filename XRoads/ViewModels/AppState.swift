@@ -1070,9 +1070,18 @@ final class AppState {
 
             do {
                 let slotIndex = index
-                let loopScript = agentType.loopScriptName
-                let scriptsDir = "/Users/birahimmbow/Projets/CrossRoads/scripts"
-                let scriptPath = "\(scriptsDir)/\(loopScript)"
+                let loopScriptName = agentType.loopScriptName
+                guard let scriptPath = LoopScriptLocator.findLoopScript(for: agentType) else {
+                    terminalSlots[index].status = .error
+                    terminalSlots[index].addLog(LogEntry(
+                        level: .error,
+                        source: "system",
+                        worktree: worktree.path,
+                        message: "Loop script \(loopScriptName) for \(agentType.displayName) not found. Install scripts or ensure they are in bundle/scripts, ~/bin, or ~/.nexus/bin."
+                    ))
+                    updateOrchestratorVisualState()
+                    continue
+                }
 
                 var environment = ProcessInfo.processInfo.environment
                 environment["CROSSROADS_SLOT"] = String(slot.slotNumber)
@@ -1117,7 +1126,7 @@ final class AppState {
                     level: .info,
                     source: agentType.rawValue,
                     worktree: worktree.path,
-                    message: "\(loopScript) started"
+                    message: "\(loopScriptName) started"
                 ))
 
             } catch {

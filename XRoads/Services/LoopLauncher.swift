@@ -268,24 +268,16 @@ actor LoopLauncher {
         let scriptName = agentType.loopScriptName
         let scriptPath = scriptsDirectory.appendingPathComponent(scriptName)
 
-        guard fileManager.fileExists(atPath: scriptPath.path) else {
-            // Try alternative locations
-            let alternatives = [
-                URL(fileURLWithPath: "/Users/birahimmbow/Projets/CrossRoads/scripts/\(scriptName)"),
-                URL(fileURLWithPath: "/Users/birahimmbow/.nexus/bin/\(scriptName)"),
-                URL(fileURLWithPath: "/Users/birahimmbow/Projets/Nexus-scripts/bin/\(scriptName)")
-            ]
-
-            for alt in alternatives {
-                if fileManager.fileExists(atPath: alt.path) {
-                    return alt
-                }
-            }
-
-            throw LoopLauncherError.loopScriptNotFound(agentType)
+        if fileManager.isExecutableFile(atPath: scriptPath.path) {
+            return scriptPath
         }
 
-        return scriptPath
+        if let resolved = LoopScriptLocator.findLoopScript(for: agentType) {
+            return URL(fileURLWithPath: resolved)
+        }
+
+        throw LoopLauncherError.loopScriptNotFound(agentType)
+
     }
 
     /// Prepare the worktree with PRD and context files

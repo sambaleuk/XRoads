@@ -477,12 +477,20 @@ actor MCPClient {
                 // If we're in DerivedData, try to find the actual project
                 if searchPath.contains("DerivedData") {
                     // Common project locations
-                    let possibleProjects = [
-                        "/Users/birahimmbow/Projets/XRoads",
-                        NSHomeDirectory() + "/Projets/XRoads",
-                        NSHomeDirectory() + "/Documents/XRoads",
-                        NSHomeDirectory() + "/Desktop/XRoads"
-                    ]
+                    let home = fileManager.homeDirectoryForCurrentUser.path
+                    let projectNames = ["CrossRoads", "XRoads"]
+                    let baseDirs = ["Projets", "Projects", "Documents", "Desktop"]
+                    var possibleProjects: [String] = []
+
+                    if let envPath = getenv("CROSSROADS_PROJECT_DIR") {
+                        possibleProjects.append(String(cString: envPath))
+                    }
+
+                    for base in baseDirs {
+                        for projectName in projectNames {
+                            possibleProjects.append("\(home)/\(base)/\(projectName)")
+                        }
+                    }
                     
                     for projectPath in possibleProjects {
                         let mcpPath = (projectPath as NSString).appendingPathComponent("xroads-mcp")
@@ -541,7 +549,9 @@ actor MCPClient {
                 return ""
             }(),
             // 6. User home directory fallback
-            "\(NSHomeDirectory())/xroads-mcp"
+            fileManager.homeDirectoryForCurrentUser
+                .appendingPathComponent("xroads-mcp")
+                .path
         ].filter { !$0.isEmpty }
 
         #if DEBUG

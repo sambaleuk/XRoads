@@ -26,6 +26,18 @@ struct LoopScriptLocator: Sendable {
         }
     }
 
+    /// Finds the path to a loop script for an agent type
+    static func findLoopScript(for agentType: AgentType) -> String? {
+        switch agentType {
+        case .claude:
+            return findLoop(.nexus)
+        case .gemini:
+            return findLoop(.gemini)
+        case .codex:
+            return findLoop(.codex)
+        }
+    }
+
     enum ScriptType: String, CaseIterable, Sendable {
         case nexusInit = "nexus-init"
         case nexusLoop = "nexus-loop"
