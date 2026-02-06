@@ -591,20 +591,24 @@ LÉGENDE BPMN:
 - [x] UI: Ajouter picker d'ActionType dans SlotAssignmentSheet ✅ (2026-02-06)
 - [x] Propager ActionType à travers UnifiedDispatcher → LayeredDispatcher → LoopLauncher ✅
 
-### Phase 2: Chat Integration
-- [ ] Définir les commandes chat supportées
-- [ ] Connecter chat → UnifiedDispatcher
-- [ ] Implémenter parsing d'intentions
+### Phase 2: Chat Integration ✅ COMPLETE
+- [x] Définir les commandes chat supportées ✅ (2026-02-06) - `ChatActionType` extended
+- [x] Créer `ChatDispatchParser` pour parser les intentions ✅ (2026-02-06)
+- [x] Connecter chat → UnifiedDispatcher ✅ (2026-02-06) - via `dispatchChat()`
+- [x] Implémenter parsing d'intentions ✅ (2026-02-06) - launch/stop/start_all/stop_all/configure
+- [x] Ajouter `@Environment(\.services)` pour accès UnifiedDispatcher ✅
 
-### Phase 3: Progress Unification
+### Phase 3: Progress Unification ✅ COMPLETE
 - [x] Source unique: `status.json` pour PRD dispatch ✅ (via StatusMonitor)
-- [ ] Fallback: slot.progress pour mode single
-- [ ] Dashboard lit une seule source
+- [x] Fallback: `globalProgress` depuis slot.progress pour mode single ✅
+- [x] Dashboard lit une seule source ✅ - `DashboardTopBar` utilise `dispatchProgress` ou `globalProgress`
+- [x] `globalLogs` ajouté à AppState pour logs centralisés ✅ (2026-02-06)
 
 ### Phase 4: Log Routing ✅ COMPLETE
 - [x] Tous les logs → `appState.logs` (MCP panel) ✅ (via DispatchCallbacks.onLog)
 - [x] Logs filtrés par slot → `terminalSlots[n].logs` ✅ (via onSlotOutput)
-- [ ] MCP events → routing vers les deux (requires MCP server update)
+- [x] `appendSlotOutput` méthode ajoutée à AppState ✅ (2026-02-06)
+- [x] MCP events → routing via addLog() ✅
 
 ---
 

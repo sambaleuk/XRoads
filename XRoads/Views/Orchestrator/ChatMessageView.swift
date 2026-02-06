@@ -200,6 +200,17 @@ struct ChatMessageView: View {
             return "paintpalette"
         case .viewSkills:
             return "list.bullet.rectangle"
+        // Phase 2: Dispatch-related actions
+        case .launchSlot:
+            return "play.fill"
+        case .startAllSlots:
+            return "forward.fill"
+        case .stopSlot:
+            return "stop.fill"
+        case .stopAllSlots:
+            return "stop.circle.fill"
+        case .configureSlot:
+            return "gearshape.fill"
         }
     }
 }

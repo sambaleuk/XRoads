@@ -158,6 +158,7 @@ let package = Package(
                 "Services/StatusMonitor.swift",
                 "Services/LayeredDispatcher.swift",
                 "Services/UnifiedDispatcher.swift",
+                "Services/ChatDispatchParser.swift",
                 "Services/WorktreePathResolver.swift",
                 // Actions
                 "Actions/ImplementAction.swift",

@@ -152,6 +152,9 @@ final class AppState {
     /// Current dispatch message
     var dispatchMessage: String = ""
 
+    /// Global logs from all dispatch sources (Phase 2)
+    var globalLogs: [LogEntry] = []
+
     /// Whether a layered dispatch is active
     var isDispatching: Bool {
         switch dispatchPhase {
@@ -506,6 +509,28 @@ final class AppState {
     /// Gets logs for a specific terminal slot
     func logsForSlot(_ slot: TerminalSlot) -> [LogEntry] {
         slot.logs
+    }
+
+    /// Append output to a terminal slot's log buffer
+    /// - Parameters:
+    ///   - slotNumber: The slot number (1-6)
+    ///   - output: The output string to append
+    func appendSlotOutput(slotNumber: Int, output: String) {
+        guard let index = terminalSlots.firstIndex(where: { $0.slotNumber == slotNumber }) else {
+            return
+        }
+
+        let logEntry = LogEntry(
+            level: .info,
+            source: terminalSlots[index].agentType?.rawValue ?? "agent",
+            worktree: terminalSlots[index].worktree?.path,
+            message: output
+        )
+
+        terminalSlots[index].logs.append(logEntry)
+
+        // Also add to global logs
+        globalLogs.append(logEntry)
     }
 
     // MARK: - Input Bridge (US-V3-013)
@@ -2344,16 +2369,26 @@ enum AppError: Error, LocalizedError, Identifiable {
     }
 }
 
-// MARK: - Environment Key
+// MARK: - Environment Keys
 
 /// Environment key for accessing AppState
 private struct AppStateKey: EnvironmentKey {
     @MainActor static var defaultValue: AppState = AppState()
 }
 
+/// Environment key for accessing ServiceContainer
+private struct ServicesKey: EnvironmentKey {
+    static var defaultValue: any ServiceContainer = DefaultServiceContainer()
+}
+
 extension EnvironmentValues {
     var appState: AppState {
         get { self[AppStateKey.self] }
         set { self[AppStateKey.self] = newValue }
+    }
+
+    var services: any ServiceContainer {
+        get { self[ServicesKey.self] }
+        set { self[ServicesKey.self] = newValue }
     }
 }

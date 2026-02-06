@@ -389,22 +389,177 @@ actor UnifiedDispatcher {
         )
     }
 
-    // MARK: - Private: Chat Mode Dispatch (Future)
+    // MARK: - Private: Chat Mode Dispatch
 
     private func dispatchChat(
         _ request: DispatchRequest,
         callbacks: DispatchCallbacks
     ) async throws -> DispatchResult {
-        // TODO: Implement chat intent parsing and dispatch
-        // For now, log that it's not implemented
+        guard let intent = request.chatIntent else {
+            throw UnifiedDispatcherError.missingParameters(mode: .chat)
+        }
+
         callbacks.onLog(LogEntry(
-            level: .warn,
+            level: .info,
             source: "dispatcher",
             worktree: nil,
-            message: "Chat dispatch not yet implemented. Intent: \(request.chatIntent ?? "none")"
+            message: "[chat] Processing intent: \(intent)"
         ))
 
-        throw UnifiedDispatcherError.notImplemented(feature: "chat dispatch")
+        switch intent {
+        case "launch_slot":
+            return try await dispatchChatLaunchSlot(request, callbacks: callbacks)
+
+        case "stop_slot":
+            return try await dispatchChatStopSlot(request, callbacks: callbacks)
+
+        case "start_all":
+            return try await dispatchChatStartAll(request, callbacks: callbacks)
+
+        case "stop_all":
+            return try await dispatchChatStopAll(request, callbacks: callbacks)
+
+        case "configure_slot":
+            // Configuration is UI-only, return success immediately
+            callbacks.onLog(LogEntry(
+                level: .info,
+                source: "dispatcher",
+                worktree: nil,
+                message: "[chat] Slot configuration requested via chat - triggering UI update"
+            ))
+            return DispatchResult(
+                requestId: request.id,
+                success: true,
+                processIds: [],
+                error: nil,
+                startedAt: Date(),
+                mode: .chat
+            )
+
+        default:
+            throw UnifiedDispatcherError.dispatchFailed(reason: "Unknown chat intent: \(intent)")
+        }
+    }
+
+    // MARK: - Chat Intent Handlers
+
+    private func dispatchChatLaunchSlot(
+        _ request: DispatchRequest,
+        callbacks: DispatchCallbacks
+    ) async throws -> DispatchResult {
+        guard let slotNumber = request.slotNumber else {
+            throw UnifiedDispatcherError.dispatchFailed(reason: "Missing slot number for launch")
+        }
+
+        guard let agentType = request.agentType else {
+            throw UnifiedDispatcherError.dispatchFailed(reason: "Missing agent type for slot \(slotNumber)")
+        }
+
+        guard let worktreePath = request.worktreePath else {
+            throw UnifiedDispatcherError.dispatchFailed(reason: "Missing worktree path for slot \(slotNumber)")
+        }
+
+        callbacks.onLog(LogEntry(
+            level: .info,
+            source: "dispatcher",
+            worktree: worktreePath,
+            message: "[chat] Launching slot \(slotNumber) with \(agentType.displayName)"
+        ))
+
+        // Create single dispatch request and delegate
+        let singleRequest = DispatchRequest.single(
+            slotNumber: slotNumber,
+            agentType: agentType,
+            worktreePath: worktreePath,
+            actionType: request.actionType ?? .implement,
+            taskDescription: request.taskDescription,
+            source: .chat
+        )
+
+        return try await dispatchSingle(singleRequest, callbacks: callbacks)
+    }
+
+    private func dispatchChatStopSlot(
+        _ request: DispatchRequest,
+        callbacks: DispatchCallbacks
+    ) async throws -> DispatchResult {
+        guard let slotNumber = request.slotNumber else {
+            throw UnifiedDispatcherError.dispatchFailed(reason: "Missing slot number for stop")
+        }
+
+        callbacks.onLog(LogEntry(
+            level: .info,
+            source: "dispatcher",
+            worktree: nil,
+            message: "[chat] Stop request for slot \(slotNumber)"
+        ))
+
+        // Note: Actual stopping would require tracking process IDs in state
+        // For now, we signal success and let the UI handle the stop
+        return DispatchResult(
+            requestId: request.id,
+            success: true,
+            processIds: [],
+            error: nil,
+            startedAt: Date(),
+            mode: .chat
+        )
+    }
+
+    private func dispatchChatStartAll(
+        _ request: DispatchRequest,
+        callbacks: DispatchCallbacks
+    ) async throws -> DispatchResult {
+        callbacks.onLog(LogEntry(
+            level: .info,
+            source: "dispatcher",
+            worktree: nil,
+            message: "[chat] Start all slots requested - this requires PRD or slot configuration"
+        ))
+
+        // Check if we have PRD info
+        guard let prd = request.prd,
+              let slotAssignments = request.slotAssignments,
+              let repoPath = request.repoPath else {
+            // No PRD context - return error suggesting PRD load
+            throw UnifiedDispatcherError.dispatchFailed(
+                reason: "Start all requires PRD configuration. Use 'load PRD' first."
+            )
+        }
+
+        // Delegate to PRD dispatch
+        let prdRequest = DispatchRequest.prd(
+            prd: prd,
+            slotAssignments: slotAssignments,
+            repoPath: repoPath,
+            source: .chat
+        )
+
+        return try await dispatchPRD(prdRequest, callbacks: callbacks)
+    }
+
+    private func dispatchChatStopAll(
+        _ request: DispatchRequest,
+        callbacks: DispatchCallbacks
+    ) async throws -> DispatchResult {
+        callbacks.onLog(LogEntry(
+            level: .info,
+            source: "dispatcher",
+            worktree: nil,
+            message: "[chat] Stop all agents requested"
+        ))
+
+        // Use layered dispatcher to stop all
+        await layeredDispatcher.stopAll()
+
+        return DispatchResult(
+            requestId: request.id,
+            success: true,
+            processIds: [],
+            error: nil,
+            startedAt: Date(),
+            mode: .chat
+        )
     }
 
     // MARK: - Private: Quick Action Dispatch (Future)

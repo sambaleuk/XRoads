@@ -13,9 +13,13 @@ import SwiftUI
 /// Main chat view for interacting with the orchestrator AI
 struct OrchestratorChatView: View {
     @Environment(\.appState) private var appState
+    @Environment(\.services) private var services
     @StateObject private var viewModel = OrchestratorChatViewModel()
     @State private var showPRDFullView = false
     @State private var selectedPRDForView: DetectedPRD?
+
+    // Phase 2: Chat dispatch integration
+    private let dispatchParser = ChatDispatchParser()
 
     var body: some View {
         ZStack {
@@ -237,10 +241,9 @@ struct OrchestratorChatView: View {
             // Open PRD assistant with context from action
             NotificationCenter.default.post(name: .openPRDAssistant, object: action.payload)
         case .launchLoop:
-            // Launch nexus loop with PRD
+            // Launch nexus loop with PRD via UnifiedDispatcher
             if let prdPath = action.payload?["prdPath"] {
                 Task {
-                    // Load PRD and start orchestration
                     appState.pendingPRDURL = URL(fileURLWithPath: prdPath)
                 }
             }
@@ -264,6 +267,134 @@ struct OrchestratorChatView: View {
         case .viewSkills:
             // Open skills browser
             NotificationCenter.default.post(name: .openSkillsBrowser, object: nil)
+
+        // Phase 2: Dispatch-related actions via UnifiedDispatcher
+        case .launchSlot:
+            handleLaunchSlotAction(action)
+        case .startAllSlots:
+            handleStartAllAction()
+        case .stopSlot:
+            handleStopSlotAction(action)
+        case .stopAllSlots:
+            handleStopAllAction()
+        case .configureSlot:
+            handleConfigureSlotAction(action)
+        }
+    }
+
+    // MARK: - Phase 2: Dispatch Action Handlers
+
+    private func handleLaunchSlotAction(_ action: ChatAction) {
+        Task {
+            guard let slotNumberStr = action.payload?["slotNumber"],
+                  let slotNumber = Int(slotNumberStr) else {
+                viewModel.addSystemMessage("Missing slot number for launch action")
+                return
+            }
+
+            // Parse agent type from payload
+            var agentType: AgentType = .claude
+            if let agentTypeStr = action.payload?["agentType"],
+               let parsed = AgentType(rawValue: agentTypeStr) {
+                agentType = parsed
+            }
+
+            let worktreePath = action.payload?["worktreePath"] ?? appState.projectPath ?? ""
+
+            let request = DispatchRequest.single(
+                slotNumber: slotNumber,
+                agentType: agentType,
+                worktreePath: worktreePath,
+                source: .chat
+            )
+
+            await dispatchViaUnified(request)
+        }
+    }
+
+    private func handleStartAllAction() {
+        Task {
+            let request = DispatchRequest(
+                mode: .chat,
+                source: .chat,
+                chatIntent: "start_all"
+            )
+            await dispatchViaUnified(request)
+        }
+    }
+
+    private func handleStopSlotAction(_ action: ChatAction) {
+        Task {
+            let slotNumber = action.payload?["slotNumber"].flatMap { Int($0) }
+            let request = DispatchRequest(
+                mode: .chat,
+                source: .chat,
+                slotNumber: slotNumber,
+                chatIntent: "stop_slot"
+            )
+            await dispatchViaUnified(request)
+        }
+    }
+
+    private func handleStopAllAction() {
+        Task {
+            let request = DispatchRequest(
+                mode: .chat,
+                source: .chat,
+                chatIntent: "stop_all"
+            )
+            await dispatchViaUnified(request)
+        }
+    }
+
+    private func handleConfigureSlotAction(_ action: ChatAction) {
+        // Configuration triggers UI, not dispatch
+        NotificationCenter.default.post(name: .openSlotConfiguration, object: action.payload)
+    }
+
+    /// Dispatch via UnifiedDispatcher with callbacks
+    private func dispatchViaUnified(_ request: DispatchRequest) async {
+        let callbacks = DispatchCallbacks(
+            onProgress: { progress in
+                Task { @MainActor in
+                    self.appState.dispatchProgress = progress
+                }
+            },
+            onSlotUpdate: { slotInfo in
+                Task { @MainActor in
+                    // Update slot in appState
+                    if let index = self.appState.terminalSlots.firstIndex(where: { $0.slotNumber == slotInfo.slotNumber }) {
+                        self.appState.terminalSlots[index].processId = slotInfo.processId
+                    }
+                }
+            },
+            onSlotOutput: { slotNumber, output in
+                Task { @MainActor in
+                    // Route to terminal slot
+                    self.appState.appendSlotOutput(slotNumber: slotNumber, output: output)
+                }
+            },
+            onLog: { log in
+                Task { @MainActor in
+                    self.appState.globalLogs.append(log)
+                }
+            },
+            onComplete: {
+                Task { @MainActor in
+                    self.viewModel.addSystemMessage("Dispatch completed successfully")
+                }
+            },
+            onError: { error in
+                Task { @MainActor in
+                    self.viewModel.addSystemMessage("Dispatch error: \(error.localizedDescription)")
+                }
+            }
+        )
+
+        do {
+            _ = try await services.unifiedDispatcher.dispatch(request, callbacks: callbacks)
+        } catch {
+            viewModel.addSystemMessage("Failed to dispatch: \(error.localizedDescription)")
         }
     }
 
@@ -291,7 +422,7 @@ struct OrchestratorChatView: View {
 
             // Save PRD to file
             guard let projectPath = appState.projectPath else {
-                await viewModel.addSystemMessage("Veuillez d'abord sélectionner un projet.")
+                viewModel.addSystemMessage("Veuillez d'abord sélectionner un projet.")
                 return
             }
 
@@ -299,7 +430,7 @@ struct OrchestratorChatView: View {
             do {
                 try prd.rawJSON.write(toFile: prdPath, atomically: true, encoding: .utf8)
             } catch {
-                await viewModel.addSystemMessage("Erreur lors de la sauvegarde du PRD: \(error.localizedDescription)")
+                viewModel.addSystemMessage("Erreur lors de la sauvegarde du PRD: \(error.localizedDescription)")
                 return
             }
 
@@ -324,7 +455,7 @@ struct OrchestratorChatView: View {
             }
 
             // Notify about launch
-            await viewModel.addSystemMessage("""
+            viewModel.addSystemMessage("""
                 🚀 Lancement de l'implémentation...
 
                 **PRD:** \(prd.title)

@@ -49,4 +49,8 @@ extension Notification.Name {
     /// Notification to launch an agent loop with PRD
     /// UserInfo keys: agent (AgentType), prdPath (String), branch (String), projectPath (String)
     static let launchAgentLoop = Notification.Name("launchAgentLoop")
+
+    /// Notification to open slot configuration sheet (Phase 2: Chat Integration)
+    /// UserInfo keys: slotNumber (String), agentType (String?), actionType (String?)
+    static let openSlotConfiguration = Notification.Name("openSlotConfiguration")
 }

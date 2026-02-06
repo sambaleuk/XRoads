@@ -126,6 +126,13 @@ public enum ChatActionType: String, Codable, Sendable {
     case runCommand        // Execute a shell command
     case viewArtBible      // View art direction bible
     case viewSkills        // Browse available skills
+
+    // Dispatch-related actions (Phase 2)
+    case launchSlot        // Launch a specific slot with agent
+    case startAllSlots     // Start all configured slots
+    case stopSlot          // Stop a running slot
+    case stopAllSlots      // Stop all running agents
+    case configureSlot     // Configure a slot with agent/action
 }
 
 // MARK: - ChatMessage
