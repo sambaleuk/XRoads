@@ -24,7 +24,6 @@ struct SkillsBadge: View {
     var onTap: (() -> Void)?
 
     @State private var isHovered: Bool = false
-    @State private var showPopover: Bool = false
 
     // MARK: - Computed Properties
 
@@ -47,80 +46,39 @@ struct SkillsBadge: View {
 
     // MARK: - Body
 
-    /// Dismisses the popover **without animation** to avoid the NSPopover
-    /// SIGSEGV crash (EXC_BAD_ACCESS at 0x0) that occurs when the hosting
-    /// view disappears while the popover's dismissal animation is in-flight.
-    private func dismissPopoverImmediately() {
-        guard showPopover else { return }
-        var transaction = Transaction()
-        transaction.disablesAnimations = true
-        withTransaction(transaction) {
-            showPopover = false
-        }
-    }
-
     var body: some View {
-        // The Button is kept in the tree at all times (hidden via opacity)
-        // so that NSPopover's anchor view is never removed while the popover
-        // is animating.  This prevents the null-function-pointer crash in
-        // PopoverHostingView.updateAnimatedWindowSize.
-        Button {
-            onTap?()
-        } label: {
-            HStack(spacing: 4) {
-                // Skills icon
-                Image(systemName: "sparkles")
-                    .font(.system(size: 9, weight: .medium))
+        // No .popover() — SwiftUI's NSPopover crashes (SIGSEGV at 0x0 in
+        // PopoverHostingView.updateAnimatedWindowSize) during idle layout
+        // passes on macOS.  Tap opens Skills Browser via onTap callback.
+        if skillCount > 0 {
+            Button {
+                onTap?()
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 9, weight: .medium))
 
-                // Count
-                Text("\(skillCount)")
-                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    Text("\(skillCount)")
+                        .font(.system(size: 10, weight: .semibold, design: .monospaced))
 
-                // Warning indicator for missing dependencies
-                if hasMissingDependencies {
-                    Image(systemName: "exclamationmark.triangle.fill")
-                        .font(.system(size: 8))
-                        .foregroundStyle(Color.statusWarning)
+                    if hasMissingDependencies {
+                        Image(systemName: "exclamationmark.triangle.fill")
+                            .font(.system(size: 8))
+                            .foregroundStyle(Color.statusWarning)
+                    }
                 }
+                .foregroundStyle(badgeColor)
+                .padding(.horizontal, 6)
+                .padding(.vertical, 3)
+                .background(badgeColor.opacity(0.15))
+                .clipShape(Capsule())
+                .overlay(
+                    Capsule()
+                        .stroke(badgeColor.opacity(isHovered ? 0.5 : 0.2), lineWidth: 1)
+                )
             }
-            .foregroundStyle(badgeColor)
-            .padding(.horizontal, 6)
-            .padding(.vertical, 3)
-            .background(badgeColor.opacity(0.15))
-            .clipShape(Capsule())
-            .overlay(
-                Capsule()
-                    .stroke(badgeColor.opacity(isHovered ? 0.5 : 0.2), lineWidth: 1)
-            )
-        }
-        .buttonStyle(.plain)
-        // Hide entirely when there are no skills, but keep the view in the tree
-        .opacity(skillCount > 0 ? 1 : 0)
-        .allowsHitTesting(skillCount > 0)
-        .frame(width: skillCount > 0 ? nil : 0, height: skillCount > 0 ? nil : 0)
-        .clipped()
-        .onHover { hovering in
-            isHovered = hovering
-            if hovering && skillCount > 0 {
-                showPopover = true
-            } else if !hovering {
-                // Dismiss without animation when the cursor leaves so the
-                // popover does not outlive its context.
-                dismissPopoverImmediately()
-            }
-        }
-        .popover(isPresented: $showPopover, arrowEdge: .bottom) {
-            SkillsPopoverContent(
-                skills: skills,
-                availableMCPTools: availableMCPTools
-            )
-        }
-        .onChange(of: skillCount) { _, newCount in
-            // If skills are removed while the popover is open, tear it down
-            // synchronously to prevent the animation-crash race.
-            if newCount == 0 {
-                dismissPopoverImmediately()
-            }
+            .buttonStyle(.plain)
+            .onHover { isHovered = $0 }
         }
     }
 
