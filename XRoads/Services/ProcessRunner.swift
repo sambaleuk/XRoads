@@ -72,6 +72,8 @@ actor ProcessRunner {
     ///   - executable: Path to the executable
     ///   - arguments: Command-line arguments
     ///   - workingDirectory: Working directory for the process
+    ///   - environment: Environment variables for the process
+    ///   - closeStdinImmediately: If true, closes stdin right after launch (for tools expecting EOF)
     ///   - onOutput: Callback invoked on MainActor when output is received (stdout or stderr)
     /// - Returns: UUID identifying the launched process
     /// - Throws: ProcessError if launch fails
@@ -80,6 +82,7 @@ actor ProcessRunner {
         arguments: [String] = [],
         workingDirectory: String,
         environment: [String: String]? = nil,
+        closeStdinImmediately: Bool = false,
         onOutput: @escaping OutputHandler
     ) async throws -> UUID {
         // Verify executable exists
@@ -138,7 +141,13 @@ actor ProcessRunner {
 
         // Setup termination handler
         let terminationProcessId = processId
-        process.terminationHandler = { [weak self] _ in
+        process.terminationHandler = { [weak self] terminatedProcess in
+            let msg = "[\(Date())] Termination handler called for \(terminationProcessId), exitCode: \(terminatedProcess.terminationStatus)\n"
+            if let data = msg.data(using: .utf8), let handle = FileHandle(forWritingAtPath: "/tmp/xroads_orchestrator.log") {
+                handle.seekToEndOfFile()
+                handle.write(data)
+                handle.closeFile()
+            }
             Task { [weak self] in
                 await self?.markTerminated(id: terminationProcessId)
             }
@@ -173,6 +182,11 @@ actor ProcessRunner {
 
         processes[processId] = managedProcess
 
+        // Close stdin immediately if requested (for tools expecting EOF to start processing)
+        if closeStdinImmediately {
+            stdinPipe.fileHandleForWriting.closeFile()
+        }
+
         return processId
     }
 
@@ -202,7 +216,9 @@ actor ProcessRunner {
         guard let managedProcess = processes[id] else {
             return false
         }
-        return managedProcess.process.isRunning && !managedProcess.isTerminated
+        let processIsRunning = managedProcess.process.isRunning
+        let isTerminated = managedProcess.isTerminated
+        return processIsRunning && !isTerminated
     }
 
     /// Sends input to a process's stdin

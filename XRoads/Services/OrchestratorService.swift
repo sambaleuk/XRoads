@@ -384,14 +384,38 @@ actor OrchestratorService {
         var responseContent = ""
         let workingDirectory = context?.projectPath ?? FileManager.default.currentDirectoryPath
 
+        // Build arguments for Claude CLI in print mode
+        // --dangerously-skip-permissions: Required for non-interactive mode
+        // --output-format text: Get plain text output (not JSON)
+        // -p: Print mode - execute prompt and exit
+        let arguments = [
+            "--dangerously-skip-permissions",
+            "--output-format", "text",
+            "-p", content
+        ]
+
+        // Debug logging to file
+        let logFile = "/tmp/xroads_orchestrator.log"
+        let logMsg = """
+        [\(Date())] Launching Claude CLI
+        Path: \(claudePath)
+        Arguments: \(arguments)
+        Working directory: \(workingDirectory)
+
+        """
+        try? logMsg.write(toFile: logFile, atomically: false, encoding: .utf8)
+        print("[OrchestratorService] Launching Claude CLI at: \(claudePath)")
+
         // Launch Claude CLI with the message
         do {
             let processId = try await processRunner.launch(
                 executable: claudePath,
-                arguments: ["-p", content],
-                workingDirectory: workingDirectory
+                arguments: arguments,
+                workingDirectory: workingDirectory,
+                closeStdinImmediately: true  // Claude -p mode needs EOF on stdin
             ) { [weak self] output in
                 guard let self = self else { return }
+                print("[OrchestratorService] Received output chunk: \(output.prefix(100))...")
                 Task {
                     responseContent += output
                     await self.delegate?.orchestratorDidReceiveChunk(self, chunk: output)
@@ -400,10 +424,32 @@ actor OrchestratorService {
             }
 
             terminalProcessId = processId
+            print("[OrchestratorService] Process launched with ID: \(processId)")
 
-            // Wait for process to complete
+            // Wait for process to complete with timeout (5 minutes max)
+            let timeoutSeconds = 300
+            var elapsedSeconds = 0
+            print("[OrchestratorService] Waiting for process to complete...")
             while await processRunner.isRunning(id: processId) {
                 try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                elapsedSeconds += 1
+                if elapsedSeconds % 50 == 0 { // Log every 5 seconds
+                    print("[OrchestratorService] Still waiting... elapsed: \(elapsedSeconds / 10)s, isRunning: true")
+                }
+                if elapsedSeconds >= timeoutSeconds * 10 { // 100ms intervals
+                    // Timeout - terminate the process
+                    try? await processRunner.terminate(id: processId)
+                    terminalProcessId = nil
+                    updateMessage(id: responseMessage.id, content: responseContent + "\n\n[Timeout: Process terminated after 5 minutes]", status: .complete)
+                    await delegate?.orchestratorDidFinishStreaming(self)
+                    return ChatMessage(
+                        id: responseMessage.id,
+                        role: .assistant,
+                        content: responseContent + "\n\n[Timeout: Process terminated after 5 minutes]",
+                        timestamp: responseMessage.timestamp,
+                        status: .complete
+                    )
+                }
             }
 
             terminalProcessId = nil
