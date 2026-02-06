@@ -490,7 +490,7 @@ struct OrchestratorChatView: View {
 
 /// View model for OrchestratorChatView managing chat state and service communication
 @MainActor
-final class OrchestratorChatViewModel: ObservableObject {
+final class OrchestratorChatViewModel: ObservableObject, OrchestratorServiceDelegate {
     @Published var messages: [ChatMessage] = []
     @Published var inputText: String = ""
     @Published var mode: OrchestratorMode = .api
@@ -501,6 +501,7 @@ final class OrchestratorChatViewModel: ObservableObject {
 
     private let orchestratorService = OrchestratorService()
     private var context: ChatContext?
+    private var streamingMessageId: UUID?
 
     // MARK: - Context Loading
 
@@ -536,6 +537,7 @@ final class OrchestratorChatViewModel: ObservableObject {
 
         await orchestratorService.setContext(context!)
         await orchestratorService.updateSystemPrompt()
+        await orchestratorService.setDelegate(self)
 
         // Load API key from Keychain (secure storage)
         if let apiKey = await KeychainService.shared.getAPIKey(provider: "anthropic") {
@@ -555,22 +557,31 @@ final class OrchestratorChatViewModel: ObservableObject {
         await orchestratorService.setMode(mode)
 
         do {
-            // Add user message immediately
+            // Add user message immediately to UI
             let userMessage = ChatMessage.user(content)
             messages.append(userMessage)
-            await orchestratorService.addMessage(userMessage)
+            // Note: orchestratorService.sendMessage() adds user message internally,
+            // so we do NOT call orchestratorService.addMessage() here to avoid duplicates.
 
-            // Create streaming placeholder
+            // Create streaming placeholder for UI
             let placeholder = ChatMessage.streamingPlaceholder()
             messages.append(placeholder)
+            streamingMessageId = placeholder.id
 
-            // Send and stream response
+            // Send and stream response -- delegate callbacks update UI during streaming
             let response = try await orchestratorService.sendMessage(content)
 
-            // Update placeholder with final response
+            // Finalize: ensure placeholder has the complete response
             if let index = messages.firstIndex(where: { $0.id == placeholder.id }) {
-                messages[index] = response
+                messages[index] = ChatMessage(
+                    id: placeholder.id,
+                    role: .assistant,
+                    content: response.content,
+                    timestamp: placeholder.timestamp,
+                    status: .complete
+                )
             }
+            streamingMessageId = nil
             lastMessageContent = response.content
 
             // Detect PRD in response
@@ -581,6 +592,7 @@ final class OrchestratorChatViewModel: ObservableObject {
             }
 
         } catch {
+            streamingMessageId = nil
             // Update last message with error
             if let lastIndex = messages.indices.last,
                messages[lastIndex].role == .assistant {
@@ -620,6 +632,47 @@ final class OrchestratorChatViewModel: ObservableObject {
                 status: .complete
             )
         }
+    }
+
+    // MARK: - OrchestratorServiceDelegate
+
+    func orchestratorDidStartStreaming(_ service: OrchestratorService) {
+        // Placeholder already added in sendMessage
+    }
+
+    func orchestratorDidReceiveChunk(_ service: OrchestratorService, chunk: String) {
+        guard let messageId = streamingMessageId,
+              let index = messages.firstIndex(where: { $0.id == messageId }) else { return }
+
+        let updatedContent = messages[index].content + chunk
+        messages[index] = ChatMessage(
+            id: messageId,
+            role: .assistant,
+            content: updatedContent,
+            timestamp: messages[index].timestamp,
+            status: .streaming
+        )
+        lastMessageContent = updatedContent
+    }
+
+    func orchestratorDidFinishStreaming(_ service: OrchestratorService) {
+        // Final update happens in sendMessage when it returns
+    }
+
+    func orchestratorDidEncounterError(_ service: OrchestratorService, error: OrchestratorChatError) {
+        guard let messageId = streamingMessageId,
+              let index = messages.firstIndex(where: { $0.id == messageId }) else { return }
+
+        messages[index] = ChatMessage(
+            id: messageId,
+            role: .assistant,
+            content: messages[index].content.isEmpty
+                ? "An error occurred. Please try again."
+                : messages[index].content,
+            timestamp: messages[index].timestamp,
+            status: .error(error.localizedDescription)
+        )
+        streamingMessageId = nil
     }
 
     func clearChat() {

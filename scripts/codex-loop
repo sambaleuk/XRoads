@@ -12,7 +12,6 @@ set -o pipefail
 # Find script directory and load common library
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-# Try bundled lib first, then fallback to ~/.nexus
 if [[ -f "${SCRIPT_DIR}/lib/common.sh" ]]; then
     source "${SCRIPT_DIR}/lib/common.sh"
 elif [[ -f "${HOME}/.nexus/lib/common.sh" ]]; then
@@ -22,18 +21,115 @@ else
     exit 1
 fi
 
-# Configuration
-MAX_ITERATIONS=${1:-12}
-SLEEP_SECONDS=${2:-4}
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
+MAX_ITERATIONS=${1:-10}
+SLEEP_SECONDS=${2:-3}
 LOG_DIR="logs"
 MAX_CONSECUTIVE_FAILURES=3
+AGENT_NAME="Codex"
+AGENT_COLOR="$GREEN"
+COMPLETION_TOKEN="<nexus-complete>"
+
 mkdir -p "$LOG_DIR"
+
+# ============================================================================
+# CLI-SPECIFIC: Command builder
+# ============================================================================
+run_agent() {
+    local prompt="$1"
+    local iter_log="$2"
+
+    # Codex reads prompt from stdin via `-`
+    printf "%s" "$prompt" | codex --approval-mode full-auto --cd "$(pwd)" - 2>&1 | tee "$iter_log" | tee /dev/stderr
+}
+
+# ============================================================================
+# PROMPT BUILDER
+# ============================================================================
+build_prompt() {
+    local iteration="$1"
+
+    # Detect XRoads-prepared context files
+    local agent_brief=""
+    if [[ -f "AGENT.md" ]]; then
+        agent_brief="$(cat AGENT.md)"
+    fi
+
+    local status_file="${CROSSROADS_STATUS_FILE:-}"
+    local status_instructions=""
+    if [[ -n "$status_file" && -f "$status_file" ]]; then
+        status_instructions="
+## Cross-Agent Coordination
+
+**Status file:** $status_file
+- READ this file before starting any story to check dependency status
+- UPDATE this file when you COMPLETE a story (set status to \"complete\")
+"
+    fi
+
+    cat <<PROMPT
+You are Nexus, an autonomous coding agent powered by Codex. Do exactly ONE task per iteration.
+
+## Context
+
+$(if [[ -n "$agent_brief" ]]; then echo "$agent_brief"; fi)
+
+## Steps
+
+1. Read $PRD_FILE and find the first user story that is NOT complete (status != "complete").
+2. Read $PROGRESS_FILE - check the Learnings section for patterns from previous iterations.
+3. Read $AGENTS_FILE if it exists for codebase patterns.
+4. Check if the story has a \`unit_test\` field - unit tests are MANDATORY.
+5. Implement that ONE story only.
+6. Write the unit test file specified in the story's \`unit_test.file\` field.
+7. Run the unit test and ensure it PASSES.
+$status_instructions
+## Completion Criteria (ALL must be true)
+
+To mark a story as complete:
+1. Implementation done
+2. Build passes (npm run build or equivalent)
+3. Typecheck passes (if applicable)
+4. UNIT TEST PASSES (MANDATORY)
+
+## If Checks PASS:
+
+- Update $PRD_FILE:
+  - Set story status to "complete"
+  - Set story's unit_test.status to "passing"
+  - Add "completed_at" timestamp
+- Commit changes: git commit -am 'feat(scope): US-XXX description'
+- Append what worked to $PROGRESS_FILE
+
+## If Checks FAIL:
+
+- Do NOT mark the story complete
+- Do NOT commit broken code
+- Append what went wrong to $PROGRESS_FILE
+- The loop will retry in the next iteration
+
+## Progress Block Format
+
+### Iteration $iteration - [Story ID]
+- Delta: ...
+- Checks: ...
+- Learnings: ...
+
+## End Condition
+
+After completing your task, check $PRD_FILE:
+- If ALL stories have status "complete", output exactly: ${COMPLETION_TOKEN}ALL DONE${COMPLETION_TOKEN/</</}
+- Otherwise just end your response so the next iteration can continue.
+PROMPT
+}
 
 # ============================================================================
 # INITIALIZATION
 # ============================================================================
 init() {
-    show_nexus_banner "Codex" "$GREEN"
+    show_nexus_banner "$AGENT_NAME" "$AGENT_COLOR"
 
     log_info "Checking dependencies..."
     check_codex_deps || exit 1
@@ -44,54 +140,18 @@ init() {
         exit 1
     fi
 
-    # Init progress file if missing
     if [ ! -f "$PROGRESS_FILE" ]; then
         local feature=$(prd_get_feature_name)
         create_progress_file "$feature" > "$PROGRESS_FILE"
         log_success "Created $PROGRESS_FILE"
     fi
 
-    # Init AGENTS.md if missing
     if [ ! -f "$AGENTS_FILE" ]; then
         create_agents_file > "$AGENTS_FILE"
         log_success "Created $AGENTS_FILE"
     fi
 
     log_success "All dependencies OK"
-}
-
-build_prompt() {
-    local iteration="$1"
-    cat <<PROMPT
-You are Codex Nexus, an autonomous coding agent. Do exactly ONE task per iteration.
-
-## Mission Context
-- PRD: $PRD_FILE
-- Progress log: $PROGRESS_FILE
-
-## Steps
-
-1. Read $PRD_FILE and pick the first user story whose status != "complete".
-2. Read $AGENTS_FILE for reusable patterns.
-3. Implement exactly ONE story per iteration.
-4. Run quality gates (lint, test, build).
-5. Update artifacts:
-   - If checks pass: set story status -> "complete", commit changes
-   - If checks fail: log learnings to $PROGRESS_FILE, do NOT commit
-
-## Progress Block Format
-
-### Iteration $iteration - [Story ID]
-- Delta: ...
-- Checks: ...
-- Learnings: ...
-
-## Completion Protocol
-
-After applying changes, inspect $PRD_FILE:
-- If every story is complete, output <codex-complete>ALL DONE</codex-complete>
-- Otherwise end the response so the next iteration can continue.
-PROMPT
 }
 
 # ============================================================================
@@ -112,6 +172,7 @@ main() {
     log_info "Starting loop: $pending/$total stories remaining"
     log_info "Feature: ${YELLOW}$feature_name${NC}"
     log_info "Max iterations: $MAX_ITERATIONS"
+    log_info "${CYAN}Unit tests are MANDATORY - story won't complete until test passes${NC}"
     echo ""
 
     local consecutive_failures=0
@@ -126,25 +187,21 @@ main() {
         local prompt=$(build_prompt "$i")
         local timestamp=$(date '+%Y%m%d_%H%M%S')
         local iter_log="$LOG_DIR/codex_loop_iter_${i}_$timestamp.log"
-        local iter_last="$LOG_DIR/codex_loop_iter_${i}_last.txt"
 
-        echo -e "${DIM}─────────────────────────────────────────────${NC}"
-        echo -e "${GREEN}Codex working...${NC}"
+        echo -e "${DIM}---${NC}"
+        echo -e "${AGENT_COLOR}${AGENT_NAME} working...${NC}"
         echo ""
 
         set +e
-        printf "%s" "$prompt" | codex --approval-mode full-auto --cd "$(pwd)" - 2>&1 | tee "$iter_log"
-        local exit_code=${PIPESTATUS[1]}
+        run_agent "$prompt" "$iter_log"
+        local exit_code=${PIPESTATUS[0]}
         set -e
 
-        # Save last output for completion check
-        tail -100 "$iter_log" > "$iter_last" 2>/dev/null || true
-
         echo ""
-        echo -e "${DIM}─────────────────────────────────────────────${NC}"
+        echo -e "${DIM}---${NC}"
 
         if [ $exit_code -ne 0 ]; then
-            log_warn "Codex exited with code $exit_code"
+            log_warn "$AGENT_NAME exited with code $exit_code"
             consecutive_failures=$((consecutive_failures + 1))
             if [ $consecutive_failures -ge $MAX_CONSECUTIVE_FAILURES ]; then
                 log_error "Reached $MAX_CONSECUTIVE_FAILURES consecutive failures. Aborting."
@@ -156,16 +213,18 @@ main() {
         fi
         consecutive_failures=0
 
-        # Check for completion
-        if grep -q "<codex-complete>" "$iter_last" 2>/dev/null || grep -q "<codex-complete>" "$iter_log" 2>/dev/null; then
+        # Check for completion in log
+        if grep -q "$COMPLETION_TOKEN" "$iter_log" 2>/dev/null; then
             show_completion_banner "$i" "$feature_name"
+            echo -e "${GREEN}All stories complete with passing unit tests!${NC}"
             exit 0
         fi
 
-        # Check remaining
+        # Check remaining via PRD
         pending=$(prd_count_pending)
         if [ "$pending" = "0" ]; then
             show_completion_banner "$i" "$feature_name"
+            echo -e "${GREEN}All stories complete with passing unit tests!${NC}"
             exit 0
         fi
 
@@ -173,7 +232,6 @@ main() {
         sleep $SLEEP_SECONDS
     done
 
-    # Max iterations reached
     show_timeout_banner "$MAX_ITERATIONS" "$pending"
     exit 1
 }
