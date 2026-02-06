@@ -42,8 +42,13 @@ actor GitService {
 
     private let gitPath: String
 
-    init(gitPath: String = "/usr/bin/git") {
+    /// When true, all git operations are no-ops returning mock values.
+    /// Used by MockServiceContainer to prevent real I/O in tests and previews.
+    let testMode: Bool
+
+    init(gitPath: String = "/usr/bin/git", testMode: Bool = false) {
         self.gitPath = gitPath
+        self.testMode = testMode
     }
 
     // MARK: - Worktree Operations
@@ -458,6 +463,9 @@ actor GitService {
     /// Uses async/await to avoid blocking the actor
     @discardableResult
     private func runGit(arguments: [String], currentDirectory: String) async throws -> String {
+        // In test mode, return empty string without running any git command
+        if testMode { return "" }
+
         // Verify git exists
         guard FileManager.default.fileExists(atPath: gitPath) else {
             throw GitError.gitNotFound

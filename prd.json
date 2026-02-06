@@ -305,7 +305,8 @@
       "title": "Extract MockServiceContainer to use actual mock implementations",
       "description": "MockServiceContainer creates real service instances (real GitService, real MCPClient, etc.) instead of mock implementations. This means tests using MockServiceContainer make real git/process calls.",
       "priority": "medium",
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-06T17:55:00Z",
       "acceptance_criteria": [
         "Create protocol conformances or mock classes for critical services (MockGitService, MockPTYRunner)",
         "MockServiceContainer uses these instead of production instances",
@@ -314,8 +315,30 @@
       ],
       "technical_notes": "ServiceContainer.swift:130-155: MockServiceContainer creates real GitService(), ProcessRunner(), PTYProcessRunner(), MCPClient(). Since these are actors, callers won't crash but may attempt real I/O. Consider making GitService a protocol or adding a testing mode flag.",
       "files_affected": [
-        "XRoads/Services/ServiceContainer.swift"
-      ]
+        "XRoads/Services/ServiceContainer.swift",
+        "XRoads/Services/ProcessRunner.swift",
+        "XRoads/Services/PTYProcess.swift",
+        "XRoads/Services/GitService.swift",
+        "XRoads/Services/MCPClient.swift"
+      ],
+      "unit_test": {
+        "file": "XRoadsTests/Services/MockServiceContainerTests.swift",
+        "name": "MockServiceContainerTests",
+        "description": "Verifies that MockServiceContainer initializes all services with testMode preventing real I/O, and that critical actors have testMode=true",
+        "assertions": [
+          "MockServiceContainer initializes without errors",
+          "GitService has testMode=true in MockServiceContainer",
+          "ProcessRunner has testMode=true in MockServiceContainer",
+          "PTYProcessRunner has testMode=true in MockServiceContainer",
+          "MCPClient has testMode=true in MockServiceContainer",
+          "ProcessRunner.launch returns UUID without launching real process in testMode",
+          "PTYProcessRunner.launch returns UUID without launching real process in testMode",
+          "GitService.runGit returns empty string without running git in testMode",
+          "MCPClient.start returns without launching server in testMode",
+          "DefaultServiceContainer services have testMode=false by default"
+        ],
+        "status": "passing"
+      }
     },
     {
       "id": "CR-001",

@@ -114,6 +114,11 @@ final class DefaultServiceContainer: ServiceContainer, @unchecked Sendable {
 
 /// Mock implementation of ServiceContainer for testing and previews.
 ///
+/// All services are initialized with `testMode: true` where supported, ensuring
+/// no real processes are launched, no git commands execute, and no MCP servers start.
+/// Services without testMode (AgentEventBus, NotesSyncService, etc.) are pure in-memory
+/// or lightweight enough to be safe in test contexts.
+///
 /// Safety: @unchecked Sendable is justified because all stored properties are `let` bindings
 /// of actor types (inherently Sendable) or Sendable value types. The class is `final`,
 /// preventing subclassing, and no mutable state exists after initialization.
@@ -136,15 +141,19 @@ final class MockServiceContainer: ServiceContainer, @unchecked Sendable {
     let orchestrator: ClaudeOrchestrator
 
     init() {
-        // Use default instances - in a full implementation, these would be mock versions
-        self.gitService = GitService()
-        self.processRunner = ProcessRunner()
-        self.ptyRunner = PTYProcessRunner()
-        self.mcpClient = MCPClient()
+        // Critical services initialized with testMode to prevent real I/O
+        self.gitService = GitService(testMode: true)
+        self.processRunner = ProcessRunner(testMode: true)
+        self.ptyRunner = PTYProcessRunner(testMode: true)
+        self.mcpClient = MCPClient(testMode: true)
+
+        // Pure in-memory services — safe without testMode
         self.agentEventBus = AgentEventBus()
-        self.mergeCoordinator = MergeCoordinator()
-        self.gitMaster = GitMaster(gitService: gitService)
         self.notesSyncService = NotesSyncService()
+
+        // Services composed from test-mode dependencies — inherit safety
+        self.mergeCoordinator = MergeCoordinator(gitService: gitService)
+        self.gitMaster = GitMaster(gitService: gitService)
         self.historyService = OrchestrationHistoryService()
         self.agentLauncher = AgentLauncher(ptyRunner: ptyRunner)
         self.loopLauncher = LoopLauncher(ptyRunner: ptyRunner, gitService: gitService)

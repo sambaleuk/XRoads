@@ -397,12 +397,26 @@ actor MCPClient {
     /// Path to Node.js executable
     private let nodePath: String
 
+    /// When true, all server start/call operations are no-ops.
+    /// Used by MockServiceContainer to prevent real I/O in tests and previews.
+    let testMode: Bool
+
     // MARK: - Initialization
 
     init(
         mcpServerPath: String = "",
-        nodePath: String = ""
+        nodePath: String = "",
+        testMode: Bool = false
     ) {
+        self.testMode = testMode
+
+        // In test mode, skip expensive path resolution
+        if testMode {
+            self.nodePath = "/usr/bin/node"
+            self.mcpServerPath = ""
+            return
+        }
+
         // Find node dynamically if not provided
         if nodePath.isEmpty {
             self.nodePath = Self.findNodePath()
@@ -583,6 +597,9 @@ actor MCPClient {
     /// Starts the MCP server process
     /// - Throws: MCPError if server fails to start
     func start() async throws {
+        // In test mode, skip server launch entirely
+        if testMode { return }
+
         guard !isRunning else {
             throw MCPError.serverAlreadyRunning
         }

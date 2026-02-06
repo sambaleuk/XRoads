@@ -2462,3 +2462,49 @@ Acceptance Criteria Met:
 - Learnings:
   - When removing a feature toggle that was always forced to one value, trace all consumers (modifiers, child views, lifecycle hooks) and simplify them too
   - The `ContentColumn` struct was dead code because it was only instantiated inside the unreachable `legacyNavigationLayout`
+
+### Iteration - CR-304 (Replace DispatchQueue.main.asyncAfter with Task.sleep)
+- Found 12 DispatchQueue.main.asyncAfter usages across 8 files (not 13 as PRD stated; AppState had 0)
+- **Replaced 6 usages** in pure SwiftUI views with `Task { @MainActor in try? await Task.sleep(for:) }`:
+  - LoadingIndicators.swift (2): staggered dots animation delays
+  - QuickActionBar.swift (1): brief loading feedback delay
+  - ArtDirectionView.swift (1): auto-clear progress message after 2s
+  - NeonBrainView.swift (2): staggered filament + spark animations
+- **Retained 6 usages** in AppKit focus workarounds, added "AppKit timing" documentation comments:
+  - FloatingInputWindow.swift (2): makeFirstResponder after window show
+  - MacTextField.swift (2): attemptFocus in viewDidMoveToWindow + updateNSView
+  - ModalPanel.swift (2): makeKey + focus after sheet animation, activateForKeyboardInput in updateNSView
+- Build: swift build PASS
+- Unit test: XRoadsTests/Views/AsyncAfterMigrationTests.swift — PASS (12/12 tests)
+- Files changed:
+  - XRoads/Views/Components/LoadingIndicators.swift (replaced 2 DispatchQueue with Task.sleep)
+  - XRoads/Views/Components/QuickActionBar.swift (replaced 1 DispatchQueue with Task.sleep)
+  - XRoads/Views/ArtDirection/ArtDirectionView.swift (replaced 1 DispatchQueue with Task.sleep)
+  - XRoads/Views/Dashboard/NeonBrainView.swift (replaced 2 DispatchQueue with Task.sleep)
+  - XRoads/Views/Components/FloatingInputWindow.swift (added AppKit timing comments)
+  - XRoads/Views/Components/MacTextField.swift (added AppKit timing comments)
+  - XRoads/Views/Components/ModalPanel.swift (added AppKit timing comments)
+  - XRoadsTests/Views/AsyncAfterMigrationTests.swift (NEW - 12 tests)
+  - prd.json (CR-304 marked complete, unit_test added and status=passing)
+- Learnings:
+  - `Task.sleep(for: .milliseconds(Int(delay * 1000)))` works for converting Double seconds to Duration
+  - AppKit NSWindow/NSTextField focus timing requires DispatchQueue — Task.sleep doesn't guarantee the same run loop scheduling for window animation completion
+  - In NSViewRepresentable.updateNSView, DispatchQueue.main.asyncAfter is the correct pattern for deferring AppKit focus calls since the method is synchronous and called by SwiftUI's update cycle
+
+### Iteration 8 - CR-305 (COMPLETE)
+- What was implemented: Added `testMode: Bool` parameter to GitService, ProcessRunner, PTYProcessRunner, and MCPClient actors. When testMode=true, launch/start methods return mock values without creating real processes or running commands. MockServiceContainer now initializes all critical services with testMode: true.
+- Unit test: XRoadsTests/Services/MockServiceContainerTests.swift - PASS (10/10)
+- Files changed:
+  - XRoads/Services/ProcessRunner.swift (added testMode property + early return in launch)
+  - XRoads/Services/PTYProcess.swift (added testMode to PTYProcessRunner + early return in launch)
+  - XRoads/Services/GitService.swift (added testMode property + early return in runGit)
+  - XRoads/Services/MCPClient.swift (added testMode property + early return in start, skip path resolution)
+  - XRoads/Services/ServiceContainer.swift (MockServiceContainer passes testMode: true to all 4 critical services)
+  - XRoadsTests/Services/MockServiceContainerTests.swift (NEW - 10 tests)
+  - prd.json (CR-305 marked complete, unit_test added and status=passing)
+- Build: swift build PASS
+- Tests: swift test --filter MockServiceContainerTests PASS (10/10), all 94 code review tests PASS
+- Learnings:
+  - Swift actors can't be subclassed, so protocol-based mocking requires changing the ServiceContainer protocol and all callers — a testMode flag is a more contained approach
+  - MCPClient init does expensive path resolution (findNodePath, findMCPServerPath) — testMode should short-circuit in init too, not just in start()
+  - Default parameter values (testMode: Bool = false) ensure zero impact on production code paths

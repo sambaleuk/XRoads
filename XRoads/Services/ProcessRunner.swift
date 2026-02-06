@@ -63,7 +63,15 @@ actor ProcessRunner {
 
     // MARK: - Properties
 
+    /// When true, all launch/terminate calls are no-ops returning mock values.
+    /// Used by MockServiceContainer to prevent real I/O in tests and previews.
+    let testMode: Bool
+
     private var processes: [UUID: ManagedProcess] = [:]
+
+    init(testMode: Bool = false) {
+        self.testMode = testMode
+    }
 
     // MARK: - Public Methods
 
@@ -85,6 +93,9 @@ actor ProcessRunner {
         closeStdinImmediately: Bool = false,
         onOutput: @escaping OutputHandler
     ) async throws -> UUID {
+        // In test mode, return a mock UUID without launching any process
+        if testMode { return UUID() }
+
         // Verify executable exists
         guard FileManager.default.fileExists(atPath: executable) else {
             throw ProcessError.executableNotFound(path: executable)

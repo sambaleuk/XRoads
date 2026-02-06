@@ -280,7 +280,15 @@ actor PTYProcessRunner {
 
     // MARK: - Properties
 
+    /// When true, all launch/terminate calls are no-ops returning mock values.
+    /// Used by MockServiceContainer to prevent real I/O in tests and previews.
+    let testMode: Bool
+
     private var processes: [UUID: ManagedPTYProcess] = [:]
+
+    init(testMode: Bool = false) {
+        self.testMode = testMode
+    }
 
     // MARK: - Public Methods
 
@@ -293,6 +301,9 @@ actor PTYProcessRunner {
         onOutput: @escaping OutputHandler,
         onTermination: TerminationHandler? = nil
     ) async throws -> UUID {
+        // In test mode, return a mock UUID without launching any process
+        if testMode { return UUID() }
+
         let processId = UUID()
 
         let process = PTYProcess(
