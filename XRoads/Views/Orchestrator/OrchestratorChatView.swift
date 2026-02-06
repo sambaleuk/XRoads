@@ -17,7 +17,6 @@ struct OrchestratorChatView: View {
     @StateObject private var viewModel = OrchestratorChatViewModel()
     @State private var showPRDFullView = false
     @State private var selectedPRDForView: DetectedPRD?
-    @State private var showSlotAssignment = false
     @State private var prdDocumentForSlotAssignment: PRDDocument?
 
     // Phase 2: Chat dispatch integration
@@ -80,11 +79,10 @@ struct OrchestratorChatView: View {
                 PRDPreviewSheet(prd: prd)
             }
         }
-        .sheet(isPresented: $showSlotAssignment) {
-            if let doc = prdDocumentForSlotAssignment,
-               let projectPath = appState.projectPath {
+        .sheet(item: $prdDocumentForSlotAssignment) { doc in
+            if let projectPath = appState.projectPath {
                 SlotAssignmentSheet(prd: doc, repoPath: URL(fileURLWithPath: projectPath)) {
-                    showSlotAssignment = false
+                    prdDocumentForSlotAssignment = nil
                 }
             }
         }
@@ -438,8 +436,25 @@ struct OrchestratorChatView: View {
             return
         }
 
-        // Convert DetectedPRD → PRDDocument for SlotAssignmentSheet
-        let stories: [PRDUserStory] = (prd.prdData?.user_stories ?? []).enumerated().map { index, story in
+        // Try structured prdData first, fallback to rawJSON parsing
+        let parsedStories: [DetectedPRD.PRDData.UserStory]
+        let featureName: String
+        let featureDescription: String
+
+        if let data = prd.prdData, let stories = data.user_stories, !stories.isEmpty {
+            parsedStories = stories
+            featureName = data.feature_name ?? prd.title
+            featureDescription = data.description ?? prd.description
+        } else {
+            // Fallback: parse rawJSON manually
+            let fallback = Self.parseRawPRDJSON(prd.rawJSON)
+            parsedStories = fallback.stories
+            featureName = fallback.featureName ?? prd.title
+            featureDescription = fallback.description ?? prd.description
+        }
+
+        // Convert to PRDUserStory array
+        let stories: [PRDUserStory] = parsedStories.enumerated().map { index, story in
             var prdStory = PRDUserStory(
                 id: story.id ?? "US-\(String(format: "%03d", index + 1))",
                 title: story.title ?? "Story \(index + 1)",
@@ -451,7 +466,6 @@ struct OrchestratorChatView: View {
                 estimatedComplexity: story.estimated_complexity ?? 3
             )
 
-            // Map unit_test if present
             if let ut = story.unit_test {
                 prdStory.unitTest = PRDUnitTest(
                     file: ut.file ?? "tests/\(prdStory.id.lowercased().replacingOccurrences(of: "-", with: "_"))_test.swift",
@@ -467,15 +481,62 @@ struct OrchestratorChatView: View {
             return prdStory
         }
 
+        guard !stories.isEmpty else {
+            viewModel.addSystemMessage("Impossible de parser les stories du PRD. Vérifiez le format JSON.")
+            return
+        }
+
         let document = PRDDocument(
-            featureName: prd.prdData?.feature_name ?? prd.title,
-            description: prd.prdData?.description ?? prd.description,
+            featureName: featureName,
+            description: featureDescription,
             userStories: stories
         )
 
         withAnimation { viewModel.dismissPRDProposal() }
         prdDocumentForSlotAssignment = document
-        showSlotAssignment = true
+    }
+
+    /// Fallback parser for rawJSON when Codable decoding fails
+    private static func parseRawPRDJSON(_ json: String) -> (featureName: String?, description: String?, stories: [DetectedPRD.PRDData.UserStory]) {
+        guard let data = json.data(using: .utf8),
+              let dict = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return (nil, nil, [])
+        }
+
+        let featureName = dict["feature_name"] as? String
+        let description = dict["description"] as? String
+
+        guard let storiesArray = dict["user_stories"] as? [[String: Any]] else {
+            return (featureName, description, [])
+        }
+
+        let stories: [DetectedPRD.PRDData.UserStory] = storiesArray.map { s in
+            // Parse unit_test sub-object
+            var unitTest: DetectedPRD.PRDData.UnitTest? = nil
+            if let ut = s["unit_test"] as? [String: Any] {
+                unitTest = DetectedPRD.PRDData.UnitTest(
+                    file: ut["file"] as? String,
+                    name: ut["name"] as? String,
+                    description: ut["description"] as? String,
+                    assertions: ut["assertions"] as? [String],
+                    status: ut["status"] as? String
+                )
+            }
+
+            return DetectedPRD.PRDData.UserStory(
+                id: s["id"] as? String,
+                title: s["title"] as? String,
+                priority: s["priority"] as? String,
+                description: s["description"] as? String,
+                status: s["status"] as? String,
+                acceptance_criteria: s["acceptance_criteria"] as? [String],
+                depends_on: s["depends_on"] as? [String],
+                estimated_complexity: s["estimated_complexity"] as? Int,
+                unit_test: unitTest
+            )
+        }
+
+        return (featureName, description, stories)
     }
 
     private func launchImplementation(prd: DetectedPRD, agent: AgentType, branch: String) {
