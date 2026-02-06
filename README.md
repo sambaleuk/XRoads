@@ -17,7 +17,7 @@
 
 <br />
 
-*Built by [Neurogrid](https://neurogrid.io)*
+*Built by [Neurogrid](https://neurogrid.me)*
 
 </div>
 
