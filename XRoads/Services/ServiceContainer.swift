@@ -50,7 +50,11 @@ protocol ServiceContainer: Sendable {
 
 // MARK: - DefaultServiceContainer
 
-/// Production implementation of ServiceContainer with real services
+/// Production implementation of ServiceContainer with real services.
+///
+/// Safety: @unchecked Sendable is justified because all stored properties are `let` bindings
+/// of actor types (inherently Sendable) or Sendable value types. The class is `final`,
+/// preventing subclassing, and no mutable state exists after initialization.
 final class DefaultServiceContainer: ServiceContainer, @unchecked Sendable {
 
     let gitService: GitService
@@ -108,7 +112,11 @@ final class DefaultServiceContainer: ServiceContainer, @unchecked Sendable {
 
 // MARK: - MockServiceContainer
 
-/// Mock implementation of ServiceContainer for testing and previews
+/// Mock implementation of ServiceContainer for testing and previews.
+///
+/// Safety: @unchecked Sendable is justified because all stored properties are `let` bindings
+/// of actor types (inherently Sendable) or Sendable value types. The class is `final`,
+/// preventing subclassing, and no mutable state exists after initialization.
 final class MockServiceContainer: ServiceContainer, @unchecked Sendable {
 
     let gitService: GitService

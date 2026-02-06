@@ -3,8 +3,14 @@ import Darwin
 
 // MARK: - PTYProcess
 
-/// A process wrapper that provides pseudo-terminal (PTY) support using the `script` command
-/// Required for interactive CLI tools like Claude Code, Gemini CLI, Codex
+/// A process wrapper that provides pseudo-terminal (PTY) support using the `script` command.
+/// Required for interactive CLI tools like Claude Code, Gemini CLI, Codex.
+///
+/// Safety: @unchecked Sendable is justified because all mutable state (`process`, `stdinPipe`,
+/// `stdoutPipe`, `stderrPipe`) is protected by `NSLock` for every read and write access.
+/// Immutable properties (`id`, `executable`, `arguments`, `workingDirectory`, `environment`)
+/// are set once at init and never modified. Callback references (`outputHandler`,
+/// `terminationHandler`) are set once in `launch()` before the process starts.
 final class PTYProcess: @unchecked Sendable {
 
     // MARK: - Types

@@ -1,6 +1,9 @@
 import Foundation
 
-struct NotesSyncService {
+/// Safety: @unchecked Sendable is justified because all stored properties are `let` bindings.
+/// The `ISO8601DateFormatter` is a reference type but is private, never shared, and only
+/// used via its `string(from:)` method which does not mutate observable state.
+struct NotesSyncService: @unchecked Sendable {
 
     private let fileManager: FileManager = .default
     private let files = ["decisions.md", "learnings.md", "blockers.md"]

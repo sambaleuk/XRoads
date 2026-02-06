@@ -1,0 +1,299 @@
+{
+  "feature_name": "Code Review Refactoring",
+  "description": "Automated code improvements identified by code-reviewer on the XRoads codebase (127 Swift files, ~50k LOC). Focus on maintainability, security, and code health.",
+  "branch": "refactor/code-review-2026-02-06",
+  "created_at": "2026-02-06T12:00:00Z",
+  "status": "pending",
+  "goals": [
+    "Remove hardcoded paths and replace with dynamic resolution",
+    "Break down God Object AppState into focused sub-states",
+    "Replace print() debug statements with structured logging",
+    "Fix @unchecked Sendable suppressions with proper thread safety",
+    "Clean up TODO/FIXME markers and stale code"
+  ],
+  "user_stories": [
+    {
+      "id": "CR-201",
+      "title": "Remove hardcoded user paths from production code",
+      "description": "Multiple files contain hardcoded /Users/birahimmbow paths, which break portability. Replace with dynamic resolution using FileManager.homeDirectoryForCurrentUser or Bundle paths.",
+      "priority": "critical",
+      "status": "complete",
+      "completed_at": "2026-02-06T17:01:00Z",
+      "acceptance_criteria": [
+        "Remove '/Users/birahimmbow/Projets/CrossRoads/scripts' from AppState.swift:1074",
+        "Remove '/Users/birahimmbow/Projets/XRoads' from MCPClient.swift:481",
+        "Remove all 3 hardcoded paths from LoopLauncher.swift:274-276",
+        "Replace with dynamic path resolution (NSHomeDirectory, Bundle.main, or env vars)",
+        "swift build passes with no errors",
+        "App still finds MCP server and loop scripts at runtime"
+      ],
+      "technical_notes": "Files: MCPClient.swift (1 path), AppState.swift (1 path), LoopLauncher.swift (3 paths). Use a centralized PathResolver or extend existing ConfigChecker/LoopScriptLocator.",
+      "files_affected": [
+        "XRoads/Services/MCPClient.swift",
+        "XRoads/ViewModels/AppState.swift",
+        "XRoads/Services/LoopLauncher.swift"
+      ],
+      "unit_test": {
+        "file": "XRoadsTests/Services/PathResolutionTests.swift",
+        "name": "PathResolutionTests",
+        "description": "Verifies no hardcoded /Users/birahimmbow paths remain in source files and that LoopScriptLocator dynamically resolves paths",
+        "assertions": [
+          "No /Users/birahimmbow strings in any XRoads/*.swift source file (non-comment lines)",
+          "MCPClient.swift has no hardcoded user paths",
+          "AppState.swift has no hardcoded user paths",
+          "LoopLauncher.swift has no hardcoded user paths",
+          "LoopScriptLocator.checkAvailability returns all loop types",
+          "LoopScriptLocator.diagnostics references all loop script names",
+          "LoopScriptLocator.findLoop returns executable paths or nil",
+          "LoopScriptLocator.findScript returns executable paths or nil",
+          "LoopScriptLocator.getScriptStatuses returns all script types"
+        ],
+        "status": "passing"
+      }
+    },
+    {
+      "id": "CR-301",
+      "title": "Decompose AppState God Object into focused sub-states",
+      "description": "AppState.swift is 2469 lines and manages session, worktree, dashboard, orchestration, dispatch, GitMaster, input bridge, chat, and health monitoring state. Split into focused @Observable sub-states with clear boundaries.",
+      "priority": "high",
+      "status": "complete",
+      "completed_at": "2026-02-06T17:13:00Z",
+      "acceptance_criteria": [
+        "Extract DashboardState (slots, visual state, progress) into separate @Observable class",
+        "Extract DispatchState (phase, progress, layers) into separate @Observable class",
+        "Extract OrchestrationState (session, assignments, agents) into separate @Observable class",
+        "AppState composes sub-states via stored properties",
+        "All existing views continue working with sub-state references",
+        "swift test passes with no regressions"
+      ],
+      "technical_notes": "AppState.swift: 2469 LOC. Suggested split: DashboardState (~400 LOC), DispatchState (~200 LOC), OrchestrationState (~300 LOC), keeping core state (~1500 LOC) in AppState. Use @Observable composition pattern.",
+      "files_affected": [
+        "XRoads/ViewModels/AppState.swift",
+        "XRoads/ViewModels/DashboardState.swift",
+        "XRoads/ViewModels/DispatchState.swift",
+        "XRoads/ViewModels/OrchestrationState.swift"
+      ],
+      "unit_test": {
+        "file": "XRoadsTests/ViewModels/AppStateDecompositionTests.swift",
+        "name": "AppStateDecompositionTests",
+        "description": "Verifies AppState is decomposed into DashboardState, DispatchState, and OrchestrationSubState with proper composition and delegation",
+        "assertions": [
+          "DashboardState exists as separate @Observable class",
+          "DispatchState exists as separate @Observable class",
+          "OrchestrationSubState exists as separate @Observable class",
+          "AppState composes sub-states via .dashboard, .dispatch, .orchestration properties",
+          "DashboardState owns terminalSlots (6 slots), orchestratorVisualState, dashboardMode, git info",
+          "DispatchState owns dispatchPhase, dispatchProgress, globalLogs, layer tracking",
+          "OrchestrationSubState owns session, agentAssignments, health monitoring, merge state, history/PRD",
+          "AppState delegates dashboard/dispatch/orchestration properties to sub-states",
+          "Core properties (sessions, worktrees, agents, logs) remain in AppState",
+          "Sub-state methods (clearAssignments, setActivePRD, updateOrchestratorVisualState) work correctly"
+        ],
+        "status": "passing"
+      }
+    },
+    {
+      "id": "CR-101",
+      "title": "Replace print() calls with structured Logger",
+      "description": "73 print() calls across 16 Swift files are used for debug logging. Replace with os.Logger or a lightweight wrapper for filtering, levels, and production log management.",
+      "priority": "high",
+      "status": "complete",
+      "completed_at": "2026-02-06T17:26:00Z",
+      "acceptance_criteria": [
+        "Create a minimal XRoadsLogger utility using os.Logger",
+        "Replace all 73 print() calls in production code with appropriate log levels (debug/info/error)",
+        "Keep print() only in test files if needed",
+        "Logger supports subsystem filtering (e.g., 'com.xroads.mcp', 'com.xroads.loop')",
+        "swift build passes"
+      ],
+      "technical_notes": "Heaviest files: MCPClient.swift (13 prints), ModalPanel.swift (9 prints), LayeredDispatcher.swift (5 prints), XRoadsDashboardView.swift (5 prints). Use os.Logger with subsystem 'com.xroads' and per-service categories.",
+      "files_affected": [
+        "XRoads/Services/XRoadsLogger.swift",
+        "XRoads/Services/MCPClient.swift",
+        "XRoads/Services/LayeredDispatcher.swift",
+        "XRoads/Services/LoopLauncher.swift",
+        "XRoads/Services/StatusMonitor.swift",
+        "XRoads/Services/ActionRunner.swift",
+        "XRoads/Services/OrchestratorService.swift",
+        "XRoads/Services/AgentLauncher.swift",
+        "XRoads/Views/Components/ModalPanel.swift",
+        "XRoads/Views/Components/MacTextField.swift",
+        "XRoads/Views/Dashboard/XRoadsDashboardView.swift",
+        "XRoads/Views/Dashboard/TerminalSlotView.swift",
+        "XRoads/ViewModels/AppState.swift",
+        "XRoads/App/XRoadsApp.swift"
+      ],
+      "unit_test": {
+        "file": "XRoadsTests/Services/StructuredLoggingTests.swift",
+        "name": "StructuredLoggingTests",
+        "description": "Verifies that print() calls are replaced with structured os.Logger and the Log enum provides correct subsystem/categories",
+        "assertions": [
+          "Log.subsystem equals 'com.xroads'",
+          "All 11 logger categories exist (mcp, loop, status, dispatcher, action, orchestrator, agent, dashboard, input, modal, app)",
+          "No unconditional print() calls in production code outside #if DEBUG blocks",
+          "XRoadsLogger.swift imports os and uses Logger(subsystem:)",
+          "MCPClient.swift uses Log.mcp",
+          "LoopLauncher.swift uses Log.loop",
+          "LayeredDispatcher.swift uses Log.dispatcher",
+          "StatusMonitor.swift uses Log.status",
+          "ActionRunner.swift uses Log.action",
+          "OrchestratorService.swift uses Log.orchestrator",
+          "XRoadsDashboardView.swift uses Log.dashboard"
+        ],
+        "status": "passing"
+      }
+    },
+    {
+      "id": "CR-102",
+      "title": "Fix @unchecked Sendable suppressions with proper thread safety",
+      "description": "4 types use @unchecked Sendable to bypass compiler checks: DefaultServiceContainer, MockServiceContainer, PTYProcess, WeakAppStateRef. Audit and either justify or fix.",
+      "priority": "high",
+      "status": "complete",
+      "completed_at": "2026-02-06T17:32:00Z",
+      "acceptance_criteria": [
+        "ServiceContainer: Make protocol non-Sendable or make containers use actors/locks properly",
+        "PTYProcess: Already uses NSLock for all mutable state - verify completeness and document the @unchecked as justified",
+        "WeakAppStateRef: Verify weak reference is safe across isolation boundaries",
+        "Add inline comments explaining WHY @unchecked is used for any that remain",
+        "No new data race warnings with swift build -strict-concurrency=complete"
+      ],
+      "technical_notes": "ServiceContainer.swift:54 (DefaultServiceContainer), ServiceContainer.swift:112 (MockServiceContainer), PTYProcess.swift:8, AppState.swift:14 (WeakAppStateRef). PTYProcess uses NSLock correctly - may be fine as-is with documentation. ServiceContainers hold only actors/Sendable types but the class itself is mutable.",
+      "files_affected": [
+        "XRoads/Services/ServiceContainer.swift",
+        "XRoads/Services/PTYProcess.swift",
+        "XRoads/ViewModels/AppState.swift",
+        "XRoads/Services/NotesSyncService.swift"
+      ],
+      "unit_test": {
+        "file": "XRoadsTests/Services/SendableAuditTests.swift",
+        "name": "SendableAuditTests",
+        "description": "Verifies that all @unchecked Sendable usages are documented with safety comments and that the codebase compiles cleanly with strict concurrency",
+        "assertions": [
+          "DefaultServiceContainer has @unchecked Sendable with safety comment",
+          "MockServiceContainer has @unchecked Sendable with safety comment",
+          "PTYProcess has @unchecked Sendable with safety comment documenting NSLock protection",
+          "WeakAppStateRef has @unchecked Sendable with safety comment documenting MainActor confinement",
+          "NotesSyncService conforms to @unchecked Sendable with safety comment",
+          "All @unchecked Sendable usages have a preceding comment containing 'Safety:'",
+          "DefaultServiceContainer properties are all let bindings",
+          "MockServiceContainer properties are all let bindings",
+          "PTYProcess uses NSLock for mutable state protection"
+        ],
+        "status": "passing"
+      }
+    },
+    {
+      "id": "CR-302",
+      "title": "Eliminate Package.swift manual source enumeration",
+      "description": "Package.swift manually lists all 127 source files. This is error-prone (missing a file = build failure) and tedious to maintain. SPM auto-discovers sources by default when no explicit sources are specified.",
+      "priority": "medium",
+      "status": "pending",
+      "acceptance_criteria": [
+        "Remove the explicit `sources:` array from XRoadsLib target in Package.swift",
+        "Ensure directory structure follows SPM conventions (no conflicts)",
+        "swift build succeeds with auto-discovery",
+        "swift test succeeds"
+      ],
+      "technical_notes": "Package.swift lists 127 files manually in the `sources:` array. SPM auto-discovers all .swift files in the target path by default. Only the `exclude:` and `resources:` arrays need to remain. This is the biggest maintainability win in the whole codebase.",
+      "files_affected": [
+        "Package.swift"
+      ]
+    },
+    {
+      "id": "CR-303",
+      "title": "Clean up stale TODO/FIXME markers",
+      "description": "3 TODO markers in MainWindowView.swift reference Phase 2 cleanup that appear to be done. 1 TODO in UnifiedDispatcher.swift references unimplemented quick action dispatch.",
+      "priority": "medium",
+      "status": "pending",
+      "acceptance_criteria": [
+        "MainWindowView.swift:52 - Evaluate and remove 'TODO: Remove after confirming no regressions'",
+        "MainWindowView.swift:114 - Evaluate and remove 'TODO: Remove this branch after Phase 2 cleanup'",
+        "MainWindowView.swift:242 - Evaluate and remove 'TODO: Remove after Phase 2 cleanup'",
+        "UnifiedDispatcher.swift:588 - Either implement quick action dispatch or convert to a tracked issue",
+        "No orphaned TODO/FIXME markers remain in production code"
+      ],
+      "technical_notes": "MainWindowView.swift has 3 stale TODOs from a previous phase. UnifiedDispatcher has a genuine TODO for missing functionality. Review each and either resolve or track as a proper issue.",
+      "files_affected": [
+        "XRoads/Views/MainWindowView.swift",
+        "XRoads/Services/UnifiedDispatcher.swift"
+      ]
+    },
+    {
+      "id": "CR-304",
+      "title": "Replace DispatchQueue.main.asyncAfter with Task.sleep in @MainActor context",
+      "description": "13 usages of DispatchQueue.main.asyncAfter across views and AppState. In a Swift Concurrency codebase using @MainActor, prefer Task { try await Task.sleep(...) } for consistency and cancellability.",
+      "priority": "medium",
+      "status": "pending",
+      "acceptance_criteria": [
+        "Replace DispatchQueue.main.asyncAfter in AppState.swift:600 with Task.sleep + weak self",
+        "Replace in FloatingInputWindow.swift (2 usages) - these may need to stay for AppKit timing",
+        "Replace in MacTextField.swift (2 usages) - evaluate AppKit timing requirements",
+        "Leave AppKit-specific timing workarounds if they serve a documented purpose",
+        "Add comment explaining why DispatchQueue is kept (if any remain)",
+        "swift build passes"
+      ],
+      "technical_notes": "Some DispatchQueue.main.asyncAfter usages in AppKit wrappers (FloatingInputWindow, MacTextField, ModalPanel) may be intentional for focus/animation timing. AppState and pure SwiftUI views should use Task.sleep. NeonBrainView uses it for staggered animations.",
+      "files_affected": [
+        "XRoads/ViewModels/AppState.swift",
+        "XRoads/Views/Components/FloatingInputWindow.swift",
+        "XRoads/Views/Components/MacTextField.swift",
+        "XRoads/Views/Components/LoadingIndicators.swift",
+        "XRoads/Views/Components/ModalPanel.swift",
+        "XRoads/Views/Dashboard/NeonBrainView.swift"
+      ]
+    },
+    {
+      "id": "CR-305",
+      "title": "Extract MockServiceContainer to use actual mock implementations",
+      "description": "MockServiceContainer creates real service instances (real GitService, real MCPClient, etc.) instead of mock implementations. This means tests using MockServiceContainer make real git/process calls.",
+      "priority": "medium",
+      "status": "pending",
+      "acceptance_criteria": [
+        "Create protocol conformances or mock classes for critical services (MockGitService, MockPTYRunner)",
+        "MockServiceContainer uses these instead of production instances",
+        "Tests using MockServiceContainer no longer trigger real process launches",
+        "swift test passes"
+      ],
+      "technical_notes": "ServiceContainer.swift:130-155: MockServiceContainer creates real GitService(), ProcessRunner(), PTYProcessRunner(), MCPClient(). Since these are actors, callers won't crash but may attempt real I/O. Consider making GitService a protocol or adding a testing mode flag.",
+      "files_affected": [
+        "XRoads/Services/ServiceContainer.swift"
+      ]
+    },
+    {
+      "id": "CR-001",
+      "title": "Add bounded growth to unbounded collections in AppState",
+      "description": "Several collections in AppState grow without bounds: logs, globalLogs, agentTimelineEvents, historyRecords. These can cause memory issues during long orchestration sessions.",
+      "priority": "high",
+      "status": "pending",
+      "acceptance_criteria": [
+        "logs array: cap at 5000 entries with FIFO eviction",
+        "globalLogs array: cap at 5000 entries with FIFO eviction",
+        "agentTimelineEvents: cap at 1000 entries",
+        "Extract log management into a dedicated LogBuffer struct with configurable max size",
+        "TerminalSlot.logs already capped at 50 - verify this is sufficient"
+      ],
+      "technical_notes": "AppState.swift has multiple unbounded arrays. TerminalSlot already caps at 50 (line 200). MCP server already caps at 1000 logs. But AppState.logs, globalLogs, and agentTimelineEvents have no bounds. During a 6-agent orchestration, logs accumulate rapidly.",
+      "files_affected": [
+        "XRoads/ViewModels/AppState.swift"
+      ]
+    },
+    {
+      "id": "CR-202",
+      "title": "Harden MCP node path resolution against NVM version changes",
+      "description": "MCPClient.swift:427 hardcodes a specific NVM node version path (v20.19.4). When the user updates Node, the MCP server fails to start.",
+      "priority": "high",
+      "status": "pending",
+      "acceptance_criteria": [
+        "Replace hardcoded NVM version path with glob-based resolution (~/.nvm/versions/node/*/bin/node)",
+        "Sort by version number descending to prefer latest",
+        "Keep fallback chain (Homebrew, /usr/local/bin, /usr/bin, which node)",
+        "Add unit test for path resolution logic",
+        "MCP server starts correctly after Node version change"
+      ],
+      "technical_notes": "MCPClient.swift:427: hardcoded '/Users/birahimmbow/.nvm/versions/node/v20.19.4/bin/node'. Should glob ~/.nvm/versions/node/*/bin/node and pick latest. This is a portability + maintenance issue.",
+      "files_affected": [
+        "XRoads/Services/MCPClient.swift"
+      ]
+    }
+  ]
+}

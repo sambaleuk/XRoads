@@ -11,6 +11,9 @@ final class AppState {
 
     // MARK: - Weak Reference Wrapper
 
+    /// Safety: @unchecked Sendable is justified because the weak reference is only written
+    /// once at init (on MainActor) and only read inside `MainActor.run` blocks, ensuring
+    /// all access is confined to the main actor's serial executor.
     private final class WeakAppStateRef: @unchecked Sendable {
         weak var value: AppState?
 

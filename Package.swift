@@ -242,7 +242,9 @@ let package = Package(
                 // US-V4-028: Git Info Panel Quick Actions Tests
                 "Dashboard/GitInfoPanelTests.swift",
                 // Orchestration Workflow Tests
-                "Orchestrator/OrchestrationWorkflowTests.swift"
+                "Orchestrator/OrchestrationWorkflowTests.swift",
+                // CR-102: @unchecked Sendable Audit Tests
+                "Services/SendableAuditTests.swift"
             ]
         )
     ]
