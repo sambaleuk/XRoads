@@ -1,4 +1,0 @@
-Updated component context detection + injection (`XRoads/Services/ComponentContextBuilder.swift`), added tests (`XRoadsTests/ArtDirection/ComponentContextTests.swift`), and inserted the Available Components section in `AGENTS.md`.  
-Extended `~/.xroads/lib/skill-loader.sh` with `--inject-components` and component section generation.
-
-Tests: `./scripts/swift-build.sh`; `swift test --disable-sandbox` (warnings about unhandled test resource `XRoadsTests/Orchestrator/OrchestratorChatViewTests.swift`, plus existing unused variables in `XRoadsTests/Settings/MCPSettingsTests.swift` and `XRoadsTests/Skills/SkillsBrowserViewTests.swift`).

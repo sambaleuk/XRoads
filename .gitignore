@@ -76,8 +76,11 @@ scratch/
 Screenshot*.png
 *.jpeg
 *.jpg
+# Root-level PNGs (screenshots, exports, etc.)
+/*.png
 # Keep docs/assets for intentional documentation images
 !docs/assets/
+!docs/assets/**
 
 # AI-generated images
 *-create-a-*.svg
@@ -147,3 +150,9 @@ test-results/
 # External/Unrelated projects (accidentally added)
 # -----------------------------------------------------------------------------
 ios-swift-skills/
+
+# -----------------------------------------------------------------------------
+# Misc development artifacts
+# -----------------------------------------------------------------------------
+progress.txt
+kill-app.sh
