@@ -105,6 +105,42 @@ emit_log({ level: "info", source: "claude", message: "Implementing auth..." })
 update_status({ agent: "gemini", status: "running", progress: 45 })
 ```
 
+### 🔄 Nexus Loops — Battle-Tested Agentic Patterns
+
+What makes XRoads truly robust is its integration with **Nexus Loops** — a set of loop scripts implementing proven patterns for agentic execution, inspired by the [Ralph Wiggum Loop](https://www.reddit.com/r/ClaudeAI/comments/1jazz5r/introducing_the_ralph_wiggum_loop_a_system_for/) methodology.
+
+**Why loops matter:**
+
+Unlike raw CLI invocations, Nexus Loops provide:
+
+- **Structured prompting** — Consistent context injection with PRD, notes, and project metadata
+- **Error recovery** — Automatic retry with exponential backoff on failures
+- **Session persistence** — Loops maintain state across iterations
+- **Clean handoffs** — Structured output for GitMaster to process
+
+```bash
+# Each agent runs through a dedicated loop
+nexus-loop    # Claude Code with full context injection
+gemini-loop   # Gemini CLI with adapted prompting
+codex-loop    # Codex with OpenAI-specific patterns
+```
+
+**Loop execution flow:**
+
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│   Inject    │────▶│   Execute   │────▶│   Verify    │
+│   Context   │     │   Agent     │     │   Output    │
+└─────────────┘     └─────────────┘     └──────┬──────┘
+                                               │
+                    ┌─────────────┐            │
+                    │   Retry /   │◀───────────┘
+                    │   Recover   │   (on failure)
+                    └─────────────┘
+```
+
+This is what transforms XRoads from "6 terminals side by side" into a **production-grade orchestrator**.
+
 ---
 
 ## Quick Start
@@ -176,6 +212,7 @@ swift run XRoads
 | `GitService` | Git operations via Swift actor |
 | `PTYProcessRunner` | Interactive terminal emulation |
 | `GitMaster` | Intelligent conflict resolution agent |
+| `LoopLauncher` | Nexus Loop execution with context injection |
 | `LayeredDispatcher` | Dependency-aware task distribution |
 | `MCPClient` | Model Context Protocol communication |
 
@@ -268,6 +305,7 @@ We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guid
 - [x] Git worktree isolation
 - [x] GitMaster conflict resolution
 - [x] PRD-driven dispatch
+- [x] Nexus Loops integration
 - [x] MCP integration
 - [ ] Agent-to-agent communication
 - [ ] Cloud sync for team collaboration
@@ -289,6 +327,18 @@ You may obtain a copy of the License at
 
     http://www.apache.org/licenses/LICENSE-2.0
 ```
+
+---
+
+## Acknowledgments
+
+XRoads stands on the shoulders of giants:
+
+- **[Maestro](https://github.com/its-maestro-baby/maestro)** — Pioneering multi-terminal AI orchestration with Tauri/Rust. XRoads takes inspiration from Maestro's parallel execution model while adding loop integration and intelligent merge resolution for the macOS ecosystem.
+
+- **[Ralph Wiggum Loop](https://www.reddit.com/r/ClaudeAI/comments/1jazz5r/introducing_the_ralph_wiggum_loop_a_system_for/)** — The methodology behind robust agentic loops. The Nexus Loops implementation adapts these patterns for multi-agent coordination.
+
+- **[Model Context Protocol](https://modelcontextprotocol.io/)** — Anthropic's open standard for AI-tool communication, enabling structured agent monitoring.
 
 ---
 
