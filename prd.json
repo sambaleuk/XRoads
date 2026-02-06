@@ -223,7 +223,8 @@
       "title": "Clean up stale TODO/FIXME markers",
       "description": "3 TODO markers in MainWindowView.swift reference Phase 2 cleanup that appear to be done. 1 TODO in UnifiedDispatcher.swift references unimplemented quick action dispatch.",
       "priority": "medium",
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-06T17:44:00Z",
       "acceptance_criteria": [
         "MainWindowView.swift:52 - Evaluate and remove 'TODO: Remove after confirming no regressions'",
         "MainWindowView.swift:114 - Evaluate and remove 'TODO: Remove this branch after Phase 2 cleanup'",
@@ -235,7 +236,23 @@
       "files_affected": [
         "XRoads/Views/MainWindowView.swift",
         "XRoads/Services/UnifiedDispatcher.swift"
-      ]
+      ],
+      "unit_test": {
+        "file": "XRoadsTests/Views/StaleTODOCleanupTests.swift",
+        "name": "StaleTODOCleanupTests",
+        "description": "Verifies that stale TODO/FIXME markers are removed from production code and legacy agentic mode toggle is cleaned up",
+        "assertions": [
+          "No '// TODO:' comments in MainWindowView.swift",
+          "No '// TODO:' comments in UnifiedDispatcher.swift",
+          "MainWindowView.swift has no forcedAgenticMode variable",
+          "MainWindowView.swift has no isFullAgenticMode @AppStorage",
+          "MainWindowView.swift has no legacyNavigationLayout property",
+          "MainWindowView.swift has no ContentColumn struct",
+          "LifecycleModifier has no isFullAgenticMode parameter",
+          "UnifiedDispatcher.swift dispatchQuickAction has no TODO marker"
+        ],
+        "status": "passing"
+      }
     },
     {
       "id": "CR-304",

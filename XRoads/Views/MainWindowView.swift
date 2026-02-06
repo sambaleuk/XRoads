@@ -24,9 +24,6 @@ extension Array {
 struct MainWindowView: View {
     @Environment(\.appState) private var appState
 
-    /// Column visibility state
-    @State private var columnVisibility: NavigationSplitViewVisibility = .all
-
     /// Controls the inspector visibility
     @State private var showInspector: Bool = true
 
@@ -47,11 +44,6 @@ struct MainWindowView: View {
 
     /// Chat panel width (US-V4-015)
     @AppStorage(UserDefaults.Keys.chatPanelWidth) private var chatPanelWidth: Double = 360
-
-    // Legacy toggle - always true now, kept for migration
-    // TODO: Remove after confirming no regressions
-    @AppStorage(UserDefaults.Keys.fullAgenticMode) private var isFullAgenticMode: Bool = true
-    private let forcedAgenticMode: Bool = true  // Override for cleanup phase
 
     var body: some View {
         mainContent
@@ -79,10 +71,8 @@ struct MainWindowView: View {
                 }
             ))
             .modifier(LifecycleModifier(
-                isFullAgenticMode: isFullAgenticMode,
                 showPRDLoaderSheet: $showPRDLoaderSheet,
                 startEventStream: { appState.startAgentEventStream() },
-                stopEventStream: { appState.stopAgentEventStream() },
                 pendingPRDURL: appState.pendingPRDURL
             ))
             .modifier(HealthDialogModifier(
@@ -104,34 +94,8 @@ struct MainWindowView: View {
 
     @ViewBuilder
     private var navigationContent: some View {
-        // Phase 1: Force agentic mode, legacy code kept but unreachable
-        if forcedAgenticMode {
-            // Full agentic mode: Custom layout without NavigationSplitView
-            agenticModeLayout
-                .toolbar { toolbarContent }
-        } else {
-            // LEGACY: Standard mode with NavigationSplitView
-            // TODO: Remove this branch after Phase 2 cleanup
-            legacyNavigationLayout
-                .toolbar { toolbarContent }
-        }
-    }
-
-    // MARK: - Legacy Navigation Layout (to be removed)
-    @ViewBuilder
-    private var legacyNavigationLayout: some View {
-        NavigationSplitView(columnVisibility: $columnVisibility) {
-            SidebarView(showNewWorktreeSheet: $showNewWorktreeSheet)
-                .navigationSplitViewColumnWidth(min: 200, ideal: Theme.Layout.sidebarWidth, max: 300)
-        } content: {
-            ContentColumn(isFullAgenticMode: isFullAgenticMode)
-        } detail: {
-            if showInspector {
-                InspectorColumn()
-                    .navigationSplitViewColumnWidth(min: 280, ideal: Theme.Layout.inspectorWidth, max: 400)
-            }
-        }
-        .navigationSplitViewStyle(.balanced)
+        agenticModeLayout
+            .toolbar { toolbarContent }
     }
 
     /// Agentic mode layout: Chat Panel | Dashboard (max space) | Right Panel (Git + Logs stacked)
@@ -238,16 +202,6 @@ struct MainWindowView: View {
 
         Divider()
 
-        // LEGACY: Toggle hidden - agentic mode is now the default
-        // TODO: Remove after Phase 2 cleanup
-        // Toggle(isOn: $isFullAgenticMode) {
-        //     Label("Full Agentic Mode", systemImage: "chart.bar.doc.horizontal")
-        // }
-        // .toggleStyle(.switch)
-        // .help("Switch between manual worktree view and orchestration dashboard")
-
-        // Divider()
-
         Button { showPRDLoaderSheet = true } label: {
             Label("Load PRD", systemImage: "doc.text")
         }
@@ -321,42 +275,6 @@ struct MainWindowView: View {
     private func healthDialogTitle(for issue: AgentHealthIssue) -> String {
         let agentName = issue.agentType?.displayName ?? String(issue.agentId.prefix(6))
         return "\(agentName) Needs Attention"
-    }
-}
-
-// MARK: - Content Column
-
-private struct ContentColumn: View {
-    @Environment(\.appState) private var appState
-    let isFullAgenticMode: Bool
-
-    var body: some View {
-        Group {
-            if isFullAgenticMode {
-                // Dashboard v3 with hexagonal layout + neon brain
-                XRoadsDashboardView(
-                    dashboardMode: Binding(
-                        get: { appState.dashboardMode },
-                        set: { appState.dashboardMode = $0 }
-                    ),
-                    terminalSlots: Binding(
-                        get: { appState.terminalSlots },
-                        set: { appState.terminalSlots = $0 }
-                    ),
-                    orchestratorState: Binding(
-                        get: { appState.orchestratorVisualState },
-                        set: { appState.orchestratorVisualState = $0 }
-                    )
-                )
-            } else if let worktree = appState.selectedWorktree {
-                WorktreeDetailView(worktree: worktree)
-            } else {
-                // Show Git Dashboard as quick start view
-                GitDashboardView()
-            }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.bgApp)
     }
 }
 
@@ -1104,12 +1022,10 @@ private struct NotificationHandlersModifier: ViewModifier {
 // MARK: - Lifecycle Modifier
 
 private struct LifecycleModifier: ViewModifier {
-    let isFullAgenticMode: Bool
     @Binding var showPRDLoaderSheet: Bool
     let startEventStream: () -> Void
-    let stopEventStream: () -> Void
     let pendingPRDURL: URL?
-    
+
     @Environment(\.appState) private var appState
 
     func body(content: Content) -> some View {
@@ -1119,19 +1035,7 @@ private struct LifecycleModifier: ViewModifier {
                 Task {
                     await appState.startLogStreaming()
                 }
-                
-                if isFullAgenticMode {
-                    startEventStream()
-                } else {
-                    stopEventStream()
-                }
-            }
-            .onChange(of: isFullAgenticMode) { _, newValue in
-                if newValue {
-                    startEventStream()
-                } else {
-                    stopEventStream()
-                }
+                startEventStream()
             }
             .onChange(of: pendingPRDURL) { _, newURL in
                 if newURL != nil {

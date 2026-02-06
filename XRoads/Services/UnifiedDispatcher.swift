@@ -585,8 +585,8 @@ actor UnifiedDispatcher {
         _ request: DispatchRequest,
         callbacks: DispatchCallbacks
     ) async throws -> DispatchResult {
-        // TODO: Implement quick action dispatch
-        // For now, fall back to single mode if params are available
+        // Quick action dispatch is not yet implemented.
+        // Falls back to single mode when slot parameters are available.
         if request.slotNumber != nil && request.agentType != nil && request.worktreePath != nil {
             return try await dispatchSingle(request, callbacks: callbacks)
         }
