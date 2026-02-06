@@ -288,6 +288,26 @@ enum Theme {
         static let statusBadgeHeight: CGFloat = 20
         static let statusDotSize: CGFloat = 8
         static let sessionCardMinHeight: CGFloat = 96
+
+        // Slot cards
+        static let slotCardWidth: CGFloat = 220
+        static let slotCardHeight: CGFloat = 160
+        static let slotHeaderHeight: CGFloat = 36
+
+        // Panels
+        static let leftPanelWidth: CGFloat = 210
+        static let rightPanelWidth: CGFloat = 280
+        static let panelHeaderHeight: CGFloat = 40
+        static let sectionHeaderHeight: CGFloat = 20
+    }
+
+    // MARK: - Slot Card Colors (Neon Theme)
+
+    enum SlotCard {
+        static let background = Color(hex: "#14161a")
+        static let headerBackground = Color(hex: "#1a1d23")
+        static let terminalBackground = Color(hex: "#0d0f12")
+        static let borderInactive = Color(hex: "#333840")
     }
 }
 

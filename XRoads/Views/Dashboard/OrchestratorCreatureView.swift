@@ -75,21 +75,38 @@ struct OrchestratorCreatureView: View {
     // MARK: - Status Indicator
 
     private var statusIndicator: some View {
-        HStack(spacing: 6) {
-            // Animated status dot
-            Circle()
-                .fill(state.color)
-                .frame(width: 8, height: 8)
-                .shadow(color: state.color, radius: 4)
+        HStack(spacing: Theme.Spacing.sm) {
+            // Animated status dot with glow
+            ZStack {
+                // Outer glow
+                Circle()
+                    .fill(state.color.opacity(0.3))
+                    .frame(width: 14, height: 14)
+                    .blur(radius: 3)
+
+                // Inner dot
+                Circle()
+                    .fill(state.color)
+                    .frame(width: 6, height: 6)
+                    .shadow(color: state.color, radius: 4)
+            }
 
             Text(state.statusMessage)
-                .font(.system(size: 11, weight: .medium, design: .monospaced))
-                .foregroundStyle(Color.textSecondary)
+                .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                .foregroundStyle(state == .sleeping ? Color.textTertiary : Color.textPrimary)
+                .tracking(0.5)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 6)
-        .background(Color.bgSurface.opacity(0.85))
-        .cornerRadius(12)
+        .padding(.horizontal, Theme.Spacing.md)
+        .padding(.vertical, Theme.Spacing.sm)
+        .background(
+            RoundedRectangle(cornerRadius: Theme.Radius.md)
+                .fill(Color.bgSurface.opacity(0.9))
+                .overlay(
+                    RoundedRectangle(cornerRadius: Theme.Radius.md)
+                        .stroke(state.color.opacity(0.3), lineWidth: 1)
+                )
+        )
+        .shadow(color: state.color.opacity(0.2), radius: 8, y: 2)
     }
 
     // MARK: - Animations

@@ -107,10 +107,7 @@ struct GitInfoPanel: View {
     private var quickActionsSection: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             // Section header
-            Text("QUICK ACTIONS")
-                .font(.system(size: 10, weight: .semibold))
-                .foregroundStyle(Color.textTertiary)
-                .tracking(0.5)
+            SectionHeader(title: "QUICK ACTIONS")
 
             // Action buttons
             VStack(spacing: Theme.Spacing.xs) {
@@ -222,20 +219,10 @@ struct GitInfoPanel: View {
     private var recentPRDsSection: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             // Section header
-            HStack {
-                Text("RECENT PRDS")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Color.textTertiary)
-                    .tracking(0.5)
-
-                Spacer()
-
-                if !recentPRDs.isEmpty {
-                    Text("\(recentPRDs.count)")
-                        .font(.system(size: 9))
-                        .foregroundStyle(Color.textTertiary.opacity(0.7))
-                }
-            }
+            SectionHeader(
+                title: "RECENT PRDS",
+                count: recentPRDs.isEmpty ? nil : recentPRDs.count
+            )
 
             // PRDs list or empty state
             if recentPRDs.isEmpty {
@@ -260,13 +247,19 @@ struct GitInfoPanel: View {
     }
 
     private var emptyPRDsView: some View {
-        HStack {
+        HStack(spacing: Theme.Spacing.sm) {
+            Image(systemName: "doc.text")
+                .font(.system(size: 10))
+                .foregroundStyle(Color.textTertiary.opacity(0.5))
+
             Text("No recent PRDs")
                 .font(.system(size: 10))
                 .foregroundStyle(Color.textTertiary)
         }
         .frame(maxWidth: .infinity)
-        .padding(.vertical, Theme.Spacing.sm)
+        .padding(.vertical, Theme.Spacing.md)
+        .background(Color.bgCanvas.opacity(0.3))
+        .cornerRadius(Theme.Radius.sm)
     }
 
     /// Returns recent PRDs from orchestration history
@@ -287,18 +280,10 @@ struct GitInfoPanel: View {
     private var recentCommitsSection: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             // Section header
-            HStack {
-                Text("RECENT COMMITS")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Color.textTertiary)
-                    .tracking(0.5)
-
-                Spacer()
-
-                Text("\(commits.count) total")
-                    .font(.system(size: 9))
-                    .foregroundStyle(Color.textTertiary.opacity(0.7))
-            }
+            SectionHeader(
+                title: "COMMITS",
+                count: commits.isEmpty ? nil : commits.count
+            )
 
             // Commits list
             if commits.isEmpty {
@@ -321,13 +306,19 @@ struct GitInfoPanel: View {
     }
 
     private var emptyCommitsView: some View {
-        HStack {
+        HStack(spacing: Theme.Spacing.sm) {
+            Image(systemName: "clock.arrow.circlepath")
+                .font(.system(size: 10))
+                .foregroundStyle(Color.textTertiary.opacity(0.5))
+
             Text("No commits yet")
                 .font(.system(size: 10))
                 .foregroundStyle(Color.textTertiary)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, Theme.Spacing.md)
+        .background(Color.bgCanvas.opacity(0.3))
+        .cornerRadius(Theme.Radius.sm)
     }
 
     // MARK: - Worktrees Section
@@ -335,23 +326,14 @@ struct GitInfoPanel: View {
     private var worktreesSection: some View {
         VStack(alignment: .leading, spacing: Theme.Spacing.sm) {
             // Section header
-            HStack {
-                Text("WORKTREES")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(Color.textTertiary)
-                    .tracking(0.5)
-
-                Spacer()
-
-                Button {
+            SectionHeader(
+                title: "WORKTREES",
+                count: appState.worktrees.isEmpty ? nil : appState.worktrees.count,
+                actionIcon: "plus",
+                onAction: {
                     NotificationCenter.default.post(name: .showNewWorktreeSheet, object: nil)
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundStyle(Color.textSecondary)
                 }
-                .buttonStyle(.plain)
-            }
+            )
 
             // Worktrees list or empty state
             if appState.worktrees.isEmpty {
@@ -709,6 +691,46 @@ struct GitInfoPanel: View {
         }
 
         isRefreshing = false
+    }
+}
+
+// MARK: - Section Header
+
+private struct SectionHeader: View {
+    let title: String
+    var count: Int? = nil
+    var actionIcon: String? = nil
+    var onAction: (() -> Void)? = nil
+
+    var body: some View {
+        HStack {
+            Text(title)
+                .font(.system(size: 9, weight: .bold, design: .monospaced))
+                .foregroundStyle(Color.textTertiary)
+                .tracking(1)
+
+            Spacer()
+
+            if let count = count {
+                Text("\(count)")
+                    .font(.system(size: 9, weight: .medium, design: .monospaced))
+                    .foregroundStyle(Color.textTertiary.opacity(0.6))
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
+                    .background(Color.bgElevated)
+                    .cornerRadius(3)
+            }
+
+            if let icon = actionIcon, let action = onAction {
+                Button(action: action) {
+                    Image(systemName: icon)
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(Color.textSecondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .frame(height: Theme.Component.sectionHeaderHeight)
     }
 }
 

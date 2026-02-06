@@ -39,13 +39,13 @@ struct TerminalSlotView: View {
                 emptySlotContent
             }
         }
-        .frame(width: 220, height: 160)
-        .background(Color(red: 0.08, green: 0.09, blue: 0.12))
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .frame(width: Theme.Component.slotCardWidth, height: Theme.Component.slotCardHeight)
+        .background(Theme.SlotCard.background)
+        .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md))
         .overlay(
-            RoundedRectangle(cornerRadius: 8)
+            RoundedRectangle(cornerRadius: Theme.Radius.md)
                 .stroke(
-                    slot.status.isActive ? agentColor.opacity(0.8) : Color(white: 0.2),
+                    slot.status.isActive ? agentColor.opacity(0.8) : Theme.SlotCard.borderInactive,
                     lineWidth: slot.status.isActive ? 1.5 : 1
                 )
         )
@@ -54,18 +54,18 @@ struct TerminalSlotView: View {
             radius: slot.status.isActive ? 12 : 0
         )
         .scaleEffect(isHovered ? 1.02 : 1.0)
-        .animation(.easeInOut(duration: 0.15), value: isHovered)
+        .animation(.easeInOut(duration: Theme.Animation.normal), value: isHovered)
         .onHover { isHovered = $0 }
     }
 
     // MARK: - Header
 
     private var slotHeader: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: Theme.Spacing.sm) {
             // Slot label
             Text("SLOT \(slot.slotNumber)")
                 .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                .foregroundStyle(Color.white.opacity(0.9))
+                .foregroundStyle(Color.textPrimary.opacity(0.9))
 
             // Agent indicator (colored dot + name)
             if let agent = slot.agentType {
@@ -93,24 +93,27 @@ struct TerminalSlotView: View {
             // Config/Action button
             headerActionButton
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(Color(red: 0.1, green: 0.11, blue: 0.14))
+        .padding(.horizontal, Theme.Spacing.sm + 2)
+        .padding(.vertical, Theme.Spacing.sm)
+        .frame(height: Theme.Component.slotHeaderHeight)
+        .background(Theme.SlotCard.headerBackground)
     }
 
     // MARK: - Header Action Button
 
     @ViewBuilder
     private var headerActionButton: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: Theme.Spacing.xs) {
             // Config/gear button - always visible until running
             if !slot.status.isActive {
                 Button {
                     showConfigPopover = true
                 } label: {
-                    Image(systemName: slot.isConfigured ? "gearshape" : "plus")
-                        .font(.system(size: 9, weight: .medium))
-                        .foregroundStyle(Color.white.opacity(0.5))
+                    Image(systemName: slot.isConfigured ? "gearshape" : "plus.circle")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(slot.isConfigured ? Color.textTertiary : Color.accentPrimary.opacity(0.8))
+                        .frame(width: 20, height: 20)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .popover(isPresented: $showConfigPopover, arrowEdge: .bottom) {
@@ -126,8 +129,11 @@ struct TerminalSlotView: View {
             if slot.status.canStart {
                 Button(action: onStart) {
                     Image(systemName: "play.fill")
-                        .font(.system(size: 9))
+                        .font(.system(size: 10))
                         .foregroundStyle(Color.statusSuccess)
+                        .frame(width: 20, height: 20)
+                        .background(Color.statusSuccess.opacity(0.15))
+                        .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
             }
@@ -136,8 +142,11 @@ struct TerminalSlotView: View {
             if slot.status.canStop {
                 Button(action: onStop) {
                     Image(systemName: "stop.fill")
-                        .font(.system(size: 9))
+                        .font(.system(size: 10))
                         .foregroundStyle(Color.statusError)
+                        .frame(width: 20, height: 20)
+                        .background(Color.statusError.opacity(0.15))
+                        .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
             }
@@ -158,26 +167,34 @@ struct TerminalSlotView: View {
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 8)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, Theme.Spacing.sm)
+                    .padding(.vertical, Theme.Spacing.sm - 2)
                 }
                 .onChange(of: slot.logs.count) { _, _ in
                     if let lastLog = slot.recentLogs.last {
-                        withAnimation(.easeOut(duration: 0.1)) {
+                        withAnimation(.easeOut(duration: Theme.Animation.fast)) {
                             proxy.scrollTo(lastLog.id, anchor: .bottom)
                         }
                     }
                 }
             }
-            .background(Color(red: 0.05, green: 0.06, blue: 0.08))
+            .background(Theme.SlotCard.terminalBackground)
 
             // Progress bar (when active)
             if slot.status.isActive && slot.progress > 0 {
                 GeometryReader { geo in
-                    Rectangle()
-                        .fill(agentColor)
-                        .frame(width: geo.size.width * slot.progress, height: 2)
-                        .shadow(color: agentColor, radius: 3)
+                    ZStack(alignment: .leading) {
+                        // Background track
+                        Rectangle()
+                            .fill(Color.borderMuted.opacity(0.3))
+                            .frame(height: 2)
+
+                        // Progress fill
+                        Rectangle()
+                            .fill(agentColor)
+                            .frame(width: geo.size.width * slot.progress, height: 2)
+                            .shadow(color: agentColor, radius: 3)
+                    }
                 }
                 .frame(height: 2)
             }
@@ -196,21 +213,26 @@ struct TerminalSlotView: View {
     // MARK: - Empty Slot Content
 
     private var emptySlotContent: some View {
-        VStack(spacing: 8) {
+        VStack(spacing: Theme.Spacing.sm) {
             Spacer()
 
-            Text("Select Agent")
-                .font(.system(size: 13, weight: .medium))
-                .foregroundStyle(Color.white.opacity(0.5))
+            // Plus icon
+            Image(systemName: "plus.circle")
+                .font(.system(size: 24))
+                .foregroundStyle(Color.textTertiary.opacity(0.5))
 
-            Text("Worktree needed")
+            Text("Configure Slot")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundStyle(Color.textSecondary)
+
+            Text("Select agent & branch")
                 .font(.system(size: 10))
-                .foregroundStyle(Color.white.opacity(0.3))
+                .foregroundStyle(Color.textTertiary)
 
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(red: 0.05, green: 0.06, blue: 0.08))
+        .background(Theme.SlotCard.terminalBackground)
         .contentShape(Rectangle())
         .onTapGesture {
             showConfigPopover = true

@@ -200,6 +200,7 @@ struct DashboardTopBar: View {
 
             Divider()
                 .frame(height: 24)
+                .background(Color.borderMuted)
 
             // Progress indicator
             progressSection
@@ -211,36 +212,63 @@ struct DashboardTopBar: View {
         }
         .padding(.horizontal, Theme.Spacing.md)
         .padding(.vertical, Theme.Spacing.sm)
-        .frame(height: 48)
+        .frame(height: Theme.Component.headerHeight)
         .background(Color.bgSurface)
+        .onAppear {
+            // Start pulse animation
+            withAnimation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true)) {
+                pulseScale = 1.4
+            }
+        }
     }
 
     // MARK: - Orchestration Status
 
     private var orchestrationStatus: some View {
         HStack(spacing: Theme.Spacing.sm) {
-            // Status icon with animation
-            Image(systemName: orchestrationIcon)
-                .font(.system(size: 14))
-                .foregroundStyle(orchestrationColor)
-                .symbolEffect(.pulse, options: .repeating, isActive: appState.isDispatching)
+            // Status indicator - pulsing dot for READY, icon for other states
+            ZStack {
+                if appState.dispatchPhase == .idle {
+                    // Pulsing dot for READY state
+                    Circle()
+                        .fill(Color.statusSuccess.opacity(0.3))
+                        .frame(width: 20, height: 20)
+                        .scaleEffect(pulseScale)
+
+                    Circle()
+                        .fill(Color.statusSuccess)
+                        .frame(width: 8, height: 8)
+                        .shadow(color: Color.statusSuccess.opacity(0.6), radius: 4)
+                } else {
+                    Image(systemName: orchestrationIcon)
+                        .font(.system(size: 14))
+                        .foregroundStyle(orchestrationColor)
+                        .symbolEffect(.pulse, options: .repeating, isActive: appState.isDispatching)
+                }
+            }
+            .frame(width: 24, height: 24)
 
             VStack(alignment: .leading, spacing: 2) {
                 // Phase name
                 Text(appState.dispatchPhase == .idle ? "READY" : appState.dispatchPhase.rawValue.uppercased())
-                    .font(.caption.bold())
+                    .font(.system(size: 11, weight: .bold, design: .monospaced))
                     .foregroundStyle(Color.textPrimary)
 
                 // Message or PRD name
                 if let prd = appState.currentPRD {
                     Text(prd.featureName)
-                        .font(.caption2)
+                        .font(.system(size: 10))
                         .foregroundStyle(Color.textSecondary)
                         .lineLimit(1)
                 } else if !appState.dispatchMessage.isEmpty {
                     Text(appState.dispatchMessage)
-                        .font(.caption2)
+                        .font(.system(size: 10))
                         .foregroundStyle(Color.textSecondary)
+                        .lineLimit(1)
+                } else if appState.dispatchPhase == .idle {
+                    Text("Awaiting instructions")
+                        .font(.system(size: 10))
+                        .foregroundStyle(Color.textTertiary)
                         .lineLimit(1)
                 }
             }
@@ -248,7 +276,7 @@ struct DashboardTopBar: View {
             // Layer indicator when dispatching
             if appState.isDispatching && appState.totalDispatchLayers > 0 {
                 Text("L\(appState.currentDispatchLayer)/\(appState.totalDispatchLayers)")
-                    .font(.caption.bold())
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
                     .foregroundStyle(Color.accentPrimary)
                     .padding(.horizontal, 6)
                     .padding(.vertical, 2)
@@ -258,6 +286,8 @@ struct DashboardTopBar: View {
         }
         .frame(minWidth: 180, alignment: .leading)
     }
+
+    @State private var pulseScale: CGFloat = 1.0
 
     private var orchestrationIcon: String {
         switch appState.dispatchPhase {
@@ -285,43 +315,75 @@ struct DashboardTopBar: View {
     // MARK: - Progress Section
 
     private var progressSection: some View {
-        HStack(spacing: Theme.Spacing.sm) {
+        HStack(spacing: Theme.Spacing.md) {
             // Story progress when dispatching
             if let dispatchProgress = appState.dispatchProgress {
-                VStack(alignment: .leading, spacing: 2) {
-                    ProgressView(value: Double(dispatchProgress.storiesComplete),
-                                 total: Double(max(1, dispatchProgress.totalStories)))
-                        .progressViewStyle(.linear)
-                        .tint(Color.statusSuccess)
-                        .frame(width: 140)
+                VStack(alignment: .leading, spacing: 3) {
+                    // Custom progress bar with better contrast
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            // Background track
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(Color.borderMuted.opacity(0.5))
+                                .frame(height: 4)
+
+                            // Progress fill
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(Color.statusSuccess)
+                                .frame(width: geo.size.width * Double(dispatchProgress.storiesComplete) / Double(max(1, dispatchProgress.totalStories)), height: 4)
+                                .shadow(color: Color.statusSuccess.opacity(0.5), radius: 2)
+                        }
+                    }
+                    .frame(width: 140, height: 4)
 
                     Text("\(dispatchProgress.storiesComplete)/\(dispatchProgress.totalStories) stories")
-                        .font(.caption2)
+                        .font(.system(size: 10, design: .monospaced))
                         .foregroundStyle(Color.textSecondary)
                 }
             } else {
                 // Fallback to slot progress
-                ProgressView(value: progress)
-                    .progressViewStyle(.linear)
-                    .tint(Color.accentPrimary)
-                    .frame(width: 120)
+                VStack(alignment: .leading, spacing: 3) {
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            // Background track
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(Color.borderMuted.opacity(0.5))
+                                .frame(height: 4)
 
-                Text("\(Int(progress * 100))%")
-                    .font(.small)
-                    .fontWeight(.medium)
-                    .foregroundStyle(Color.textPrimary)
-                    .frame(width: 40, alignment: .trailing)
+                            // Progress fill
+                            RoundedRectangle(cornerRadius: 2)
+                                .fill(Color.accentPrimary)
+                                .frame(width: geo.size.width * progress, height: 4)
+                                .shadow(color: Color.accentPrimary.opacity(0.5), radius: 2)
+                        }
+                    }
+                    .frame(width: 120, height: 4)
+
+                    Text("\(Int(progress * 100))%")
+                        .font(.system(size: 10, weight: .medium, design: .monospaced))
+                        .foregroundStyle(Color.textPrimary)
+                }
             }
 
-            // Active agents count
-            HStack(spacing: 4) {
+            // Divider
+            Divider()
+                .frame(height: 20)
+                .background(Color.borderMuted)
+
+            // Active agents count with better styling
+            HStack(spacing: Theme.Spacing.xs) {
                 Circle()
                     .fill(activeAgents > 0 ? Color.statusSuccess : Color.textTertiary)
                     .frame(width: 6, height: 6)
+                    .shadow(color: activeAgents > 0 ? Color.statusSuccess.opacity(0.5) : .clear, radius: 3)
 
                 Text("\(activeAgents)/\(totalAgents)")
-                    .font(.xs)
-                    .foregroundStyle(Color.textSecondary)
+                    .font(.system(size: 11, weight: .medium, design: .monospaced))
+                    .foregroundStyle(activeAgents > 0 ? Color.textPrimary : Color.textSecondary)
+
+                Text("agents")
+                    .font(.system(size: 10))
+                    .foregroundStyle(Color.textTertiary)
             }
         }
     }
@@ -332,28 +394,62 @@ struct DashboardTopBar: View {
         HStack(spacing: Theme.Spacing.sm) {
             if appState.isDispatching {
                 Button(action: onStopAll) {
-                    Label("Stop Dispatch", systemImage: "stop.fill")
-                        .font(.small)
+                    HStack(spacing: Theme.Spacing.xs) {
+                        Image(systemName: "stop.fill")
+                            .font(.system(size: 10))
+                        Text("Stop")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .padding(.horizontal, Theme.Spacing.sm)
+                    .padding(.vertical, Theme.Spacing.xs)
+                    .background(Color.statusError.opacity(0.15))
+                    .foregroundStyle(Color.statusError)
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                            .stroke(Color.statusError.opacity(0.3), lineWidth: 1)
+                    )
                 }
-                .buttonStyle(.bordered)
-                .tint(.statusError)
-                .controlSize(.small)
+                .buttonStyle(.plain)
             } else {
                 Button(action: onStartAll) {
-                    Label("Start All", systemImage: "play.fill")
-                        .font(.small)
+                    HStack(spacing: Theme.Spacing.xs) {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 10))
+                        Text("Start All")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .padding(.horizontal, Theme.Spacing.sm)
+                    .padding(.vertical, Theme.Spacing.xs)
+                    .background(totalAgents == 0 ? Color.textTertiary.opacity(0.15) : Color.statusSuccess.opacity(0.2))
+                    .foregroundStyle(totalAgents == 0 ? Color.textTertiary : Color.statusSuccess)
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                            .stroke(totalAgents == 0 ? Color.borderMuted : Color.statusSuccess.opacity(0.4), lineWidth: 1)
+                    )
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(.statusSuccess)
-                .controlSize(.small)
+                .buttonStyle(.plain)
                 .disabled(totalAgents == 0)
 
                 Button(action: onStopAll) {
-                    Label("Stop All", systemImage: "stop.fill")
-                        .font(.small)
+                    HStack(spacing: Theme.Spacing.xs) {
+                        Image(systemName: "stop.fill")
+                            .font(.system(size: 10))
+                        Text("Stop")
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .padding(.horizontal, Theme.Spacing.sm)
+                    .padding(.vertical, Theme.Spacing.xs)
+                    .background(activeAgents == 0 ? Color.textTertiary.opacity(0.1) : Color.borderMuted.opacity(0.5))
+                    .foregroundStyle(activeAgents == 0 ? Color.textTertiary : Color.textSecondary)
+                    .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                            .stroke(Color.borderMuted, lineWidth: 1)
+                    )
                 }
-                .buttonStyle(.bordered)
-                .controlSize(.small)
+                .buttonStyle(.plain)
                 .disabled(activeAgents == 0)
             }
         }

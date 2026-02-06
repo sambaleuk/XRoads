@@ -103,10 +103,10 @@ struct NeonBrainConnection: View {
     @State private var impulsePosition: CGFloat = 0
     @State private var glowIntensity: Double = 0.3
 
-    // Neon colors
+    // Neon colors - enhanced visibility
     private let neonCyan = Color(red: 0.0, green: 0.9, blue: 1.0)
     private let neonMagenta = Color(red: 1.0, green: 0.2, blue: 0.8)
-    private let cordBaseColor = Color(red: 0.15, green: 0.18, blue: 0.25)
+    private let cordBaseColor = Color(red: 0.18, green: 0.21, blue: 0.28)
 
     private var isActive: Bool { slotStatus.isActive }
 
@@ -117,17 +117,17 @@ struct NeonBrainConnection: View {
         )
 
         ZStack {
-            // Layer 1: Dark cord base (always visible)
+            // Layer 1: Dark cord base (always visible) - enhanced for better visibility
             cordPath(to: endPoint)
                 .stroke(
                     cordBaseColor,
-                    style: StrokeStyle(lineWidth: 14, lineCap: .round, lineJoin: .round)
+                    style: StrokeStyle(lineWidth: 16, lineCap: .round, lineJoin: .round)
                 )
 
-            // Layer 2: Inner cord highlight
+            // Layer 2: Inner cord highlight with subtle glow
             cordPath(to: endPoint)
                 .stroke(
-                    cordBaseColor.opacity(0.8),
+                    isConfigured ? slotColor.opacity(0.15) : cordBaseColor.opacity(0.6),
                     style: StrokeStyle(lineWidth: 10, lineCap: .round, lineJoin: .round)
                 )
 
