@@ -102,35 +102,44 @@ struct TerminalSlotView: View {
 
     @ViewBuilder
     private var headerActionButton: some View {
-        if slot.status.canStart {
-            Button(action: onStart) {
-                Image(systemName: "play.fill")
-                    .font(.system(size: 9))
-                    .foregroundStyle(Color.statusSuccess)
+        HStack(spacing: 6) {
+            // Config/gear button - always visible until running
+            if !slot.status.isActive {
+                Button {
+                    showConfigPopover = true
+                } label: {
+                    Image(systemName: slot.isConfigured ? "gearshape" : "plus")
+                        .font(.system(size: 9, weight: .medium))
+                        .foregroundStyle(Color.white.opacity(0.5))
+                }
+                .buttonStyle(.plain)
+                .popover(isPresented: $showConfigPopover, arrowEdge: .bottom) {
+                    SlotConfigPopover(
+                        slot: $slot,
+                        selectedAction: $selectedAction,
+                        worktrees: appState.worktrees
+                    )
+                }
             }
-            .buttonStyle(.plain)
-        } else if slot.status.canStop {
-            Button(action: onStop) {
-                Image(systemName: "stop.fill")
-                    .font(.system(size: 9))
-                    .foregroundStyle(Color.statusError)
+
+            // Play button - only when ready
+            if slot.status.canStart {
+                Button(action: onStart) {
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(Color.statusSuccess)
+                }
+                .buttonStyle(.plain)
             }
-            .buttonStyle(.plain)
-        } else {
-            Button {
-                showConfigPopover = true
-            } label: {
-                Image(systemName: "plus")
-                    .font(.system(size: 10, weight: .medium))
-                    .foregroundStyle(Color.white.opacity(0.5))
-            }
-            .buttonStyle(.plain)
-            .popover(isPresented: $showConfigPopover, arrowEdge: .bottom) {
-                SlotConfigPopover(
-                    slot: $slot,
-                    selectedAction: $selectedAction,
-                    worktrees: appState.worktrees
-                )
+
+            // Stop button - only when running
+            if slot.status.canStop {
+                Button(action: onStop) {
+                    Image(systemName: "stop.fill")
+                        .font(.system(size: 9))
+                        .foregroundStyle(Color.statusError)
+                }
+                .buttonStyle(.plain)
             }
         }
     }

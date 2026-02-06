@@ -35,6 +35,12 @@ protocol ServiceContainer: Sendable {
     /// Layered dispatcher for dependency-aware loop launching
     var layeredDispatcher: LayeredDispatcher { get }
 
+    /// Action runner for skill-based action execution
+    var actionRunner: ActionRunner { get }
+
+    /// Unified dispatcher - single entry point for all dispatch operations
+    var unifiedDispatcher: UnifiedDispatcher { get }
+
     /// Claude orchestrator for Full Agentic Mode
     var orchestrator: ClaudeOrchestrator { get }
 }
@@ -55,6 +61,8 @@ final class DefaultServiceContainer: ServiceContainer, @unchecked Sendable {
     let agentLauncher: AgentLauncher
     let loopLauncher: LoopLauncher
     let layeredDispatcher: LayeredDispatcher
+    let actionRunner: ActionRunner
+    let unifiedDispatcher: UnifiedDispatcher
     let orchestrator: ClaudeOrchestrator
 
     init(
@@ -78,6 +86,12 @@ final class DefaultServiceContainer: ServiceContainer, @unchecked Sendable {
         self.agentLauncher = AgentLauncher(ptyRunner: ptyRunner)
         self.loopLauncher = LoopLauncher(ptyRunner: ptyRunner, gitService: gitService)
         self.layeredDispatcher = LayeredDispatcher(loopLauncher: loopLauncher, gitService: gitService)
+        self.actionRunner = ActionRunner(ptyRunner: ptyRunner)
+        self.unifiedDispatcher = UnifiedDispatcher(
+            layeredDispatcher: layeredDispatcher,
+            actionRunner: actionRunner,
+            gitService: gitService
+        )
         self.orchestrator = ClaudeOrchestrator(
             gitService: gitService,
             processRunner: processRunner,
@@ -103,6 +117,8 @@ final class MockServiceContainer: ServiceContainer, @unchecked Sendable {
     let agentLauncher: AgentLauncher
     let loopLauncher: LoopLauncher
     let layeredDispatcher: LayeredDispatcher
+    let actionRunner: ActionRunner
+    let unifiedDispatcher: UnifiedDispatcher
     let orchestrator: ClaudeOrchestrator
 
     init() {
@@ -118,6 +134,12 @@ final class MockServiceContainer: ServiceContainer, @unchecked Sendable {
         self.agentLauncher = AgentLauncher(ptyRunner: ptyRunner)
         self.loopLauncher = LoopLauncher(ptyRunner: ptyRunner, gitService: gitService)
         self.layeredDispatcher = LayeredDispatcher(loopLauncher: loopLauncher, gitService: gitService)
+        self.actionRunner = ActionRunner(ptyRunner: ptyRunner)
+        self.unifiedDispatcher = UnifiedDispatcher(
+            layeredDispatcher: layeredDispatcher,
+            actionRunner: actionRunner,
+            gitService: gitService
+        )
         self.orchestrator = ClaudeOrchestrator(
             gitService: gitService,
             processRunner: processRunner,

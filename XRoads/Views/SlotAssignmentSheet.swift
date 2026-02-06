@@ -13,6 +13,7 @@ struct SlotStoryAssignment: Identifiable {
     let id = UUID()
     var slotNumber: Int
     var agentType: AgentType
+    var actionType: ActionType  // Role/action for this slot
     var storyIds: [String]
     var worktreePath: String
 }
@@ -350,6 +351,31 @@ struct SlotAssignmentSheet: View {
 
                 Divider()
 
+                // Action/Role selector
+                VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
+                    Text("Action/Role")
+                        .font(.caption)
+                        .foregroundStyle(Color.textSecondary)
+
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: Theme.Spacing.xs) {
+                            ForEach(ActionType.allCases, id: \.self) { action in
+                                actionButton(action, for: slotNumber)
+                            }
+                        }
+                    }
+
+                    // Show action description
+                    if let assignment = assignments[slotNumber] {
+                        Text(assignment.actionType.description)
+                            .font(.caption2)
+                            .foregroundStyle(Color.textTertiary)
+                            .lineLimit(2)
+                    }
+                }
+
+                Divider()
+
                 // Assigned stories
                 VStack(alignment: .leading, spacing: Theme.Spacing.xs) {
                     Text("Assigned Stories")
@@ -430,6 +456,40 @@ struct SlotAssignmentSheet: View {
         }
         .buttonStyle(.plain)
         .foregroundStyle(isSelected ? agent.neonColor : Color.textSecondary)
+    }
+
+    private func actionButton(_ action: ActionType, for slotNumber: Int) -> some View {
+        let isSelected = assignments[slotNumber]?.actionType == action
+        let actionColor = actionTypeColor(action)
+
+        return Button(action: { setAction(action, for: slotNumber) }) {
+            VStack(spacing: 2) {
+                Image(systemName: action.iconName)
+                    .font(.caption)
+                Text(action.displayName)
+                    .font(.caption2.bold())
+                    .lineLimit(1)
+            }
+            .frame(width: 70, height: 44)
+            .background(isSelected ? actionColor.opacity(0.2) : Color.bgCanvas)
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                    .stroke(isSelected ? actionColor : Color.borderMuted, lineWidth: isSelected ? 2 : 1)
+            )
+            .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.sm))
+        }
+        .buttonStyle(.plain)
+        .foregroundStyle(isSelected ? actionColor : Color.textSecondary)
+    }
+
+    private func actionTypeColor(_ action: ActionType) -> Color {
+        switch action {
+        case .implement: return Color.statusSuccess
+        case .review: return Color.accentPrimary
+        case .integrationTest: return Color.statusWarning
+        case .write: return Color(hex: "#bc8cff")
+        case .custom: return Color.textSecondary
+        }
     }
 
     // MARK: - Footer
@@ -527,10 +587,11 @@ struct SlotAssignmentSheet: View {
             assignment.storyIds.append(storyId)
             assignments[slotNumber] = assignment
         } else {
-            // Create new assignment with default agent
+            // Create new assignment with default agent and action
             assignments[slotNumber] = SlotStoryAssignment(
                 slotNumber: slotNumber,
                 agentType: .claude,
+                actionType: .implement,  // Default action
                 storyIds: [storyId],
                 worktreePath: repoPath.appendingPathComponent("worktree-slot-\(slotNumber)").path
             )
@@ -545,6 +606,22 @@ struct SlotAssignmentSheet: View {
             assignments[slotNumber] = SlotStoryAssignment(
                 slotNumber: slotNumber,
                 agentType: agent,
+                actionType: .implement,  // Default action
+                storyIds: [],
+                worktreePath: repoPath.appendingPathComponent("worktree-slot-\(slotNumber)").path
+            )
+        }
+    }
+
+    private func setAction(_ action: ActionType, for slotNumber: Int) {
+        if var assignment = assignments[slotNumber] {
+            assignment.actionType = action
+            assignments[slotNumber] = assignment
+        } else {
+            assignments[slotNumber] = SlotStoryAssignment(
+                slotNumber: slotNumber,
+                agentType: .claude,
+                actionType: action,
                 storyIds: [],
                 worktreePath: repoPath.appendingPathComponent("worktree-slot-\(slotNumber)").path
             )
@@ -569,10 +646,10 @@ struct SlotAssignmentSheet: View {
         isStarting = true
         errorMessage = nil
 
-        // Build slot assignments map
-        var slotAssignmentsTyped: [Int: (agentType: AgentType, storyIds: [String])] = [:]
+        // Build slot assignments map with action types
+        var slotAssignmentsTyped: [Int: (agentType: AgentType, actionType: ActionType, storyIds: [String])] = [:]
         for (slot, assignment) in assignments {
-            slotAssignmentsTyped[slot] = (agentType: assignment.agentType, storyIds: assignment.storyIds)
+            slotAssignmentsTyped[slot] = (agentType: assignment.agentType, actionType: assignment.actionType, storyIds: assignment.storyIds)
 
             // Use centralized path resolver for consistency
             let worktreePath = WorktreePathResolver.resolve(
@@ -587,10 +664,9 @@ struct SlotAssignmentSheet: View {
                 storyIds: assignment.storyIds
             )
 
-            // Pre-create the worktree directory (empty placeholder)
-            // This prevents ActionRunner validation errors before LayeredDispatcher creates real worktrees
+            // Ensure worktrees parent directory exists (but don't create the actual worktree yet)
+            // LayeredDispatcher will create the real git worktrees
             try? WorktreePathResolver.ensureWorktreesDirectory(repoPath: repoPath)
-            try? FileManager.default.createDirectory(at: worktreePath, withIntermediateDirectories: true)
 
             // Configure the terminal slot in AppState
             let worktree = Worktree(
@@ -618,12 +694,18 @@ struct SlotAssignmentSheet: View {
         dismiss()
         onComplete?()
 
-        // Start dispatch in background - updates go to AppState
+        // Start dispatch via UnifiedDispatcher - single entry point for all dispatch operations
         Task {
-            await appState.services.layeredDispatcher.startDispatch(
+            // Create unified dispatch request
+            let request = DispatchRequest.prd(
                 prd: prd,
                 slotAssignments: slotAssignmentsTyped,
                 repoPath: repoPath,
+                source: .prdLoader
+            )
+
+            // Create unified callbacks that route to AppState
+            let callbacks = DispatchCallbacks(
                 onProgress: { progress in
                     Task { @MainActor in
                         appState.dispatchPhase = progress.phase
@@ -658,13 +740,23 @@ struct SlotAssignmentSheet: View {
                     Task { @MainActor in
                         // Forward output to terminal slot as log entry
                         if let index = appState.terminalSlots.firstIndex(where: { $0.slotNumber == slotNumber }) {
+                            let agentType = appState.terminalSlots[index].agentType
+                            let worktreePath = appState.terminalSlots[index].worktree?.path
                             let logEntry = LogEntry(
                                 level: .info,
-                                source: "slot-\(slotNumber)",
+                                source: agentType?.rawValue ?? "slot-\(slotNumber)",
+                                worktree: worktreePath,
                                 message: output
                             )
+                            // Add to slot logs
                             appState.terminalSlots[index].addLog(logEntry)
                         }
+                    }
+                },
+                onLog: { logEntry in
+                    Task { @MainActor in
+                        // Route all logs to global MCP logs panel
+                        appState.addLog(logEntry)
                     }
                 },
                 onComplete: {
@@ -682,6 +774,9 @@ struct SlotAssignmentSheet: View {
                     }
                 }
             )
+
+            // Dispatch via unified system
+            _ = try? await appState.services.unifiedDispatcher.dispatch(request, callbacks: callbacks)
         }
     }
 }

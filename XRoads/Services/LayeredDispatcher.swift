@@ -26,6 +26,7 @@ struct SlotLaunchInfo: Sendable, Identifiable {
     let id: UUID
     let slotNumber: Int
     let agentType: AgentType
+    let actionType: ActionType  // Role/action for this slot
     let storyIds: [String]
     let worktreePath: URL
     let branchName: String
@@ -71,6 +72,7 @@ actor LayeredDispatcher {
     private var prd: PRDDocument?
     private var layers: [[String]] = []
     private var currentLayerIndex: Int = 0
+    private var completedStoryIds: Set<String> = []  // Track actually completed stories
 
     // Callbacks
     private var onProgress: ((DispatchProgress) -> Void)?
@@ -92,7 +94,7 @@ actor LayeredDispatcher {
     /// Start the layered dispatch process
     func startDispatch(
         prd: PRDDocument,
-        slotAssignments: [Int: (agentType: AgentType, storyIds: [String])],
+        slotAssignments: [Int: (agentType: AgentType, actionType: ActionType, storyIds: [String])],
         repoPath: URL,
         onProgress: @escaping (DispatchProgress) -> Void,
         onSlotUpdate: @escaping (SlotLaunchInfo) -> Void,
@@ -170,7 +172,7 @@ actor LayeredDispatcher {
     // MARK: - Private: Worktree Creation
 
     private func createAllWorktrees(
-        slotAssignments: [Int: (agentType: AgentType, storyIds: [String])]
+        slotAssignments: [Int: (agentType: AgentType, actionType: ActionType, storyIds: [String])]
     ) async throws {
         guard let repoPath = repoPath, let prd = prd else {
             throw DispatcherError.notInitialized
@@ -180,7 +182,7 @@ actor LayeredDispatcher {
             let storyIdsSuffix = assignment.storyIds.prefix(2).joined(separator: "-").lowercased()
             let branchName = "xroads/slot-\(slotNumber)-\(assignment.agentType.rawValue)-\(storyIdsSuffix)"
 
-            // Build configuration
+            // Build configuration with action type for skills loading
             let stories = prd.userStories.filter { assignment.storyIds.contains($0.id) }
             let config = LoopConfiguration(
                 slotNumber: slotNumber,
@@ -189,14 +191,16 @@ actor LayeredDispatcher {
                 branchName: branchName,
                 stories: stories,
                 fullPRD: prd,
+                actionType: assignment.actionType,
                 statusFilePath: statusFilePath
             )
 
-            // Create slot info
+            // Create slot info with action type
             var info = SlotLaunchInfo(
                 id: UUID(),
                 slotNumber: slotNumber,
                 agentType: assignment.agentType,
+                actionType: assignment.actionType,
                 storyIds: assignment.storyIds,
                 worktreePath: config.worktreePath,
                 branchName: branchName,
@@ -206,7 +210,16 @@ actor LayeredDispatcher {
             // Create worktree (LoopLauncher handles this internally when launching,
             // but we want to pre-create for validation)
             let worktreePath = config.worktreePath
-            if !FileManager.default.fileExists(atPath: worktreePath.path) {
+            let gitFile = worktreePath.appendingPathComponent(".git")
+
+            // Check if it's a real worktree (has .git file) vs just an empty directory
+            if !FileManager.default.fileExists(atPath: gitFile.path) {
+                // Remove any existing empty directory first
+                if FileManager.default.fileExists(atPath: worktreePath.path) {
+                    try? FileManager.default.removeItem(at: worktreePath)
+                }
+
+                // Ensure parent directory exists
                 try FileManager.default.createDirectory(
                     at: worktreePath.deletingLastPathComponent(),
                     withIntermediateDirectories: true
@@ -268,7 +281,8 @@ actor LayeredDispatcher {
 
     private func handleStoryComplete(_ event: StatusUpdateEvent) async {
         print("[LayeredDispatcher] Story completed: \(event.storyId)")
-        emitProgress("Story \(event.storyId) completed!")
+        completedStoryIds.insert(event.storyId)
+        emitProgress("Story \(event.storyId) completed! ✅")
     }
 
     private func handleLayerComplete(_ event: LayerCompletionEvent) async {
@@ -351,6 +365,7 @@ actor LayeredDispatcher {
             branchName: info.branchName,
             stories: stories,
             fullPRD: prd,
+            actionType: info.actionType,
             statusFilePath: statusFilePath
         )
 
@@ -368,11 +383,6 @@ actor LayeredDispatcher {
     // MARK: - Private: Progress
 
     private func emitProgress(_ message: String) {
-        let completedStories = slotInfos.values
-            .filter { $0.status == .completed }
-            .flatMap { $0.storyIds }
-            .count
-
         let totalStories = prd?.userStories.count ?? 0
 
         let progress = DispatchProgress(
@@ -381,7 +391,7 @@ actor LayeredDispatcher {
             totalLayers: layers.count,
             slotsLaunched: slotInfos.values.filter { $0.status == .running || $0.status == .completed }.count,
             totalSlots: slotInfos.count,
-            storiesComplete: completedStories,
+            storiesComplete: completedStoryIds.count,  // Use actual completed story count
             totalStories: totalStories,
             message: message
         )

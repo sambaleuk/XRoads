@@ -157,6 +157,7 @@ let package = Package(
                 "Services/DependencyTracker.swift",
                 "Services/StatusMonitor.swift",
                 "Services/LayeredDispatcher.swift",
+                "Services/UnifiedDispatcher.swift",
                 "Services/WorktreePathResolver.swift",
                 // Actions
                 "Actions/ImplementAction.swift",
