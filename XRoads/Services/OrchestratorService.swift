@@ -448,6 +448,9 @@ actor OrchestratorService {
         var responseContent = ""
         let workingDirectory = context?.projectPath ?? FileManager.default.currentDirectoryPath
 
+        // Build prompt with conversation history (terminal mode is stateless per invocation)
+        let terminalPrompt = buildTerminalPrompt(content, excludingId: responseMessage.id)
+
         // Build arguments for Claude CLI in print mode
         // --dangerously-skip-permissions: Required for non-interactive mode
         // --output-format text: Get plain text output (not JSON)
@@ -457,7 +460,7 @@ actor OrchestratorService {
             "--dangerously-skip-permissions",
             "--output-format", "text",
             "--system-prompt", systemPrompt,
-            "-p", content
+            "-p", terminalPrompt
         ]
 
         // Debug logging to file
@@ -548,6 +551,32 @@ actor OrchestratorService {
     }
 
     // MARK: - Helpers
+
+    /// Build a prompt that includes conversation history for stateless terminal mode.
+    /// This mirrors the API mode's behavior of sending the full message array.
+    private func buildTerminalPrompt(_ currentMessage: String, excludingId placeholderId: UUID) -> String {
+        // Collect past messages (exclude system messages and the current placeholder)
+        let history = conversationHistory.filter { msg in
+            msg.role != .system &&
+            msg.id != placeholderId &&
+            msg.status != .streaming
+        }
+
+        // If only the current user message exists, no history needed
+        let pastMessages = history.dropLast() // Drop the current user message (just added)
+        guard !pastMessages.isEmpty else {
+            return currentMessage
+        }
+
+        // Build conversation transcript
+        var prompt = "Here is our conversation so far:\n\n"
+        for msg in pastMessages {
+            let role = msg.role == .user ? "Human" : "Assistant"
+            prompt += "\(role): \(msg.content)\n\n"
+        }
+        prompt += "---\n\nNow respond to this latest message:\n\n\(currentMessage)"
+        return prompt
+    }
 
     private func findClaudeCLI() -> String? {
         let home = NSHomeDirectory()
