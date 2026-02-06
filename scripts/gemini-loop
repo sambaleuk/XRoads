@@ -52,8 +52,8 @@ build_prompt() {
 
     # Detect XRoads-prepared context files
     local agent_brief=""
-    if [[ -f "AGENT.md" ]]; then
-        agent_brief="$(cat AGENT.md)"
+    if [[ -f "$AGENTS_FILE" ]]; then
+        agent_brief="$(cat "$AGENTS_FILE")"
     fi
 
     local status_file="${CROSSROADS_STATUS_FILE:-}"
