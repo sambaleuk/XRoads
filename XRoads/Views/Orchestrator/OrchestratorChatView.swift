@@ -374,6 +374,12 @@ struct OrchestratorChatView: View {
                     self.appState.appendSlotOutput(slotNumber: slotNumber, output: output)
                 }
             },
+            onSlotTermination: { slotNumber, exitCode in
+                Task { @MainActor in
+                    // Update slot status on termination
+                    self.appState.handleSlotTermination(slotNumber: slotNumber, exitCode: exitCode)
+                }
+            },
             onLog: { log in
                 Task { @MainActor in
                     self.appState.globalLogs.append(log)

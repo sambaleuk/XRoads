@@ -78,6 +78,7 @@ actor LayeredDispatcher {
     private var onProgress: ((DispatchProgress) -> Void)?
     private var onSlotUpdate: ((SlotLaunchInfo) -> Void)?
     private var onSlotOutput: ((Int, String) -> Void)?  // (slotNumber, output)
+    private var onSlotTermination: ((Int, Int32) -> Void)?  // (slotNumber, exitCode)
     private var onComplete: (() -> Void)?
     private var onError: ((Error) -> Void)?
 
@@ -99,6 +100,7 @@ actor LayeredDispatcher {
         onProgress: @escaping (DispatchProgress) -> Void,
         onSlotUpdate: @escaping (SlotLaunchInfo) -> Void,
         onSlotOutput: @escaping (Int, String) -> Void,
+        onSlotTermination: @escaping (Int, Int32) -> Void,
         onComplete: @escaping () -> Void,
         onError: @escaping (Error) -> Void
     ) async {
@@ -107,6 +109,7 @@ actor LayeredDispatcher {
         self.onProgress = onProgress
         self.onSlotUpdate = onSlotUpdate
         self.onSlotOutput = onSlotOutput
+        self.onSlotTermination = onSlotTermination
         self.onComplete = onComplete
         self.onError = onError
 
@@ -369,15 +372,62 @@ actor LayeredDispatcher {
             statusFilePath: statusFilePath
         )
 
-        // Capture the callback to avoid actor isolation issues
+        // Capture the callbacks to avoid actor isolation issues
         let outputCallback = onSlotOutput
+        let terminationCallback = onSlotTermination
 
-        let processId = try await loopLauncher.launchLoop(config: config) { output in
-            // Forward output to UI
-            outputCallback?(slotNumber, output)
-        }
+        let processId = try await loopLauncher.launchLoop(
+            config: config,
+            onOutput: { output in
+                // Forward output to UI
+                outputCallback?(slotNumber, output)
+            },
+            onTermination: { slot, exitCode in
+                // Handle slot termination
+                Task { [weak self] in
+                    await self?.handleSlotTermination(slotNumber: slot, exitCode: exitCode)
+                }
+                // Forward to external callback
+                terminationCallback?(slot, exitCode)
+            }
+        )
 
         return processId
+    }
+
+    /// Handle slot termination and update internal state
+    private func handleSlotTermination(slotNumber: Int, exitCode: Int32) async {
+        guard var info = slotInfos[slotNumber] else { return }
+
+        // Update slot status based on exit code
+        if exitCode == 0 {
+            info.status = .completed
+            emitProgress("Slot \(slotNumber) completed successfully ✅")
+        } else {
+            info.status = .failed
+            emitProgress("Slot \(slotNumber) failed with code \(exitCode) ❌")
+        }
+
+        info.processId = nil
+        slotInfos[slotNumber] = info
+        onSlotUpdate?(info)
+
+        // Check if all slots are done
+        let allDone = slotInfos.values.allSatisfy {
+            $0.status == .completed || $0.status == .failed || $0.status == .pending
+        }
+        let anyRunning = slotInfos.values.contains { $0.status == .running || $0.status == .launching }
+
+        if allDone && !anyRunning {
+            // Check if we should launch the next layer
+            let pendingSlots = slotInfos.values.filter { $0.status == .pending }
+            if pendingSlots.isEmpty {
+                // All slots done, no pending - dispatch complete
+                currentPhase = .completed
+                onComplete?()
+                emitProgress("All slots completed! 🎉")
+            }
+        }
     }
 
     // MARK: - Private: Progress

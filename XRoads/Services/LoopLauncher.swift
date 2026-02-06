@@ -157,10 +157,14 @@ actor LoopLauncher {
         return await dependencyTracker.calculateLayers(stories: stories)
     }
 
+    /// Termination handler type for loop completion
+    typealias TerminationHandler = @Sendable (Int, Int32) -> Void  // (slotNumber, exitCode)
+
     /// Launch a loop script on a slot with worktree creation
     func launchLoop(
         config: LoopConfiguration,
-        onOutput: @escaping PTYProcessRunner.OutputHandler
+        onOutput: @escaping PTYProcessRunner.OutputHandler,
+        onTermination: TerminationHandler? = nil
     ) async throws -> UUID {
         // 1. Find the loop script
         let loopScript = try findLoopScript(for: config.agentType)
@@ -182,6 +186,9 @@ actor LoopLauncher {
             environment["CROSSROADS_STATUS_FILE"] = statusPath.path
         }
 
+        // Capture slot number for termination callback
+        let slotNumber = config.slotNumber
+
         // 5. Launch the loop via PTY
         let processId = try await ptyRunner.launch(
             executable: loopScript.path,
@@ -190,7 +197,9 @@ actor LoopLauncher {
             environment: environment,
             onOutput: onOutput,
             onTermination: { exitCode in
-                print("[LoopLauncher] Slot \(config.slotNumber) loop terminated with code: \(exitCode)")
+                print("[LoopLauncher] Slot \(slotNumber) loop terminated with code: \(exitCode)")
+                // Notify caller about termination
+                onTermination?(slotNumber, exitCode)
             }
         )
 

@@ -753,6 +753,12 @@ struct SlotAssignmentSheet: View {
                         }
                     }
                 },
+                onSlotTermination: { slotNumber, exitCode in
+                    Task { @MainActor in
+                        // Handle slot termination - update status
+                        appState.handleSlotTermination(slotNumber: slotNumber, exitCode: exitCode)
+                    }
+                },
                 onLog: { logEntry in
                     Task { @MainActor in
                         // Route all logs to global MCP logs panel

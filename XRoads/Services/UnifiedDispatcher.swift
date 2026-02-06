@@ -153,6 +153,7 @@ struct DispatchCallbacks: Sendable {
     let onProgress: @Sendable (DispatchProgress) -> Void
     let onSlotUpdate: @Sendable (SlotLaunchInfo) -> Void
     let onSlotOutput: @Sendable (Int, String) -> Void
+    let onSlotTermination: @Sendable (Int, Int32) -> Void  // (slotNumber, exitCode)
     let onLog: @Sendable (LogEntry) -> Void
     let onComplete: @Sendable () -> Void
     let onError: @Sendable (Error) -> Void
@@ -161,6 +162,7 @@ struct DispatchCallbacks: Sendable {
         onProgress: { _ in },
         onSlotUpdate: { _ in },
         onSlotOutput: { _, _ in },
+        onSlotTermination: { _, _ in },
         onLog: { _ in },
         onComplete: { },
         onError: { _ in }
@@ -368,6 +370,21 @@ actor UnifiedDispatcher {
                     source: "slot-\(slotNumber)",
                     worktree: nil,
                     message: output
+                )
+                callbacks.onLog(logEntry)
+            },
+            onSlotTermination: { slotNumber, exitCode in
+                // Forward slot termination to callbacks
+                callbacks.onSlotTermination(slotNumber, exitCode)
+
+                // Log the termination
+                let level: LogLevel = exitCode == 0 ? .info : .error
+                let status = exitCode == 0 ? "completed" : "failed (code \(exitCode))"
+                let logEntry = LogEntry(
+                    level: level,
+                    source: "slot-\(slotNumber)",
+                    worktree: nil,
+                    message: "Loop \(status)"
                 )
                 callbacks.onLog(logEntry)
             },

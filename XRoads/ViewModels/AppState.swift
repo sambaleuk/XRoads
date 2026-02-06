@@ -533,6 +533,76 @@ final class AppState {
         globalLogs.append(logEntry)
     }
 
+    /// Handle slot termination - update status when a loop finishes
+    /// - Parameters:
+    ///   - slotNumber: The slot number (1-6)
+    ///   - exitCode: The process exit code (0 = success)
+    func handleSlotTermination(slotNumber: Int, exitCode: Int32) {
+        guard let index = terminalSlots.firstIndex(where: { $0.slotNumber == slotNumber }) else {
+            return
+        }
+
+        // Update slot status based on exit code
+        if exitCode == 0 {
+            terminalSlots[index].status = .completed
+            terminalSlots[index].addLog(LogEntry(
+                level: .info,
+                source: "system",
+                worktree: terminalSlots[index].worktree?.path,
+                message: "✅ Loop completed successfully"
+            ))
+        } else {
+            terminalSlots[index].status = .error
+            terminalSlots[index].addLog(LogEntry(
+                level: .error,
+                source: "system",
+                worktree: terminalSlots[index].worktree?.path,
+                message: "❌ Loop failed with exit code \(exitCode)"
+            ))
+        }
+
+        // Clear process ID
+        terminalSlots[index].processId = nil
+
+        // Add to global logs
+        let status = exitCode == 0 ? "completed" : "failed (code \(exitCode))"
+        addLog(LogEntry(
+            level: exitCode == 0 ? .info : .error,
+            source: "slot-\(slotNumber)",
+            worktree: terminalSlots[index].worktree?.path,
+            message: "Loop \(status)"
+        ))
+
+        // Update orchestrator visual state if no more running slots
+        updateOrchestratorStateAfterTermination()
+    }
+
+    /// Update orchestrator visual state after a slot terminates
+    private func updateOrchestratorStateAfterTermination() {
+        let runningSlots = terminalSlots.filter { $0.status == .running }
+        let completedSlots = terminalSlots.filter { $0.status == .completed }
+        let failedSlots = terminalSlots.filter { $0.status == .error }
+        let configuredSlots = terminalSlots.filter { $0.isConfigured }
+
+        if runningSlots.isEmpty {
+            if !failedSlots.isEmpty {
+                // Some slots failed
+                orchestratorVisualState = .concerned
+            } else if completedSlots.count == configuredSlots.count && !configuredSlots.isEmpty {
+                // All configured slots completed successfully
+                orchestratorVisualState = .celebrating
+                // Reset to idle after celebration
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3) { [weak self] in
+                    self?.orchestratorVisualState = .idle
+                }
+            } else {
+                // No running, no failures, not all complete - idle
+                orchestratorVisualState = .idle
+            }
+        }
+        // If still running, keep current state (monitoring/distributing)
+    }
+
     // MARK: - Input Bridge (US-V3-013)
 
     /// Sends input to a terminal slot's process stdin
