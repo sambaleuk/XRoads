@@ -142,16 +142,19 @@ final class CLISettingsTests: XCTestCase {
         let geminiConfig = CLIConfiguration.defaultGemini
         let codexConfig = CLIConfiguration.defaultCodex
 
-        // Then: Default values should be set correctly
-        XCTAssertEqual(claudeConfig.path, "/usr/local/bin/claude")
+        // Then: Paths should either be an auto-detected real binary or the hardcoded fallback
+        XCTAssertTrue(claudeConfig.path.hasSuffix("/claude"),
+                       "Claude path should end with /claude, got: \(claudeConfig.path)")
         XCTAssertTrue(claudeConfig.defaultArguments.contains("--dangerously-skip-permissions"))
         XCTAssertTrue(claudeConfig.isEnabled)
 
-        XCTAssertEqual(geminiConfig.path, "/usr/local/bin/gemini")
+        XCTAssertTrue(geminiConfig.path.hasSuffix("/gemini"),
+                       "Gemini path should end with /gemini, got: \(geminiConfig.path)")
         XCTAssertTrue(geminiConfig.defaultArguments.contains("--sandbox=false"))
         XCTAssertTrue(geminiConfig.isEnabled)
 
-        XCTAssertEqual(codexConfig.path, "/usr/local/bin/codex")
+        XCTAssertTrue(codexConfig.path.hasSuffix("/codex"),
+                       "Codex path should end with /codex, got: \(codexConfig.path)")
         XCTAssertTrue(codexConfig.defaultArguments.contains("--approval-mode"))
         XCTAssertTrue(codexConfig.isEnabled)
     }
