@@ -432,21 +432,21 @@ actor MCPClient {
     }
 
     /// Find Node.js executable path
-    private static func findNodePath() -> String {
+    static func findNodePath() -> String {
         let fileManager = FileManager.default
         let home = NSHomeDirectory()
 
-        // Candidate paths for node
+        // 1. NVM: glob all installed versions and pick the latest
+        if let nvmNode = findLatestNVMNode(home: home, fileManager: fileManager) {
+            return nvmNode
+        }
+
+        // 2. Static candidate paths (Homebrew, system)
         let candidates: [String] = [
-            // 1. NVM path (common on macOS)
-            "\(home)/.nvm/versions/node/v20.19.4/bin/node",
-            // 2. Homebrew paths
             "/opt/homebrew/bin/node",
             "/usr/local/bin/node",
-            // 3. System path
             "/usr/bin/node",
-            // 4. Try to find via which (synchronous for init)
-        ].filter { !$0.isEmpty }
+        ]
 
         for candidate in candidates {
             if fileManager.fileExists(atPath: candidate) {
@@ -454,7 +454,7 @@ actor MCPClient {
             }
         }
 
-        // Try running 'which node' as fallback
+        // 3. Try running 'which node' as fallback
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/usr/bin/which")
         process.arguments = ["node"]
@@ -475,6 +475,51 @@ actor MCPClient {
 
         // Default fallback
         return "/usr/local/bin/node"
+    }
+
+    /// Discover the latest NVM-installed Node.js by globbing ~/.nvm/versions/node/*/bin/node
+    /// and sorting version directories in descending semver order.
+    static func findLatestNVMNode(
+        home: String = NSHomeDirectory(),
+        fileManager: FileManager = .default
+    ) -> String? {
+        let nvmVersionsDir = (home as NSString).appendingPathComponent(".nvm/versions/node")
+        guard fileManager.fileExists(atPath: nvmVersionsDir) else { return nil }
+
+        guard let entries = try? fileManager.contentsOfDirectory(atPath: nvmVersionsDir) else {
+            return nil
+        }
+
+        // Filter to directories starting with "v" and having a valid node binary
+        let validVersions = entries
+            .filter { $0.hasPrefix("v") }
+            .compactMap { entry -> (dir: String, version: [Int])? in
+                let nodeBin = (nvmVersionsDir as NSString)
+                    .appendingPathComponent(entry)
+                    .appending("/bin/node")
+                guard fileManager.fileExists(atPath: nodeBin) else { return nil }
+                let parts = parseVersion(entry)
+                guard !parts.isEmpty else { return nil }
+                return (nodeBin, parts)
+            }
+
+        // Sort descending by version components to prefer the latest
+        let sorted = validVersions.sorted { lhs, rhs in
+            for (l, r) in zip(lhs.version, rhs.version) {
+                if l != r { return l > r }
+            }
+            return lhs.version.count > rhs.version.count
+        }
+
+        return sorted.first?.dir
+    }
+
+    /// Parse a version string like "v20.19.4" into [20, 19, 4]
+    static func parseVersion(_ versionString: String) -> [Int] {
+        let stripped = versionString.hasPrefix("v")
+            ? String(versionString.dropFirst())
+            : versionString
+        return stripped.split(separator: ".").compactMap { Int($0) }
     }
 
     /// Find the MCP server path by checking multiple locations

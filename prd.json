@@ -3,7 +3,7 @@
   "description": "Automated code improvements identified by code-reviewer on the XRoads codebase (127 Swift files, ~50k LOC). Focus on maintainability, security, and code health.",
   "branch": "refactor/code-review-2026-02-06",
   "created_at": "2026-02-06T12:00:00Z",
-  "status": "pending",
+  "status": "complete",
   "goals": [
     "Remove hardcoded paths and replace with dynamic resolution",
     "Break down God Object AppState into focused sub-states",
@@ -388,7 +388,8 @@
       "title": "Harden MCP node path resolution against NVM version changes",
       "description": "MCPClient.swift:427 hardcodes a specific NVM node version path (v20.19.4). When the user updates Node, the MCP server fails to start.",
       "priority": "high",
-      "status": "pending",
+      "status": "complete",
+      "completed_at": "2026-02-06T18:08:00Z",
       "acceptance_criteria": [
         "Replace hardcoded NVM version path with glob-based resolution (~/.nvm/versions/node/*/bin/node)",
         "Sort by version number descending to prefer latest",
@@ -399,7 +400,24 @@
       "technical_notes": "MCPClient.swift:427: hardcoded '/Users/birahimmbow/.nvm/versions/node/v20.19.4/bin/node'. Should glob ~/.nvm/versions/node/*/bin/node and pick latest. This is a portability + maintenance issue.",
       "files_affected": [
         "XRoads/Services/MCPClient.swift"
-      ]
+      ],
+      "unit_test": {
+        "file": "XRoadsTests/Services/NVMNodePathTests.swift",
+        "name": "NVMNodePathTests",
+        "description": "Verifies MCPClient node path resolution dynamically discovers NVM versions via glob, sorts by semver descending, and maintains fallback chain",
+        "assertions": [
+          "No hardcoded NVM version string (v20.19.4) in MCPClient.swift source",
+          "findNodePath is non-empty and returns a valid string",
+          "findLatestNVMNode returns a path under ~/.nvm if NVM versions exist",
+          "findLatestNVMNode returns nil when no NVM directory exists",
+          "parseVersion correctly parses 'v20.19.4' to [20, 19, 4]",
+          "parseVersion correctly parses 'v18.0.0' to [18, 0, 0]",
+          "parseVersion returns empty array for invalid input",
+          "Latest NVM version is selected when multiple versions exist (descending sort)",
+          "Fallback chain includes /opt/homebrew/bin/node, /usr/local/bin/node, /usr/bin/node"
+        ],
+        "status": "passing"
+      }
     }
   ]
 }

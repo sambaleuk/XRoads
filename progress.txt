@@ -2536,3 +2536,27 @@ Acceptance Criteria Met:
   - When changing stored property types, delegation properties in AppState need matching type updates
   - #filePath in XCTest resolves to actual source path, not .build directory — go up N levels from test file to find project root
   - CLISettingsTests failures are pre-existing (environment-specific paths), not related to CR-001
+
+### Iteration 10 - CR-202 (Harden MCP node path resolution against NVM version changes)
+- Replaced hardcoded NVM node version path (v20.19.4) with glob-based resolution
+- New `findLatestNVMNode(home:fileManager:)` method:
+  - Globs `~/.nvm/versions/node/*/bin/node`
+  - Parses version strings via `parseVersion()` into `[Int]` components
+  - Sorts descending by semver to prefer latest installed version
+  - Returns nil if no NVM directory exists (falls through to other candidates)
+- Changed `findNodePath()` and helpers from `private` to `static` for testability
+- Kept fallback chain: NVM (latest) -> Homebrew -> /usr/local/bin -> /usr/bin -> `which node` -> /usr/local/bin/node
+- Unit test: XRoadsTests/Services/NVMNodePathTests.swift - PASS (13/13)
+- Regression check: PathResolutionTests - PASS (9/9)
+- Files changed:
+  - XRoads/Services/MCPClient.swift (findNodePath rewritten, findLatestNVMNode + parseVersion added)
+  - XRoadsTests/Services/NVMNodePathTests.swift (NEW - 13 tests)
+  - prd.json (CR-202 marked complete, unit_test added and status=passing, PRD status=complete)
+- Build: swift build PASS
+- Tests: swift test --filter NVMNodePathTests PASS (13/13), no regressions
+- Learnings:
+  - Making actor static methods non-private enables unit testing without requiring actor instance creation
+  - FileManager.contentsOfDirectory is the Swift equivalent of globbing; no need for shell glob patterns
+  - Semver sorting by splitting into Int arrays and comparing lexicographically handles all standard Node.js version formats
+
+## ALL PRD STORIES COMPLETE (10/10) - Code Review Refactoring PRD fully delivered
