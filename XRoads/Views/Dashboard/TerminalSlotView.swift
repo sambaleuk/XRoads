@@ -145,6 +145,9 @@ struct TerminalSlotView: View {
     private var headerActionButton: some View {
         HStack(spacing: Theme.Spacing.xs) {
             // Config/gear button - always visible until running
+            // IMPORTANT: The popover is attached to a persistent view to avoid
+            // crash when slot status changes while the popover is animating.
+            // See: EXC_BAD_ACCESS in PopoverHostingView.updateAnimatedWindowSize
             if !slot.status.isActive {
                 Button {
                     showConfigPopover = true
@@ -156,18 +159,16 @@ struct TerminalSlotView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .popover(isPresented: $showConfigPopover, arrowEdge: .bottom) {
-                    SlotConfigPopover(
-                        slot: $slot,
-                        selectedAction: $selectedAction,
-                        worktrees: appState.worktrees
-                    )
-                }
             }
 
             // Play button - only when ready
             if slot.status.canStart {
-                Button(action: onStart) {
+                Button(action: {
+                    // Dismiss any open popover before starting to prevent
+                    // the popover from being torn down mid-animation
+                    showConfigPopover = false
+                    onStart()
+                }) {
                     Image(systemName: "play.fill")
                         .font(.system(size: 10))
                         .foregroundStyle(Color.statusSuccess)
@@ -189,6 +190,22 @@ struct TerminalSlotView: View {
                         .clipShape(Circle())
                 }
                 .buttonStyle(.plain)
+            }
+        }
+        // Popover attached to a persistent parent (HStack) instead of the
+        // conditional Button, so it survives status transitions gracefully.
+        .popover(isPresented: $showConfigPopover, arrowEdge: .bottom) {
+            SlotConfigPopover(
+                slot: $slot,
+                selectedAction: $selectedAction,
+                worktrees: appState.worktrees
+            )
+        }
+        .onChange(of: slot.status) { _, newStatus in
+            // Force-dismiss the popover when the slot becomes active
+            // to prevent the NSPopover from outliving its hosting view
+            if newStatus.isActive && showConfigPopover {
+                showConfigPopover = false
             }
         }
     }
