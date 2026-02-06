@@ -74,6 +74,11 @@ struct OrchestratorChatView: View {
         .task {
             await viewModel.loadContext(from: appState)
         }
+        .onChange(of: appState.projectPath) { _, newPath in
+            Task {
+                await viewModel.loadContext(from: appState)
+            }
+        }
         .sheet(isPresented: $showPRDFullView) {
             if let prd = selectedPRDForView {
                 PRDPreviewSheet(prd: prd)
@@ -424,9 +429,7 @@ struct OrchestratorChatView: View {
 
         if panel.runModal() == .OK, let url = panel.url {
             appState.projectPath = url.path
-            Task {
-                await viewModel.loadContext(from: appState)
-            }
+            // loadContext is triggered automatically via .onChange(of: appState.projectPath)
         }
     }
 
