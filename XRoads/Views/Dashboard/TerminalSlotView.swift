@@ -197,46 +197,53 @@ struct TerminalSlotView: View {
 
     private var terminalOutputArea: some View {
         VStack(spacing: 0) {
-            // Terminal output
-            ScrollViewReader { proxy in
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 1) {
-                        ForEach(slot.recentLogs) { log in
-                            TerminalOutputLine(log: log, agentColor: agentColor)
-                                .id(log.id)
+            // Terminal content based on state
+            Group {
+                if slot.status == .starting {
+                    // Starting state with spinner
+                    StartingStateView(
+                        agentColor: agentColor,
+                        agentName: slot.agentType?.displayName
+                    )
+                } else if slot.recentLogs.isEmpty {
+                    // Empty terminal placeholder
+                    EmptyTerminalPlaceholder(isConfigured: slot.isConfigured)
+                        .background(Theme.SlotCard.terminalBackground)
+                } else {
+                    // Terminal output
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            VStack(alignment: .leading, spacing: 1) {
+                                ForEach(slot.recentLogs) { log in
+                                    TerminalOutputLine(log: log, agentColor: agentColor)
+                                        .id(log.id)
+                                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, Theme.Spacing.sm)
+                            .padding(.vertical, Theme.Spacing.sm - 2)
+                        }
+                        .onChange(of: slot.logs.count) { _, _ in
+                            if let lastLog = slot.recentLogs.last {
+                                withAnimation(.easeOut(duration: Theme.Animation.fast)) {
+                                    proxy.scrollTo(lastLog.id, anchor: .bottom)
+                                }
+                            }
                         }
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, Theme.Spacing.sm)
-                    .padding(.vertical, Theme.Spacing.sm - 2)
-                }
-                .onChange(of: slot.logs.count) { _, _ in
-                    if let lastLog = slot.recentLogs.last {
-                        withAnimation(.easeOut(duration: Theme.Animation.fast)) {
-                            proxy.scrollTo(lastLog.id, anchor: .bottom)
-                        }
-                    }
+                    .background(Theme.SlotCard.terminalBackground)
                 }
             }
-            .background(Theme.SlotCard.terminalBackground)
 
-            // Progress bar (when active)
+            // Animated progress bar (when active)
             if slot.status.isActive && slot.progress > 0 {
-                GeometryReader { geo in
-                    ZStack(alignment: .leading) {
-                        // Background track
-                        Rectangle()
-                            .fill(Color.borderMuted.opacity(0.3))
-                            .frame(height: 2)
-
-                        // Progress fill
-                        Rectangle()
-                            .fill(agentColor)
-                            .frame(width: geo.size.width * slot.progress, height: 2)
-                            .shadow(color: agentColor, radius: 3)
-                    }
-                }
-                .frame(height: 2)
+                AnimatedProgressBar(
+                    progress: slot.progress,
+                    color: agentColor,
+                    height: 2,
+                    showGlow: true
+                )
             }
 
             // Input bar (when process running)
@@ -256,23 +263,41 @@ struct TerminalSlotView: View {
         VStack(spacing: Theme.Spacing.sm) {
             Spacer()
 
-            // Plus icon
-            Image(systemName: "plus.circle")
-                .font(.system(size: 24))
-                .foregroundStyle(Color.textTertiary.opacity(0.5))
+            // Plus icon with hover effect
+            ZStack {
+                // Glow on hover
+                if isHovered {
+                    Circle()
+                        .fill(Color.accentPrimary.opacity(0.15))
+                        .frame(width: 48, height: 48)
+                        .blur(radius: 8)
+                }
+
+                Image(systemName: "plus.circle")
+                    .font(.system(size: 28))
+                    .foregroundStyle(isHovered ? Color.accentPrimary : Color.textTertiary.opacity(0.5))
+                    .scaleEffect(isHovered ? 1.1 : 1.0)
+            }
+            .animation(.easeOut(duration: 0.2), value: isHovered)
 
             Text("Configure Slot")
                 .font(.system(size: 12, weight: .medium))
-                .foregroundStyle(Color.textSecondary)
+                .foregroundStyle(isHovered ? Color.textPrimary : Color.textSecondary)
 
-            Text("Select agent & branch")
+            Text("Click to select agent & branch")
                 .font(.system(size: 10))
                 .foregroundStyle(Color.textTertiary)
+                .opacity(isHovered ? 1 : 0.7)
 
             Spacer()
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Theme.SlotCard.terminalBackground)
+        .background(
+            Theme.SlotCard.terminalBackground
+                .overlay(
+                    isHovered ? Color.accentPrimary.opacity(0.03) : Color.clear
+                )
+        )
         .contentShape(Rectangle())
         .onTapGesture {
             showConfigPopover = true

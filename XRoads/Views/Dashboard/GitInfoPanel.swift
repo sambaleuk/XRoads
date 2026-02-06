@@ -748,15 +748,26 @@ private struct QuickActionButton: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: Theme.Spacing.sm) {
-                Image(systemName: icon)
-                    .font(.system(size: 11))
-                    .foregroundStyle(color)
-                    .frame(width: 16)
+                // Icon with glow on hover
+                ZStack {
+                    if isHovered {
+                        Circle()
+                            .fill(color.opacity(0.2))
+                            .frame(width: 24, height: 24)
+                            .blur(radius: 4)
+                    }
+
+                    Image(systemName: icon)
+                        .font(.system(size: 11))
+                        .foregroundStyle(color)
+                        .frame(width: 16)
+                }
+                .frame(width: 20)
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(title)
                         .font(.system(size: 11, weight: .medium))
-                        .foregroundStyle(Color.textPrimary)
+                        .foregroundStyle(isHovered ? Color.textPrimary : Color.textSecondary)
 
                     if let subtitle {
                         Text(subtitle)
@@ -770,12 +781,20 @@ private struct QuickActionButton: View {
 
                 Image(systemName: "chevron.right")
                     .font(.system(size: 9))
-                    .foregroundStyle(Color.textTertiary.opacity(0.5))
+                    .foregroundStyle(isHovered ? color.opacity(0.8) : Color.textTertiary.opacity(0.4))
+                    .offset(x: isHovered ? 2 : 0)
             }
             .padding(.horizontal, Theme.Spacing.sm)
             .padding(.vertical, Theme.Spacing.xs + 2)
-            .background(isHovered ? Color.bgElevated : Color.bgCanvas.opacity(0.5))
-            .cornerRadius(Theme.Radius.sm)
+            .background(
+                RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                    .fill(isHovered ? Color.bgElevated : Color.bgCanvas.opacity(0.5))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: Theme.Radius.sm)
+                    .stroke(isHovered ? color.opacity(0.3) : Color.clear, lineWidth: 1)
+            )
+            .animation(.easeOut(duration: 0.15), value: isHovered)
         }
         .buttonStyle(.plain)
         .onHover { isHovered = $0 }

@@ -66,6 +66,8 @@ let package = Package(
                 "Views/Components/SkillsBadge.swift",
                 // Slot Status Badge Component
                 "Views/Components/SlotStatusBadge.swift",
+                // Loading Indicators & Polish
+                "Views/Components/LoadingIndicators.swift",
                 // Loop Configuration Panel
                 "Views/Components/LoopConfigurationPanel.swift",
                 // Dashboard v3 Views
