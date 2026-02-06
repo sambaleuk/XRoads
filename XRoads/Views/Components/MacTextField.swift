@@ -49,13 +49,9 @@ class FocusableTextField: NSTextField {
                 }
             }
 
-            #if DEBUG
-            print("[MacTextField] FocusableTextField became first responder")
-            #endif
+            Log.input.debug("FocusableTextField became first responder")
         } else {
-            #if DEBUG
-            print("[MacTextField] FocusableTextField FAILED to become first responder")
-            #endif
+            Log.input.debug("FocusableTextField FAILED to become first responder")
         }
         return result
     }
@@ -66,9 +62,7 @@ class FocusableTextField: NSTextField {
     }
 
     override func mouseDown(with event: NSEvent) {
-        #if DEBUG
-        print("[MacTextField] FocusableTextField clicked")
-        #endif
+        Log.input.debug("FocusableTextField clicked")
 
         // CRITICAL: Ensure window accepts keyboard before handling click
         ensureWindowAcceptsKeyboardInput()
@@ -81,9 +75,7 @@ class FocusableTextField: NSTextField {
     }
 
     override func keyDown(with event: NSEvent) {
-        #if DEBUG
-        print("[MacTextField] FocusableTextField keyDown: \(event.characters ?? "")")
-        #endif
+        Log.input.debug("FocusableTextField keyDown: \(event.characters ?? "")")
         super.keyDown(with: event)
     }
 
@@ -148,9 +140,7 @@ class FocusableTextField: NSTextField {
         // CRITICAL FIX: Get or create the field editor and configure it
         // The field editor is an NSTextView that handles actual text input
         guard let fieldEditor = window.fieldEditor(true, for: self) as? NSTextView else {
-            #if DEBUG
-            print("[MacTextField] Could not get field editor")
-            #endif
+            Log.input.debug("Could not get field editor")
             return
         }
 
@@ -166,20 +156,16 @@ class FocusableTextField: NSTextField {
         // Select all text for easy replacement
         fieldEditor.selectAll(nil)
 
-        #if DEBUG
-        print("[MacTextField] Field editor started, isEditable: \(fieldEditor.isEditable)")
-        print("[MacTextField] Field editor isFirstResponder: \(fieldEditor === window.firstResponder)")
-        #endif
+        Log.input.debug("Field editor started, isEditable: \(fieldEditor.isEditable)")
+        Log.input.debug("Field editor isFirstResponder: \(fieldEditor === window.firstResponder)")
     }
 
     func attemptFocus() {
         guard let window = self.window else { return }
 
-        #if DEBUG
-        print("[MacTextField] attemptFocus called, window: \(window)")
-        print("[MacTextField] Window isSheet: \(window.sheetParent != nil)")
-        print("[MacTextField] Window isKeyWindow: \(window.isKeyWindow)")
-        #endif
+        Log.input.debug("attemptFocus called, window: \(window)")
+        Log.input.debug("Window isSheet: \(window.sheetParent != nil)")
+        Log.input.debug("Window isKeyWindow: \(window.isKeyWindow)")
 
         // Ensure cursor is always visible
         NSCursor.unhide()
@@ -197,9 +183,7 @@ class FocusableTextField: NSTextField {
         // Force the field to become first responder
         let success = window.makeFirstResponder(self)
 
-        #if DEBUG
-        print("[MacTextField] attemptFocus: makeFirstResponder returned \(success)")
-        #endif
+        Log.input.debug("attemptFocus: makeFirstResponder returned \(success)")
 
         // Start field editing regardless of makeFirstResponder result
         // because the field editor is what actually receives keyboard input
@@ -256,9 +240,7 @@ struct MacTextField: NSViewRepresentable {
         // Store coordinator for later access
         context.coordinator.textField = textField
 
-        #if DEBUG
-        print("[MacTextField] Created text field with placeholder '\(placeholder)'")
-        #endif
+        Log.input.debug("Created text field with placeholder '\(placeholder)'")
 
         return textField
     }
@@ -270,18 +252,14 @@ struct MacTextField: NSViewRepresentable {
         // Re-attach delegate to ensure it's connected
         if nsView.delegate !== context.coordinator {
             nsView.delegate = context.coordinator
-            #if DEBUG
-            print("[MacTextField] Re-attached delegate")
-            #endif
+            Log.input.debug("Re-attached delegate")
         }
 
         // Only update text if it's different AND we're not currently editing
         // This prevents cursor jumping during typing
         let isCurrentlyEditing = nsView.currentEditor() != nil
         if nsView.stringValue != text && !isCurrentlyEditing {
-            #if DEBUG
-            print("[MacTextField] Updating view from '\(nsView.stringValue)' to '\(text)'")
-            #endif
+            Log.input.debug("Updating view from '\(nsView.stringValue)' to '\(text)'")
             nsView.stringValue = text
         }
 
@@ -313,11 +291,10 @@ struct MacTextField: NSViewRepresentable {
             guard let textField = notification.object as? NSTextField else { return }
             let newValue = textField.stringValue
 
-            #if DEBUG
             if parent.text != newValue {
-                print("[MacTextField] Text changed from '\(parent.text)' to '\(newValue)'")
+                let oldValue = parent.text
+                Log.input.debug("Text changed from '\(oldValue)' to '\(newValue)'")
             }
-            #endif
 
             // Update binding immediately on main thread
             DispatchQueue.main.async { [weak self] in
@@ -326,15 +303,11 @@ struct MacTextField: NSViewRepresentable {
         }
 
         func controlTextDidBeginEditing(_ notification: Notification) {
-            #if DEBUG
-            print("[MacTextField] Begin editing")
-            #endif
+            Log.input.debug("Begin editing")
         }
 
         func controlTextDidEndEditing(_ notification: Notification) {
-            #if DEBUG
-            print("[MacTextField] End editing")
-            #endif
+            Log.input.debug("End editing")
         }
 
         func control(_ control: NSControl, textView: NSTextView, doCommandBy commandSelector: Selector) -> Bool {

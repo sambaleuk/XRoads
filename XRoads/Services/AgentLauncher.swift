@@ -133,7 +133,7 @@ actor AgentLauncher {
             environment: environment,
             onOutput: onOutput,
             onTermination: { exitCode in
-                print("[AgentLauncher] Process terminated with exit code: \(exitCode)")
+                Log.agent.info("Process terminated with exit code: \(exitCode)")
             }
         )
 

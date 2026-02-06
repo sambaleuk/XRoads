@@ -82,21 +82,21 @@ struct XRoadsDashboardView: View {
 
     private func startSlot(_ slotNumber: Int) {
         guard let index = terminalSlots.firstIndex(where: { $0.slotNumber == slotNumber }) else {
-            print("[Dashboard] Slot \(slotNumber) not found")
+            Log.dashboard.error("Slot \(slotNumber) not found")
             return
         }
 
         let slot = terminalSlots[index]
-        print("[Dashboard] Starting slot \(slotNumber): configured=\(slot.isConfigured), agent=\(slot.agentType?.rawValue ?? "nil"), worktree=\(slot.worktree?.branch ?? "nil"), action=\(slot.actionType?.rawValue ?? "nil")")
+        Log.dashboard.info("Starting slot \(slotNumber): configured=\(slot.isConfigured), agent=\(slot.agentType?.rawValue ?? "nil"), worktree=\(slot.worktree?.branch ?? "nil"), action=\(slot.actionType?.rawValue ?? "nil")")
 
         // Check configuration and provide feedback
         guard slot.worktree != nil else {
-            print("[Dashboard] Slot \(slotNumber) missing worktree")
+            Log.dashboard.warning("Slot \(slotNumber) missing worktree")
             appState.addLog(LogEntry(level: .warn, source: "dashboard", worktree: nil, message: "Slot \(slotNumber): Please select a branch/worktree first"))
             return
         }
         guard slot.agentType != nil else {
-            print("[Dashboard] Slot \(slotNumber) missing agent")
+            Log.dashboard.warning("Slot \(slotNumber) missing agent")
             appState.addLog(LogEntry(level: .warn, source: "dashboard", worktree: nil, message: "Slot \(slotNumber): Please select an agent first"))
             return
         }
@@ -104,7 +104,7 @@ struct XRoadsDashboardView: View {
         // Auto-set action if missing
         if slot.actionType == nil {
             terminalSlots[index].actionType = .implement
-            print("[Dashboard] Auto-set action to .implement for slot \(slotNumber)")
+            Log.dashboard.debug("Auto-set action to .implement for slot \(slotNumber)")
         }
 
         terminalSlots[index].status = .starting

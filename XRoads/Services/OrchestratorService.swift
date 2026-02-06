@@ -404,7 +404,7 @@ actor OrchestratorService {
 
         """
         try? logMsg.write(toFile: logFile, atomically: false, encoding: .utf8)
-        print("[OrchestratorService] Launching Claude CLI at: \(claudePath)")
+        Log.orchestrator.info("Launching Claude CLI at: \(claudePath)")
 
         // Launch Claude CLI with the message
         do {
@@ -415,7 +415,7 @@ actor OrchestratorService {
                 closeStdinImmediately: true  // Claude -p mode needs EOF on stdin
             ) { [weak self] output in
                 guard let self = self else { return }
-                print("[OrchestratorService] Received output chunk: \(output.prefix(100))...")
+                Log.orchestrator.debug("Received output chunk: \(output.prefix(100))...")
                 Task {
                     responseContent += output
                     await self.delegate?.orchestratorDidReceiveChunk(self, chunk: output)
@@ -424,17 +424,17 @@ actor OrchestratorService {
             }
 
             terminalProcessId = processId
-            print("[OrchestratorService] Process launched with ID: \(processId)")
+            Log.orchestrator.info("Process launched with ID: \(processId)")
 
             // Wait for process to complete with timeout (5 minutes max)
             let timeoutSeconds = 300
             var elapsedSeconds = 0
-            print("[OrchestratorService] Waiting for process to complete...")
+            Log.orchestrator.info("Waiting for process to complete...")
             while await processRunner.isRunning(id: processId) {
                 try await Task.sleep(nanoseconds: 100_000_000) // 100ms
                 elapsedSeconds += 1
                 if elapsedSeconds % 50 == 0 { // Log every 5 seconds
-                    print("[OrchestratorService] Still waiting... elapsed: \(elapsedSeconds / 10)s, isRunning: true")
+                    Log.orchestrator.debug("Still waiting... elapsed: \(elapsedSeconds / 10)s, isRunning: true")
                 }
                 if elapsedSeconds >= timeoutSeconds * 10 { // 100ms intervals
                     // Timeout - terminate the process

@@ -197,7 +197,7 @@ actor LoopLauncher {
             environment: environment,
             onOutput: onOutput,
             onTermination: { exitCode in
-                print("[LoopLauncher] Slot \(slotNumber) loop terminated with code: \(exitCode)")
+                Log.loop.info("Slot \(slotNumber) loop terminated with code: \(exitCode)")
                 // Notify caller about termination
                 onTermination?(slotNumber, exitCode)
             }
@@ -237,7 +237,7 @@ actor LoopLauncher {
             // Verify it's a valid worktree
             let gitDir = worktreePath.appendingPathComponent(".git")
             if fileManager.fileExists(atPath: gitDir.path) {
-                print("[LoopLauncher] Worktree exists at \(worktreePath.path)")
+                Log.loop.debug("Worktree exists at \(worktreePath.path)")
                 return worktreePath
             } else {
                 // Directory exists but is not a worktree, remove it
@@ -256,7 +256,7 @@ actor LoopLauncher {
                 branch: config.branchName,
                 worktreePath: worktreePath.path
             )
-            print("[LoopLauncher] Created worktree: \(worktreePath.path)")
+            Log.loop.info("Created worktree: \(worktreePath.path)")
             return worktreePath
         } catch {
             throw LoopLauncherError.worktreeCreationFailed(error.localizedDescription)

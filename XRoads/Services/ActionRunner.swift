@@ -293,7 +293,7 @@ actor ActionRunner {
 
         if !missingIDs.isEmpty {
             // Log missing skills but don't fail - some skills are optional
-            print("[ActionRunner] Warning: Skills not found: \(missingIDs.joined(separator: ", "))")
+            Log.action.warning("Skills not found: \(missingIDs.joined(separator: ", "))")
         }
 
         return compatibleSkills
@@ -462,7 +462,7 @@ actor ActionRunner {
                 environment: environment,
                 onOutput: onOutput,
                 onTermination: { exitCode in
-                    print("[ActionRunner] Process terminated with exit code: \(exitCode)")
+                    Log.action.info("Process terminated with exit code: \(exitCode)")
                 }
             )
 

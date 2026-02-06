@@ -554,33 +554,25 @@ actor MCPClient {
                 .path
         ].filter { !$0.isEmpty }
 
-        #if DEBUG
-        print("🔍 MCPClient: Searching for MCP server...")
-        print("  Bundle path: \(Bundle.main.bundlePath)")
-        print("  Current directory: \(fileManager.currentDirectoryPath)")
-        print("  Checking \(candidates.count) candidate paths:")
-        #endif
+        Log.mcp.debug("Searching for MCP server...")
+        Log.mcp.debug("  Bundle path: \(Bundle.main.bundlePath)")
+        Log.mcp.debug("  Current directory: \(fileManager.currentDirectoryPath)")
+        Log.mcp.debug("  Checking \(candidates.count) candidate paths:")
 
         // Check each candidate for dist/index.js
         for (index, candidate) in candidates.enumerated() {
             let serverScript = (candidate as NSString).appendingPathComponent("dist/index.js")
-            #if DEBUG
-            print("  [\(index + 1)] \(candidate)")
-            print("      → dist/index.js exists: \(fileManager.fileExists(atPath: serverScript))")
-            #endif
+            Log.mcp.debug("  [\(index + 1)] \(candidate)")
+            Log.mcp.debug("      → dist/index.js exists: \(fileManager.fileExists(atPath: serverScript))")
             
             if fileManager.fileExists(atPath: serverScript) {
-                #if DEBUG
-                print("✅ Found MCP server at: \(candidate)")
-                #endif
+                Log.mcp.info("Found MCP server at: \(candidate)")
                 return candidate
             }
         }
 
-        #if DEBUG
-        print("❌ MCP server not found in any candidate path")
-        print("💡 You can set CROSSROADS_MCP_PATH environment variable to specify custom path")
-        #endif
+        Log.mcp.error("MCP server not found in any candidate path")
+        Log.mcp.info("You can set CROSSROADS_MCP_PATH environment variable to specify custom path")
 
         // Return first candidate as fallback (will fail with clear error)
         return candidates.first ?? "xroads-mcp"
@@ -1051,11 +1043,8 @@ actor MCPClient {
                 }
             } catch {
                 // Log parsing error with details for debugging
-                #if DEBUG
-                print("MCPClient: Failed to parse JSON-RPC response")
-                print("  Error: \(error)")
-                print("  Line: \(line)")
-                #endif
+                Log.mcp.error("Failed to parse JSON-RPC response: \(error)")
+                Log.mcp.debug("  Line: \(line)")
             }
         }
     }
@@ -1063,9 +1052,7 @@ actor MCPClient {
     /// Handle error output from the server (stderr)
     private func handleServerError(_ text: String) {
         // Log all stderr output for debugging
-        #if DEBUG
-        print("MCPClient stderr: \(text)")
-        #endif
+        Log.mcp.debug("stderr: \(text)")
 
         // Check for critical error patterns
         if text.contains("FATAL") || text.contains("Error:") || text.contains("Exception") {

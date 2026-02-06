@@ -89,7 +89,7 @@ class WindowSheetPresenter: ObservableObject {
         onDismiss: @escaping () -> Void
     ) {
         guard let parentWindow = NSApp.keyWindow ?? NSApp.mainWindow else {
-            print("[WindowSheetPresenter] No parent window found")
+            Log.modal.warning("No parent window found")
             return
         }
 
@@ -137,9 +137,7 @@ class WindowSheetPresenter: ObservableObject {
             // Make sure the sheet window is key
             sheetWindow.makeKey()
 
-            #if DEBUG
-            print("[WindowSheetPresenter] Sheet presented, isKeyWindow: \(sheetWindow.isKeyWindow)")
-            #endif
+            Log.modal.debug("Sheet presented, isKeyWindow: \(sheetWindow.isKeyWindow)")
 
             // Find the first NSTextField and focus it
             self?.focusFirstTextField(in: sheetWindow)
@@ -167,9 +165,7 @@ class WindowSheetPresenter: ObservableObject {
         if let textField = findFirstTextField(in: contentView) {
             // CRITICAL: Make the text field first responder to enable keyboard input
             let success = window.makeFirstResponder(textField)
-            #if DEBUG
-            print("[WindowSheetPresenter] Focused first text field: \(success)")
-            #endif
+            Log.modal.debug("Focused first text field: \(success)")
         }
     }
 
@@ -385,9 +381,7 @@ class FocusableNSTextField: NSTextField {
                 self?.startFieldEditorForKeyboard()
             }
 
-            #if DEBUG
-            print("[FocusableNSTextField] becomeFirstResponder succeeded")
-            #endif
+            Log.modal.debug("FocusableNSTextField becomeFirstResponder succeeded")
         }
         return result
     }
@@ -402,10 +396,8 @@ class FocusableNSTextField: NSTextField {
     func activateForKeyboardInput() {
         guard let window = self.window else { return }
 
-        #if DEBUG
-        print("[FocusableNSTextField] activateForKeyboardInput called")
-        print("[FocusableNSTextField] Window isSheet: \(window.sheetParent != nil)")
-        #endif
+        Log.modal.debug("FocusableNSTextField activateForKeyboardInput called")
+        Log.modal.debug("Window isSheet: \(window.sheetParent != nil)")
 
         // CRITICAL FIX: Proper activation sequence
         // 1. Activate the application
@@ -434,9 +426,7 @@ class FocusableNSTextField: NSTextField {
 
         // Get the field editor
         guard let fieldEditor = window.fieldEditor(true, for: self) as? NSTextView else {
-            #if DEBUG
-            print("[FocusableNSTextField] Could not get field editor")
-            #endif
+            Log.modal.debug("FocusableNSTextField could not get field editor")
             return
         }
 
@@ -451,10 +441,8 @@ class FocusableNSTextField: NSTextField {
         // Select all for easy replacement
         fieldEditor.selectAll(nil)
 
-        #if DEBUG
-        print("[FocusableNSTextField] Field editor activated")
-        print("[FocusableNSTextField] Field editor isFirstResponder: \(fieldEditor === window.firstResponder)")
-        #endif
+        Log.modal.debug("FocusableNSTextField field editor activated")
+        Log.modal.debug("Field editor isFirstResponder: \(fieldEditor === window.firstResponder)")
     }
 }
 

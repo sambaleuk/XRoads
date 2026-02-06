@@ -70,7 +70,8 @@ actor StatusMonitor {
             await self?.monitorLoop()
         }
 
-        print("[StatusMonitor] Started monitoring: \(statusFilePath.path)")
+        let path = statusFilePath.path
+        Log.status.info("Started monitoring: \(path)")
     }
 
     /// Stop monitoring
@@ -78,7 +79,7 @@ actor StatusMonitor {
         isMonitoring = false
         monitorTask?.cancel()
         monitorTask = nil
-        print("[StatusMonitor] Stopped monitoring")
+        Log.status.info("Stopped monitoring")
     }
 
     /// Get current status

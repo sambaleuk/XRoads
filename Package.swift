@@ -165,6 +165,7 @@ let package = Package(
                 "Services/KeychainService.swift",
                 "Services/LoopScriptLocator.swift",
                 "Services/LoopLauncher.swift",
+                "Services/XRoadsLogger.swift",
                 "Services/DependencyTracker.swift",
                 "Services/StatusMonitor.swift",
                 "Services/LayeredDispatcher.swift",
@@ -208,6 +209,8 @@ let package = Package(
                 "Services/AnthropicClientTests.swift",
                 // CR-201: Path Resolution Tests
                 "Services/PathResolutionTests.swift",
+                // CR-101: Structured Logging Tests
+                "Services/StructuredLoggingTests.swift",
                 // CR-301: AppState Decomposition Tests
                 "ViewModels/AppStateDecompositionTests.swift",
                 // US-V4-015: Dashboard Layout Tests

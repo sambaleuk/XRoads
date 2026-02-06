@@ -1295,9 +1295,7 @@ final class AppState {
                 try await mcpClient.emitLog(level: level, source: source, worktree: worktree, message: message)
             } catch {
                 // Silently fail MCP emission - local logs still work
-                #if DEBUG
-                print("MCP emitLog failed: \(error)")
-                #endif
+                Log.mcp.debug("emitLog failed: \(error)")
             }
         }
     }
@@ -1309,9 +1307,7 @@ final class AppState {
             do {
                 try await mcpClient.updateStatus(agent: agent, worktree: worktree, status: status, task: task)
             } catch {
-                #if DEBUG
-                print("MCP updateStatus failed: \(error)")
-                #endif
+                Log.mcp.debug("updateStatus failed: \(error)")
             }
         }
     }

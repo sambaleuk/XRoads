@@ -716,7 +716,7 @@ private struct SlotConfigPopover: View {
                 selectedAction = .implement
             }
             slot.status = .ready
-            print("[SlotConfig] Slot \(slot.slotNumber) is now ready: \(slot.agentType?.rawValue ?? "?") on \(slot.worktree?.branch ?? "?")")
+            Log.dashboard.info("Slot \(slot.slotNumber) is now ready: \(slot.agentType?.rawValue ?? "?") on \(slot.worktree?.branch ?? "?")")
         } else if slot.agentType != nil || slot.worktree != nil {
             slot.status = .configuring
         } else {

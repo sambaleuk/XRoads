@@ -283,13 +283,13 @@ actor LayeredDispatcher {
     }
 
     private func handleStoryComplete(_ event: StatusUpdateEvent) async {
-        print("[LayeredDispatcher] Story completed: \(event.storyId)")
+        Log.dispatcher.info("Story completed: \(event.storyId)")
         completedStoryIds.insert(event.storyId)
         emitProgress("Story \(event.storyId) completed! ✅")
     }
 
     private func handleLayerComplete(_ event: LayerCompletionEvent) async {
-        print("[LayeredDispatcher] Layer \(event.layerIndex) completed, next stories: \(event.nextLayerStories)")
+        Log.dispatcher.info("Layer \(event.layerIndex) completed, next stories: \(event.nextLayerStories)")
 
         // Update layer index
         currentLayerIndex = event.layerIndex + 1
@@ -307,7 +307,7 @@ actor LayeredDispatcher {
     }
 
     private func handleAllComplete() async {
-        print("[LayeredDispatcher] All stories complete!")
+        Log.dispatcher.info("All stories complete!")
         currentPhase = .completed
         await statusMonitor?.stopMonitoring()
         onComplete?()
@@ -318,7 +318,7 @@ actor LayeredDispatcher {
 
     private func launchCurrentLayer() async throws {
         guard currentLayerIndex < layers.count else {
-            print("[LayeredDispatcher] No more layers to launch")
+            Log.dispatcher.info("No more layers to launch")
             return
         }
 
@@ -346,7 +346,7 @@ actor LayeredDispatcher {
                     info.status = .failed
                     slotInfos[slotNumber] = info
                     onSlotUpdate?(info)
-                    print("[LayeredDispatcher] Failed to launch slot \(slotNumber): \(error)")
+                    Log.dispatcher.error("Failed to launch slot \(slotNumber): \(error)")
                 }
             }
         }

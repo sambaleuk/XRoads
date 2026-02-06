@@ -66,9 +66,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, ObservableObject {
             window.makeKeyAndOrderFront(nil)
         }
 
-        #if DEBUG
-        print("[AppDelegate] App launched with activation policy: regular")
-        #endif
+        Log.app.info("App launched with activation policy: regular")
     }
 
     func applicationWillTerminate(_ notification: Notification) {
