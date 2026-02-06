@@ -27,5 +27,12 @@ xroads-mcp/dist/
 *.tmp
 *.log
 
+# Screenshots (don't commit to root)
+Screenshot*.png
+*.jpeg
+
+# Build artifacts
+build/
+
 # Claude Code
 .claude/
