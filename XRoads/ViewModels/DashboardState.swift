@@ -68,8 +68,10 @@ final class DashboardState {
 
     // MARK: - Orchestrator Visual State Updates
 
-    /// Updates the orchestrator visual state based on slot states
-    func updateOrchestratorVisualState() {
+    /// Updates the orchestrator visual state based on slot states.
+    /// - Parameter isDispatching: Whether a layered dispatch is actively in progress.
+    ///   When true, prevents retrograding to `.idle` between layers.
+    func updateOrchestratorVisualState(isDispatching: Bool = false) {
         let activeCount = activeSlots.count
         let configuredCount = configuredSlots.count
         let hasErrors = terminalSlots.contains { $0.status == .error }
@@ -82,6 +84,10 @@ final class DashboardState {
             orchestratorVisualState = .concerned
         } else if activeCount > 0 {
             orchestratorVisualState = .monitoring
+        } else if isDispatching {
+            // Between layers: slots finished but next layer hasn't launched yet.
+            // Stay in monitoring to avoid "Waiting for instructions" flicker.
+            orchestratorVisualState = .monitoring
         } else if configuredCount > 0 {
             orchestratorVisualState = .idle
         } else {
@@ -89,8 +95,9 @@ final class DashboardState {
         }
     }
 
-    /// Update orchestrator visual state after a slot terminates
-    func updateOrchestratorStateAfterTermination() {
+    /// Update orchestrator visual state after a slot terminates.
+    /// - Parameter isDispatching: Whether a layered dispatch is actively in progress.
+    func updateOrchestratorStateAfterTermination(isDispatching: Bool = false) {
         let runningSlots = terminalSlots.filter { $0.status == .running }
         let completedSlots = terminalSlots.filter { $0.status == .completed }
         let failedSlots = terminalSlots.filter { $0.status == .error }
@@ -105,6 +112,9 @@ final class DashboardState {
                     try? await Task.sleep(nanoseconds: 3_000_000_000)
                     self?.orchestratorVisualState = .idle
                 }
+            } else if isDispatching {
+                // Between layers: keep monitoring instead of idle
+                orchestratorVisualState = .monitoring
             } else {
                 orchestratorVisualState = .idle
             }

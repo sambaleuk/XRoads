@@ -656,7 +656,7 @@ final class AppState {
 
     /// Update orchestrator visual state after a slot terminates
     private func updateOrchestratorStateAfterTermination() {
-        dashboard.updateOrchestratorStateAfterTermination()
+        dashboard.updateOrchestratorStateAfterTermination(isDispatching: dispatch.isDispatching)
     }
 
     // MARK: - Input Bridge (US-V3-013)
@@ -772,7 +772,7 @@ final class AppState {
 
     /// Updates the orchestrator visual state based on slot states
     func updateOrchestratorVisualState() {
-        dashboard.updateOrchestratorVisualState()
+        dashboard.updateOrchestratorVisualState(isDispatching: dispatch.isDispatching)
     }
 
     // MARK: - Unified Action Flow (US-V3-014)
