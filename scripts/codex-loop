@@ -42,7 +42,7 @@ run_agent() {
     local iter_log="$2"
 
     # Codex reads prompt from stdin via `-`
-    printf "%s" "$prompt" | codex --approval-mode full-auto --cd "$(pwd)" - 2>&1 | tee "$iter_log" | tee /dev/stderr
+    printf "%s" "$prompt" | codex --full-auto --cd "$(pwd)" - 2>&1 | tee "$iter_log" | tee /dev/stderr
 }
 
 # ============================================================================

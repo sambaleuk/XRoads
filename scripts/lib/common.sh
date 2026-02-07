@@ -32,7 +32,7 @@ export PRD_TESTS_FILE="prd-tests.json"
 export PROGRESS_FILE="progress.txt"
 export TEST_PROGRESS_FILE="test-progress.json"
 export TEST_RESULTS_FILE="test-results.json"
-export AGENTS_FILE="AGENTS.md"
+export AGENTS_FILE="AGENT.md"
 
 # ============================================================================
 # LOGGING

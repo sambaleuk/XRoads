@@ -156,7 +156,7 @@ public struct CLIConfiguration: Codable, Sendable, Equatable {
     /// Default configuration for Codex CLI
     public static let defaultCodex = CLIConfiguration(
         path: CLIConfiguration.autoDetectPath(for: "codex") ?? "/usr/local/bin/codex",
-        defaultArguments: ["--approval-mode", "full-auto"],
+        defaultArguments: ["--full-auto"],
         isEnabled: true
     )
 
@@ -523,7 +523,7 @@ public final class AppSettings {
     }
 
     /// Codex CLI default arguments
-    public var codexDefaultArgs: [String] = ["--approval-mode", "full-auto"] {
+    public var codexDefaultArgs: [String] = ["--full-auto"] {
         didSet { saveStringArray(codexDefaultArgs, forKey: .codexDefaultArgs) }
     }
 
@@ -748,7 +748,7 @@ public final class AppSettings {
     public func resetCLIArgsToDefaults() {
         claudeDefaultArgs = ["--dangerously-skip-permissions"]
         geminiDefaultArgs = ["--sandbox=false"]
-        codexDefaultArgs = ["--approval-mode", "full-auto"]
+        codexDefaultArgs = ["--full-auto"]
     }
 
     /// Reset CLI enabled states to defaults
@@ -837,7 +837,7 @@ public final class AppSettings {
         // CLI Default Arguments
         claudeDefaultArgs = loadStringArray(forKey: .claudeDefaultArgs) ?? ["--dangerously-skip-permissions"]
         geminiDefaultArgs = loadStringArray(forKey: .geminiDefaultArgs) ?? ["--sandbox=false"]
-        codexDefaultArgs = loadStringArray(forKey: .codexDefaultArgs) ?? ["--approval-mode", "full-auto"]
+        codexDefaultArgs = loadStringArray(forKey: .codexDefaultArgs) ?? ["--full-auto"]
 
         // CLI Enabled States
         claudeEnabled = defaults.object(forKey: SettingsKey.claudeEnabled.rawValue) as? Bool ?? true

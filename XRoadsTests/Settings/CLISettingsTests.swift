@@ -155,7 +155,7 @@ final class CLISettingsTests: XCTestCase {
 
         XCTAssertTrue(codexConfig.path.hasSuffix("/codex"),
                        "Codex path should end with /codex, got: \(codexConfig.path)")
-        XCTAssertTrue(codexConfig.defaultArguments.contains("--approval-mode"))
+        XCTAssertTrue(codexConfig.defaultArguments.contains("--full-auto"))
         XCTAssertTrue(codexConfig.isEnabled)
     }
 
