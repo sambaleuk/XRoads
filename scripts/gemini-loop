@@ -42,8 +42,9 @@ run_agent() {
     local iter_log="$2"
 
     # --sandbox=false allows file system access.
-    # Output is tee'd to the log file and also flows to stdout for PTY capture.
-    gemini --sandbox=false -p "$prompt" 2>&1 | tee "$iter_log"
+    # -y (yolo) auto-approves tool calls — required for non-interactive -p mode,
+    # otherwise Gemini hangs waiting for interactive confirmation.
+    gemini --sandbox=false -y -p "$prompt" 2>&1 | tee "$iter_log"
 }
 
 # ============================================================================
