@@ -78,7 +78,8 @@ final class DashboardState {
         let hasNeedsInput = terminalSlots.contains { $0.status == .needsInput }
         let allCompleted = configuredCount > 0 && configuredSlots.allSatisfy { $0.status == .completed }
 
-        if allCompleted {
+        if allCompleted && !isDispatching {
+            // Only celebrate when dispatch is done — more layers may be coming
             orchestratorVisualState = .celebrating
         } else if hasErrors || hasNeedsInput {
             orchestratorVisualState = .concerned
@@ -106,7 +107,8 @@ final class DashboardState {
         if runningSlots.isEmpty {
             if !failedSlots.isEmpty {
                 orchestratorVisualState = .concerned
-            } else if completedSlots.count == configuredSlots.count && !configuredSlots.isEmpty {
+            } else if completedSlots.count == configuredSlots.count && !configuredSlots.isEmpty && !isDispatching {
+                // Only celebrate when dispatch is done — more layers may be coming
                 orchestratorVisualState = .celebrating
                 Task { @MainActor [weak self] in
                     try? await Task.sleep(nanoseconds: 3_000_000_000)
