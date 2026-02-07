@@ -238,7 +238,12 @@ actor UnifiedDispatcher {
             }
 
             requestResults[request.id] = result
-            callbacks.onComplete()
+
+            // For PRD mode, onComplete is deferred to LayeredDispatcher
+            // (fires when all slots actually finish, not when launch returns)
+            if request.mode != .prd {
+                callbacks.onComplete()
+            }
 
             return result
 
@@ -389,7 +394,7 @@ actor UnifiedDispatcher {
                 callbacks.onLog(logEntry)
             },
             onComplete: {
-                // Will be called by dispatch() wrapper
+                callbacks.onComplete()
             },
             onError: { error in
                 callbacks.onError(error)
