@@ -1855,6 +1855,10 @@ final class AppState {
     }
 
     private func buildOrchestrationRecord(plan: MergePlan, result: MergeResult) -> OrchestrationRecord {
+        buildOrchestrationRecord(baseBranch: plan.baseBranch, startedAt: plan.createdAt, result: result)
+    }
+
+    private func buildOrchestrationRecord(baseBranch: String, startedAt: Date? = nil, result: MergeResult) -> OrchestrationRecord {
         let finishedAt = Date()
         let metrics = orchestration.makeAgentMetrics(completedAt: finishedAt)
         let totalStories = metrics.reduce(0) { $0 + $1.storiesTotal }
@@ -1863,9 +1867,9 @@ final class AppState {
 
         return OrchestrationRecord(
             id: UUID(),
-            startedAt: plan.createdAt,
+            startedAt: startedAt ?? finishedAt,
             finishedAt: finishedAt,
-            prdName: orchestration.activePRDName ?? plan.baseBranch,
+            prdName: orchestration.activePRDName ?? baseBranch,
             prdPath: orchestration.activePRDURL?.path,
             resultSummary: result.success ? "Merged" : (result.conflicts.isEmpty ? "Partial" : "Conflicts"),
             mergedBranches: result.mergedBranches,
@@ -1875,6 +1879,31 @@ final class AppState {
             agentMetrics: metrics,
             errors: errors
         )
+    }
+
+    private func cleanupPostOrchestration(assignments: [WorktreeAssignment], repoPath: URL) async {
+        addLog(LogEntry(level: .info, source: "orchestrator", worktree: nil,
+                        message: "Cleaning up \(assignments.count) worktrees..."))
+
+        for assignment in assignments {
+            do {
+                try await services.gitService.removeWorktree(
+                    repoPath: repoPath.path,
+                    worktreePath: assignment.worktreePath.path
+                )
+                try await services.gitService.deleteBranch(
+                    name: assignment.branchName,
+                    repoPath: repoPath.path
+                )
+            } catch {
+                addLog(LogEntry(level: .warn, source: "orchestrator", worktree: nil,
+                                message: "Cleanup warning for \(assignment.branchName): \(error.localizedDescription)"))
+            }
+        }
+
+        activeWorktreeAssignments = []
+        addLog(LogEntry(level: .info, source: "orchestrator", worktree: nil,
+                        message: "Post-orchestration cleanup complete"))
     }
 
     func loadHistory() async {
@@ -2037,7 +2066,10 @@ final class AppState {
         }
 
         do {
-            let result = try await services.orchestrator.coordinateMerge(for: activeWorktreeAssignments)
+            let result = try await services.orchestrator.coordinateMerge(
+                for: activeWorktreeAssignments,
+                repoPath: repoPath
+            )
             mergeResult = result
 
             if result.conflicts.isEmpty {
@@ -2045,11 +2077,12 @@ final class AppState {
                 addLog(LogEntry(level: .info, source: "orchestrator", worktree: nil, message: "Orchestration complete! Merged \(result.mergedBranches.count) branches"))
 
                 // Save to history
-                if let plan = mergePlan {
-                    let record = buildOrchestrationRecord(plan: plan, result: result)
-                    await services.historyService.append(record: record)
-                    historyRecords.insert(record, at: 0)
-                }
+                let record = buildOrchestrationRecord(baseBranch: result.baseBranch, result: result)
+                await services.historyService.append(record: record)
+                historyRecords.insert(record, at: 0)
+
+                // Cleanup worktrees and branches
+                await cleanupPostOrchestration(assignments: activeWorktreeAssignments, repoPath: repoPath)
             } else {
                 presentConflicts(from: result, repoPath: repoPath)
                 addLog(LogEntry(level: .warn, source: "orchestrator", worktree: nil, message: "Merge conflicts detected in \(result.conflicts.count) files"))

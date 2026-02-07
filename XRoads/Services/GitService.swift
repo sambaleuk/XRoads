@@ -216,6 +216,12 @@ actor GitService {
         try await runGit(arguments: ["reset", "--hard", reference], currentDirectory: repoPath)
     }
 
+    /// Deletes a local branch
+    func deleteBranch(name: String, repoPath: String, force: Bool = false) async throws {
+        let flag = force ? "-D" : "-d"
+        try await runGit(arguments: ["branch", flag, name], currentDirectory: repoPath)
+    }
+
     /// Lists files currently in conflict
     func listConflictedFiles(repoPath: String) async throws -> [String] {
         let output = try await runGit(

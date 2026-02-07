@@ -403,7 +403,8 @@ struct OrchestratorChatView: View {
             },
             onComplete: {
                 Task { @MainActor in
-                    self.viewModel.addSystemMessage("Dispatch completed successfully")
+                    self.viewModel.addSystemMessage("Dispatch completed successfully. Starting merge...")
+                    await self.appState.completeOrchestration()
                 }
             },
             onError: { error in

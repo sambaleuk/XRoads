@@ -768,8 +768,9 @@ struct SlotAssignmentSheet: View {
                 onComplete: {
                     Task { @MainActor in
                         appState.dispatchPhase = .completed
-                        appState.dispatchMessage = "All stories completed! 🎉"
+                        appState.dispatchMessage = "All stories completed! Merging..."
                         appState.orchestratorVisualState = .celebrating
+                        await appState.completeOrchestration()
                     }
                 },
                 onError: { error in

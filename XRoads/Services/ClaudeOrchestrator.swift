@@ -31,6 +31,7 @@ actor ClaudeOrchestrator: Orchestrator {
     private let processRunner: ProcessRunner
     private let mcpClient: MCPClient
     private let agentEventBus: AgentEventBus
+    private let mergeCoordinator: MergeCoordinator
     private lazy var worktreeFactory = WorktreeFactory(gitService: gitService)
     private let statusMonitor = AgentStatusMonitor()
 
@@ -42,13 +43,15 @@ actor ClaudeOrchestrator: Orchestrator {
         gitService: GitService = GitService(),
         processRunner: ProcessRunner = ProcessRunner(),
         mcpClient: MCPClient = MCPClient(),
-        agentEventBus: AgentEventBus = AgentEventBus()
+        agentEventBus: AgentEventBus = AgentEventBus(),
+        mergeCoordinator: MergeCoordinator = MergeCoordinator()
     ) {
         self.config = config
         self.gitService = gitService
         self.processRunner = processRunner
         self.mcpClient = mcpClient
         self.agentEventBus = agentEventBus
+        self.mergeCoordinator = mergeCoordinator
     }
 
     func updateConfig(_ config: OrchestratorConfig) async {
@@ -125,18 +128,18 @@ actor ClaudeOrchestrator: Orchestrator {
         }
     }
 
-    func coordinateMerge(for assignments: [WorktreeAssignment]) async throws -> MergeResult {
+    func coordinateMerge(for assignments: [WorktreeAssignment], repoPath: URL) async throws -> MergeResult {
         transition(to: .merging)
-        // Placeholder merge result until merge coordinator is implemented.
-        let merged = assignments.map(\.branchName)
-        transition(to: .complete)
-        return MergeResult(
-            baseBranch: activeBaseBranch ?? "main",
-            mergedBranches: merged,
-            conflicts: [],
-            success: true,
-            rolledBack: false
+
+        let plan = try await mergeCoordinator.prepareMerge(
+            assignments: assignments,
+            repoPath: repoPath,
+            baseBranch: activeBaseBranch
         )
+
+        let result = try await mergeCoordinator.executeMerge(plan: plan, repoPath: repoPath)
+        transition(to: result.success ? .complete : .error(message: "Merge conflicts detected"))
+        return result
     }
 
     // MARK: - Helpers

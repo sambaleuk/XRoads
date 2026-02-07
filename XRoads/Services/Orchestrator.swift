@@ -203,5 +203,5 @@ protocol Orchestrator: AnyObject, Sendable {
     func createWorktrees(for analysis: PRDAnalysis, repoPath: URL) async throws -> [WorktreeAssignment]
     func assignTasks(for worktrees: [WorktreeAssignment]) async throws -> [TaskAssignment]
     func monitorProgress(for assignments: [TaskAssignment], sessionID: UUID) async -> AsyncStream<OrchestratorEvent>
-    func coordinateMerge(for assignments: [WorktreeAssignment]) async throws -> MergeResult
+    func coordinateMerge(for assignments: [WorktreeAssignment], repoPath: URL) async throws -> MergeResult
 }

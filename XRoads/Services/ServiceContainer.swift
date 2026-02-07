@@ -111,7 +111,8 @@ final class DefaultServiceContainer: ServiceContainer, @unchecked Sendable {
             gitService: gitService,
             processRunner: processRunner,
             mcpClient: mcpClient,
-            agentEventBus: agentEventBus
+            agentEventBus: agentEventBus,
+            mergeCoordinator: mergeCoordinator
         )
     }
 }
@@ -176,7 +177,8 @@ final class MockServiceContainer: ServiceContainer, @unchecked Sendable {
             gitService: gitService,
             processRunner: processRunner,
             mcpClient: mcpClient,
-            agentEventBus: agentEventBus
+            agentEventBus: agentEventBus,
+            mergeCoordinator: mergeCoordinator
         )
     }
 }
