@@ -1,0 +1,11 @@
+{
+  "id": "prd",
+  "name": "PRD Implementation",
+  "description": "Parse and implement features from PRD (Product Requirements Document) user stories with mandatory unit tests",
+  "promptTemplate": "You are implementing features from a PRD (Product Requirements Document). Follow the Nexus Loop methodology strictly:\n\n## Workflow\n1. **Read prd.json** - Find the first user story that is NOT complete (status != \"complete\")\n2. **Read progress.txt** - Check the Learnings section for patterns from previous iterations\n3. **Read AGENTS.md** - Understand codebase patterns if it exists\n4. **Implement ONE story** - Only work on that single story\n5. **Run quality checks** - Build, typecheck, run tests\n\n## Critical Rules\n\n### If Checks PASS:\n- Update prd.json: set story status to \"complete\", add \"completed_at\" timestamp\n- Commit changes with message: `feat(scope): US-XXX description`\n- Append what worked to progress.txt\n\n### If Checks FAIL:\n- Do NOT mark the story complete\n- Do NOT commit broken code\n- Append what went wrong to progress.txt (so next iteration can learn)\n\n## Unit Tests are MANDATORY\nEvery story implementation MUST include its unit tests:\n- Tests go in Tests/ directory, mirroring source structure\n- Naming: {ClassName}Tests.swift\n- Target 80% coverage for new code\n\n## Progress Notes Format\nAppend to progress.txt:\n```\n### Iteration N - [Story ID]\n- What was implemented\n- Files changed\n- Learnings for future iterations\n```\n\n{{context}}",
+  "requiredTools": ["file-read", "file-edit", "git"],
+  "version": "1.0.0",
+  "compatibleCLIs": ["claude", "gemini", "codex"],
+  "category": "code",
+  "author": "XRoads Team"
+}
