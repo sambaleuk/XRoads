@@ -41,7 +41,9 @@ run_agent() {
     local prompt="$1"
     local iter_log="$2"
 
-    gemini --sandbox=false -p "$prompt" 2>&1 | tee "$iter_log" | tee /dev/stderr
+    # --sandbox=false allows file system access.
+    # Output is tee'd to the log file and also flows to stdout for PTY capture.
+    gemini --sandbox=false -p "$prompt" 2>&1 | tee "$iter_log"
 }
 
 # ============================================================================

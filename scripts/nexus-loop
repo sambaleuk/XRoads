@@ -41,7 +41,7 @@ run_agent() {
     local prompt="$1"
     local iter_log="$2"
 
-    claude --dangerously-skip-permissions -p "$prompt" 2>&1 | tee "$iter_log" | tee /dev/stderr
+    claude --dangerously-skip-permissions -p "$prompt" 2>&1 | tee "$iter_log"
 }
 
 # ============================================================================

@@ -41,8 +41,10 @@ run_agent() {
     local prompt="$1"
     local iter_log="$2"
 
-    # Codex reads prompt from stdin via `-`
-    printf "%s" "$prompt" | codex --full-auto --cd "$(pwd)" - 2>&1 | tee "$iter_log" | tee /dev/stderr
+    # Use `codex exec` for non-interactive (headless) execution.
+    # The interactive `codex` command requires a TTY and fails with
+    # "Error: stdin is not a terminal" when launched from PTY/pipe.
+    codex exec --full-auto --cd "$(pwd)" "$prompt" 2>&1 | tee "$iter_log"
 }
 
 # ============================================================================
