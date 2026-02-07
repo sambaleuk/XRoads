@@ -344,8 +344,8 @@ XRoads stands on the shoulders of giants:
 
 <div align="center">
 
-**Built with ❤️ by [Neurogrid](https://neurogrid.io)**
+**Built with ❤️ by [Neurogrid](https://neurogrid.me)**
 
-[Website](https://neurogrid.io) · [Documentation](docs/) · [Issues](https://github.com/neurogrid/xroads/issues)
+[Website](https://neurogrid.me) · [Documentation](docs/) · [Issues](https://github.com/neurogrid/xroads/issues)
 
 </div>
