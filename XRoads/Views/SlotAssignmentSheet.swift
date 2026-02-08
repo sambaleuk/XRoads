@@ -776,14 +776,36 @@ struct SlotAssignmentSheet: View {
                 onError: { error in
                     Task { @MainActor in
                         appState.dispatchPhase = .failed
-                        appState.dispatchMessage = "Error: \(error.localizedDescription)"
+                        appState.dispatchMessage = "Dispatch failed: \(error.localizedDescription)"
                         appState.orchestratorVisualState = .concerned
+                        // Also log the error so it's visible in the logs panel
+                        appState.addLog(LogEntry(
+                            level: .error,
+                            source: "dispatcher",
+                            worktree: nil,
+                            message: "Dispatch failed: \(error.localizedDescription)"
+                        ))
                     }
                 }
             )
 
             // Dispatch via unified system
-            _ = try? await appState.services.unifiedDispatcher.dispatch(request, callbacks: callbacks)
+            do {
+                _ = try await appState.services.unifiedDispatcher.dispatch(request, callbacks: callbacks)
+            } catch {
+                // Fallback error handling if dispatch throws before callbacks
+                await MainActor.run {
+                    appState.dispatchPhase = .failed
+                    appState.dispatchMessage = "Dispatch error: \(error.localizedDescription)"
+                    appState.orchestratorVisualState = .concerned
+                    appState.addLog(LogEntry(
+                        level: .error,
+                        source: "dispatcher",
+                        worktree: nil,
+                        message: "Dispatch threw: \(error.localizedDescription)"
+                    ))
+                }
+            }
         }
     }
 }

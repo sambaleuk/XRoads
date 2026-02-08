@@ -412,10 +412,11 @@ actor LoopLauncher {
         ```bash
         STORY_ID="US-001"
         TIMESTAMP=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+        TMPFILE=$(mktemp /tmp/status_update.XXXXXX)
         jq --arg id "$STORY_ID" --arg ts "$TIMESTAMP" \\
           '.stories[$id].status = "complete" | .stories[$id].completedAt = $ts | .updatedAt = $ts' \\
-          "\(statusFilePath)" > /tmp/status_update.json && \\
-          mv /tmp/status_update.json "\(statusFilePath)"
+          "\(statusFilePath)" > "$TMPFILE" && \\
+          mv "$TMPFILE" "\(statusFilePath)"
         ```
 
         **THIS IS MANDATORY** - other agents are polling this file!

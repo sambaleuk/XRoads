@@ -216,7 +216,10 @@ main() {
         consecutive_failures=0
 
         # Check for completion in log
-        if grep -q "$COMPLETION_TOKEN" "$iter_log" 2>/dev/null; then
+        # NOTE: codex exec outputs the full session (prompt + response) to the log.
+        # The prompt itself contains the completion token as an instruction.
+        # Only check the last 30 lines to match the agent's actual response, not the prompt.
+        if tail -30 "$iter_log" | grep -q "$COMPLETION_TOKEN" 2>/dev/null; then
             show_completion_banner "$i" "$feature_name"
             echo -e "${GREEN}All stories complete with passing unit tests!${NC}"
             exit 0

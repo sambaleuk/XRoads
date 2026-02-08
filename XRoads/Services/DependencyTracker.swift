@@ -286,15 +286,26 @@ actor DependencyTracker {
         }
     }
 
-    private func readStatusFile(from path: URL) throws -> OrchestrationStatusFile {
-        if let cached = cachedStatus {
+    private func readStatusFile(from path: URL, forceRefresh: Bool = false) throws -> OrchestrationStatusFile {
+        if !forceRefresh, let cached = cachedStatus {
             return cached
         }
 
         let data = try Data(contentsOf: path)
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode(OrchestrationStatusFile.self, from: data)
+        let status = try decoder.decode(OrchestrationStatusFile.self, from: data)
+        cachedStatus = status
+        return status
+    }
+
+    /// Re-reads status.json from disk (bypassing cache) and unblocks stories whose deps are complete.
+    func refreshAndUnblockStories() throws {
+        guard let path = statusFilePath else { return }
+        var statusFile = try readStatusFile(from: path, forceRefresh: true)
+        updateBlockedStories(&statusFile)
+        try writeStatusFile(statusFile, to: path)
+        cachedStatus = statusFile
     }
 
     private func writeStatusFile(_ statusFile: OrchestrationStatusFile, to path: URL) throws {

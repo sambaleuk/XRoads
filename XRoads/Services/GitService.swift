@@ -216,10 +216,37 @@ actor GitService {
         try await runGit(arguments: ["reset", "--hard", reference], currentDirectory: repoPath)
     }
 
+    /// Checks if a local branch exists
+    func branchExists(name: String, repoPath: String) async -> Bool {
+        if testMode { return false }
+        do {
+            let output = try await runGit(
+                arguments: ["branch", "--list", name],
+                currentDirectory: repoPath
+            )
+            return !output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        } catch {
+            return false
+        }
+    }
+
     /// Deletes a local branch
     func deleteBranch(name: String, repoPath: String, force: Bool = false) async throws {
         let flag = force ? "-D" : "-d"
         try await runGit(arguments: ["branch", flag, name], currentDirectory: repoPath)
+    }
+
+    /// Creates a worktree from an existing branch (without -b flag)
+    func addWorktreeFromBranch(repoPath: String, branch: String, worktreePath: String) async throws {
+        try await runGit(
+            arguments: ["worktree", "add", worktreePath, branch],
+            currentDirectory: repoPath
+        )
+    }
+
+    /// Prunes stale worktree entries (e.g. after manual deletion of worktree directories)
+    func pruneWorktrees(repoPath: String) async throws {
+        try await runGit(arguments: ["worktree", "prune"], currentDirectory: repoPath)
     }
 
     /// Lists files currently in conflict

@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import os
 
 // MARK: - Dispatch State
 
@@ -116,42 +117,50 @@ actor LayeredDispatcher {
         do {
             // Phase 1: Initialize
             currentPhase = .preparingWorktrees
-            emitProgress("Preparing worktrees...")
+            emitProgress("Phase 1/6: Calculating dependency layers...")
 
             // Calculate dependency layers
             layers = await loopLauncher.calculateDependencyLayers(stories: prd.userStories)
                 .map { $0.storyIds }
+            emitProgress("Computed \(layers.count) dependency layer(s) with \(prd.userStories.count) stories")
 
             // Initialize status file
             let sessionId = UUID()
+            emitProgress("Phase 1/6: Creating status file...")
             statusFilePath = try await loopLauncher.initializeSession(
                 repoPath: repoPath,
                 sessionId: sessionId,
                 prd: prd
             )
+            emitProgress("Status file created at \(statusFilePath?.lastPathComponent ?? "unknown")")
 
             // Phase 2: Create all worktrees upfront
+            emitProgress("Phase 2/6: Creating \(slotAssignments.count) worktrees...")
             try await createAllWorktrees(slotAssignments: slotAssignments)
 
             // Phase 3: Validate worktrees
             currentPhase = .validatingWorktrees
-            emitProgress("Validating worktrees...")
+            emitProgress("Phase 3/6: Validating worktrees...")
             try await validateWorktrees()
 
             // Phase 4: Start monitoring
+            emitProgress("Phase 4/6: Starting status monitor...")
             await startStatusMonitor()
 
             // Phase 5: Launch first layer
             currentPhase = .launchingLayer
             currentLayerIndex = 0
+            emitProgress("Phase 5/6: Launching layer 1/\(layers.count)...")
             try await launchCurrentLayer()
 
             // Phase 6: Now in monitoring mode
             currentPhase = .monitoring
-            emitProgress("Monitoring progress...")
+            emitProgress("Phase 6/6: All slots launched. Monitoring progress...")
 
         } catch {
             currentPhase = .failed
+            Log.dispatcher.error("Dispatch failed: \(error.localizedDescription)")
+            emitProgress("DISPATCH FAILED: \(error.localizedDescription)")
             onError(error)
         }
     }
@@ -210,14 +219,15 @@ actor LayeredDispatcher {
                 status: .pending
             )
 
-            // Create worktree (LoopLauncher handles this internally when launching,
-            // but we want to pre-create for validation)
+            // Create worktree with robust recovery from previous dispatch attempts
             let worktreePath = config.worktreePath
             let gitFile = worktreePath.appendingPathComponent(".git")
 
-            // Check if it's a real worktree (has .git file) vs just an empty directory
-            if !FileManager.default.fileExists(atPath: gitFile.path) {
-                // Remove any existing empty directory first
+            if FileManager.default.fileExists(atPath: gitFile.path) {
+                // Worktree already exists and is valid — reuse it
+                emitProgress("Reusing existing worktree for slot \(slotNumber)")
+            } else {
+                // Remove any existing empty/broken directory
                 if FileManager.default.fileExists(atPath: worktreePath.path) {
                     try? FileManager.default.removeItem(at: worktreePath)
                 }
@@ -228,11 +238,30 @@ actor LayeredDispatcher {
                     withIntermediateDirectories: true
                 )
 
-                try await gitService.createWorktree(
-                    repoPath: repoPath.path,
-                    branch: branchName,
-                    worktreePath: worktreePath.path
+                // Check if branch already exists from a previous dispatch attempt
+                let branchAlreadyExists = await gitService.branchExists(
+                    name: branchName,
+                    repoPath: repoPath.path
                 )
+
+                if branchAlreadyExists {
+                    // Branch exists but worktree doesn't — clean up stale branch
+                    // and prune any orphaned worktree registrations first
+                    emitProgress("Cleaning up stale branch '\(branchName)' from previous dispatch")
+                    try? await gitService.deleteBranch(name: branchName, repoPath: repoPath.path, force: true)
+                    try? await gitService.pruneWorktrees(repoPath: repoPath.path)
+                }
+
+                do {
+                    try await gitService.createWorktree(
+                        repoPath: repoPath.path,
+                        branch: branchName,
+                        worktreePath: worktreePath.path
+                    )
+                } catch {
+                    emitProgress("ERROR: Failed to create worktree for slot \(slotNumber): \(error.localizedDescription)")
+                    throw error
+                }
             }
 
             info.status = .worktreeCreated
@@ -286,6 +315,48 @@ actor LayeredDispatcher {
         Log.dispatcher.info("Story completed: \(event.storyId)")
         completedStoryIds.insert(event.storyId)
         emitProgress("Story \(event.storyId) completed! ✅")
+
+        // Unblock dependent stories in status.json so agents see "ready" instead of "blocked"
+        await unblockReadyStories()
+    }
+
+    /// Re-reads status.json from disk, transitions blocked→ready for stories whose deps are all complete, writes back.
+    private func unblockReadyStories() async {
+        guard let path = statusFilePath else { return }
+
+        do {
+            let data = try Data(contentsOf: path)
+            let decoder = JSONDecoder()
+            decoder.dateDecodingStrategy = .iso8601
+            var statusFile = try decoder.decode(OrchestrationStatusFile.self, from: data)
+
+            var unblocked: [String] = []
+            for (storyId, var story) in statusFile.stories {
+                if story.status == .blocked {
+                    let depsComplete = story.dependsOn.allSatisfy { depId in
+                        statusFile.stories[depId]?.status == .complete
+                    }
+                    if depsComplete {
+                        story.status = .ready
+                        statusFile.stories[storyId] = story
+                        unblocked.append(storyId)
+                    }
+                }
+            }
+
+            if !unblocked.isEmpty {
+                statusFile.updatedAt = Date()
+                let encoder = JSONEncoder()
+                encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+                encoder.dateEncodingStrategy = .iso8601
+                let updatedData = try encoder.encode(statusFile)
+                try updatedData.write(to: path, options: .atomic)
+                Log.dispatcher.info("Unblocked \(unblocked.count) stories: \(unblocked.joined(separator: ", "))")
+                emitProgress("Unblocked stories: \(unblocked.joined(separator: ", "))")
+            }
+        } catch {
+            Log.dispatcher.error("Failed to unblock stories: \(error)")
+        }
     }
 
     private func handleLayerComplete(_ event: LayerCompletionEvent) async {
@@ -433,6 +504,8 @@ actor LayeredDispatcher {
     // MARK: - Private: Progress
 
     private func emitProgress(_ message: String) {
+        Log.dispatcher.info("\(message)")
+
         let totalStories = prd?.userStories.count ?? 0
 
         let progress = DispatchProgress(
