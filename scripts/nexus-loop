@@ -175,6 +175,7 @@ main() {
     echo ""
 
     local consecutive_failures=0
+    local rate_limit_count=0
 
     for ((i=1; i<=MAX_ITERATIONS; i++)); do
         pending=$(prd_count_pending)
@@ -205,11 +206,21 @@ main() {
         if [ $exit_code -ne 0 ]; then
             # Check if failure was due to rate limiting
             if detect_rate_limit "$iter_log"; then
-                handle_rate_limit
-                # Don't count rate limits as consecutive failures (they're transient)
-                # Still auto-commit any partial work done before the rate limit hit
+                rate_limit_count=$((rate_limit_count + 1))
+                log_warn "Rate limit hit ($rate_limit_count/$RATE_LIMIT_FAILOVER_THRESHOLD)"
+
+                # Auto-commit partial work before any cooldown/failover
                 restore_loop_files
                 auto_commit_if_needed
+
+                # Threshold reached → request agent failover from orchestrator
+                if [ $rate_limit_count -ge $RATE_LIMIT_FAILOVER_THRESHOLD ]; then
+                    log_error "Rate limit threshold reached. Requesting agent failover..."
+                    exit $RATE_LIMIT_FAILOVER_EXIT
+                fi
+
+                # Below threshold → cooldown and retry
+                handle_rate_limit
                 continue
             fi
 

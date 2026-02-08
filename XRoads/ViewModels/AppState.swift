@@ -620,13 +620,23 @@ final class AppState {
         }
 
         // Update slot status based on exit code
+        let isFailover = exitCode == 42  // Agent failover requested (rate-limit threshold)
         if exitCode == 0 {
             terminalSlots[index].status = .completed
             terminalSlots[index].addLog(LogEntry(
                 level: .info,
                 source: "system",
                 worktree: terminalSlots[index].worktree?.path,
-                message: "✅ Loop completed successfully"
+                message: "Loop completed successfully"
+            ))
+        } else if isFailover {
+            // Don't mark as error — LayeredDispatcher will relaunch with alternate agent
+            terminalSlots[index].status = .starting
+            terminalSlots[index].addLog(LogEntry(
+                level: .warn,
+                source: "system",
+                worktree: terminalSlots[index].worktree?.path,
+                message: "Agent rate-limited — failover in progress..."
             ))
         } else {
             terminalSlots[index].status = .error
@@ -634,17 +644,17 @@ final class AppState {
                 level: .error,
                 source: "system",
                 worktree: terminalSlots[index].worktree?.path,
-                message: "❌ Loop failed with exit code \(exitCode)"
+                message: "Loop failed with exit code \(exitCode)"
             ))
         }
 
-        // Clear process ID
+        // Clear process ID (will be re-set if failover relaunches)
         terminalSlots[index].processId = nil
 
         // Add to global logs
-        let status = exitCode == 0 ? "completed" : "failed (code \(exitCode))"
+        let status = exitCode == 0 ? "completed" : isFailover ? "failover requested" : "failed (code \(exitCode))"
         addLog(LogEntry(
-            level: exitCode == 0 ? .info : .error,
+            level: exitCode == 0 ? .info : isFailover ? .warn : .error,
             source: "slot-\(slotNumber)",
             worktree: terminalSlots[index].worktree?.path,
             message: "Loop \(status)"
@@ -2116,7 +2126,13 @@ final class AppState {
 
     /// Triggers merge coordination after all agents complete
     func completeOrchestration() async {
-        guard isOrchestrating, !activeWorktreeAssignments.isEmpty else { return }
+        guard isOrchestrating, !activeWorktreeAssignments.isEmpty else {
+            addLog(LogEntry(
+                level: .warn, source: "orchestrator", worktree: nil,
+                message: "completeOrchestration() skipped: isOrchestrating=\(isOrchestrating), assignments=\(activeWorktreeAssignments.count)"
+            ))
+            return
+        }
 
         orchestrationState = .merging
         addLog(LogEntry(level: .info, source: "orchestrator", worktree: nil, message: "Starting merge coordination..."))

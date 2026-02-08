@@ -26,13 +26,14 @@ enum DispatchPhase: String, Sendable {
 struct SlotLaunchInfo: Sendable, Identifiable {
     let id: UUID
     let slotNumber: Int
-    let agentType: AgentType
+    var agentType: AgentType
     let actionType: ActionType  // Role/action for this slot
     let storyIds: [String]
     let worktreePath: URL
     let branchName: String
     var processId: UUID?
     var status: SlotLaunchStatus
+    var failoverAttempts: Int = 0  // Track how many failovers this slot has had
 
     enum SlotLaunchStatus: String, Sendable {
         case pending
@@ -532,22 +533,66 @@ actor LayeredDispatcher {
         return processId
     }
 
+    /// Exit code used by loop scripts to request agent failover (rate-limit threshold exceeded)
+    private static let failoverExitCode: Int32 = 42
+
     /// Handle slot termination and update internal state
     private func handleSlotTermination(slotNumber: Int, exitCode: Int32) async {
         guard var info = slotInfos[slotNumber] else { return }
 
-        // Update slot status based on exit code
-        if exitCode == 0 {
+        info.processId = nil
+
+        // Check for failover request (exit code 42 = rate-limited, needs different agent)
+        if exitCode == Self.failoverExitCode {
+            let originalAgent = info.agentType
+            let alternatives = originalAgent.failoverAlternatives
+
+            // Find an alternative that hasn't already been tried on this slot
+            let triedAgents = info.failoverAttempts
+            if triedAgents < alternatives.count {
+                let newAgent = alternatives[triedAgents]
+                info.agentType = newAgent
+                info.failoverAttempts += 1
+                info.status = .launching
+                slotInfos[slotNumber] = info
+                onSlotUpdate?(info)
+
+                emitProgress("Slot \(slotNumber): \(originalAgent.displayName) rate-limited → failing over to \(newAgent.displayName)")
+                Log.dispatcher.info("Agent failover: slot \(slotNumber) \(originalAgent.rawValue) → \(newAgent.rawValue) (attempt \(info.failoverAttempts))")
+
+                // Relaunch slot with new agent
+                do {
+                    let processId = try await launchSlot(slotNumber: slotNumber)
+                    info.processId = processId
+                    info.status = .running
+                    slotInfos[slotNumber] = info
+                    onSlotUpdate?(info)
+                    emitProgress("Slot \(slotNumber) now running with \(newAgent.displayName)")
+                    return  // Don't fall through to completion checks
+                } catch {
+                    info.status = .failed
+                    slotInfos[slotNumber] = info
+                    onSlotUpdate?(info)
+                    Log.dispatcher.error("Failover launch failed for slot \(slotNumber): \(error)")
+                    emitProgress("Slot \(slotNumber) failover failed: \(error.localizedDescription) ❌")
+                }
+            } else {
+                info.status = .failed
+                slotInfos[slotNumber] = info
+                onSlotUpdate?(info)
+                emitProgress("Slot \(slotNumber): all agents exhausted after \(triedAgents) failovers ❌")
+            }
+        } else if exitCode == 0 {
             info.status = .completed
+            slotInfos[slotNumber] = info
+            onSlotUpdate?(info)
             emitProgress("Slot \(slotNumber) completed successfully ✅")
         } else {
             info.status = .failed
+            slotInfos[slotNumber] = info
+            onSlotUpdate?(info)
             emitProgress("Slot \(slotNumber) failed with code \(exitCode) ❌")
         }
-
-        info.processId = nil
-        slotInfos[slotNumber] = info
-        onSlotUpdate?(info)
 
         // Check if all slots are done
         let allDone = slotInfos.values.allSatisfy {

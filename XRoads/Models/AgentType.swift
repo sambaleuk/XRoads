@@ -58,4 +58,13 @@ enum AgentType: String, Codable, Hashable, Sendable, CaseIterable {
         case .codex: return "codex-loop"
         }
     }
+
+    /// Ordered failover alternatives when this agent is rate-limited
+    var failoverAlternatives: [AgentType] {
+        switch self {
+        case .claude: return [.gemini, .codex]
+        case .gemini: return [.claude, .codex]
+        case .codex: return [.claude, .gemini]
+        }
+    }
 }

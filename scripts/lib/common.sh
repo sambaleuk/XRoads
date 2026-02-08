@@ -284,6 +284,8 @@ sync_prd_to_status() {
 # 429 in the log, the API has been hammered for minutes already.
 
 RATE_LIMIT_COOLDOWN=${RATE_LIMIT_COOLDOWN:-60}  # seconds to wait after rate limit
+RATE_LIMIT_FAILOVER_EXIT=42                     # special exit code: request agent failover
+RATE_LIMIT_FAILOVER_THRESHOLD=${RATE_LIMIT_FAILOVER_THRESHOLD:-3}  # consecutive rate limits before failover
 
 detect_rate_limit() {
     local log_file="$1"

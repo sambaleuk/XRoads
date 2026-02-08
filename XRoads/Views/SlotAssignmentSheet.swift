@@ -690,6 +690,40 @@ struct SlotAssignmentSheet: View {
         appState.dispatchPhase = .preparingWorktrees
         appState.dispatchMessage = "Preparing worktrees..."
 
+        // Build WorktreeAssignments so completeOrchestration() can merge after dispatch
+        var worktreeAssignments: [WorktreeAssignment] = []
+        for (slot, assignment) in assignments {
+            let worktreePath = WorktreePathResolver.resolve(
+                repoPath: repoPath,
+                slotNumber: slot,
+                agentType: assignment.agentType,
+                storyIds: assignment.storyIds
+            )
+            let branchName = WorktreePathResolver.branchName(
+                slotNumber: slot,
+                agentType: assignment.agentType,
+                storyIds: assignment.storyIds
+            )
+            let taskGroup = TaskGroup(
+                id: "slot-\(slot)",
+                preferredAgent: assignment.agentType,
+                storyIds: assignment.storyIds,
+                estimatedComplexity: assignment.storyIds.count
+            )
+            worktreeAssignments.append(WorktreeAssignment(
+                id: UUID(),
+                taskGroup: taskGroup,
+                agentType: assignment.agentType,
+                branchName: branchName,
+                worktreePath: worktreePath
+            ))
+        }
+
+        // Set orchestration state so completeOrchestration() guard passes after dispatch
+        appState.orchestrationRepoPath = repoPath
+        appState.activeWorktreeAssignments = worktreeAssignments
+        appState.orchestrationState = .monitoring
+
         // Close the sheet - progress will show in dashboard
         dismiss()
         onComplete?()
@@ -717,8 +751,11 @@ struct SlotAssignmentSheet: View {
                 },
                 onSlotUpdate: { info in
                     Task { @MainActor in
-                        // Update terminal slot status based on dispatch info
+                        // Update terminal slot status and agent type (may change on failover)
                         if let index = appState.terminalSlots.firstIndex(where: { $0.slotNumber == info.slotNumber }) {
+                            // Sync agent type (changes during failover)
+                            appState.terminalSlots[index].agentType = info.agentType
+
                             switch info.status {
                             case .pending:
                                 appState.terminalSlots[index].status = .configuring
