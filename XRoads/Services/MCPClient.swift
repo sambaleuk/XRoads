@@ -528,7 +528,11 @@ actor MCPClient {
 
         // Candidate paths to check
         let candidates: [String] = [
-            // 0. Search up from executable path (most reliable — independent of CWD)
+            // 0. App bundle Resources (for .app distribution via DMG)
+            Bundle.main.resourcePath.map {
+                ($0 as NSString).appendingPathComponent("xroads-mcp")
+            } ?? "",
+            // 1. Search up from executable path (most reliable — independent of CWD)
             {
                 guard let execPath = Bundle.main.executablePath else { return "" }
                 var path = (execPath as NSString).deletingLastPathComponent

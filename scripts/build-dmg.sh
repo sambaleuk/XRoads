@@ -136,6 +136,28 @@ if [[ -d "$SPM_RESOURCES" ]]; then
     echo "  Copied SPM resource bundle"
 fi
 
+# Copy MCP server (build if needed)
+MCP_SRC="$PROJECT_ROOT/xroads-mcp"
+MCP_DIST="$MCP_SRC/dist/index.js"
+if [[ -d "$MCP_SRC" ]]; then
+    if [[ ! -f "$MCP_DIST" ]]; then
+        echo "  Building MCP server..."
+        (cd "$MCP_SRC" && npm install --silent && npm run build --silent)
+    fi
+    if [[ -f "$MCP_DIST" ]]; then
+        mkdir -p "$RESOURCES_DIR/xroads-mcp/dist"
+        cp "$MCP_DIST" "$RESOURCES_DIR/xroads-mcp/dist/index.js"
+        # Copy package.json for Node to resolve dependencies
+        cp "$MCP_SRC/package.json" "$RESOURCES_DIR/xroads-mcp/"
+        if [[ -d "$MCP_SRC/node_modules" ]]; then
+            cp -R "$MCP_SRC/node_modules" "$RESOURCES_DIR/xroads-mcp/"
+        fi
+        echo "  Copied MCP server to bundle"
+    else
+        echo "  WARNING: MCP server build failed, dist/index.js not found"
+    fi
+fi
+
 echo "  Bundle: $APP_BUNDLE"
 
 # ---------------------------------------------------------------------------

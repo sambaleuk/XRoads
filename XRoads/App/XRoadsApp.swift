@@ -22,10 +22,13 @@ public struct XRoadsApp: App {
                     // Store reference for cleanup
                     appDelegate.appState = appState
 
-                    // Initialize project path to current working directory
+                    // Initialize project path from saved preference, not cwd
                     Task {
-                        let cwd = FileManager.default.currentDirectoryPath
-                        await appState.setProjectPath(cwd)
+                        let saved = AppSettings.shared.defaultRepoPath
+                        if !saved.isEmpty && FileManager.default.fileExists(atPath: saved) {
+                            await appState.setProjectPath(saved)
+                        }
+                        // If no saved path, leave projectPath nil — user picks via UI
                     }
                 }
         }

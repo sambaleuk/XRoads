@@ -1657,9 +1657,13 @@ final class AppState {
         return newPath
     }
 
-    /// Sets the project path and checks git status
+    /// Sets the project path, persists it, and checks git status
     func setProjectPath(_ path: String) async {
         await MainActor.run { self.projectPath = path }
+
+        // Persist as default so the app reopens this repo next launch
+        AppSettings.shared.defaultRepoPath = path
+
         await checkGitRepositoryStatus()
 
         // Also load recent commits if it's a git repo
