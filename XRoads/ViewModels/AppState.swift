@@ -1885,6 +1885,63 @@ final class AppState {
         )
     }
 
+    /// Runs a post-merge build/test validation to catch integration issues.
+    /// Returns true if validation passed, false if there were issues.
+    private func runPostMergeValidation(repoPath: URL) async -> Bool {
+        let fm = FileManager.default
+        let path = repoPath.path
+
+        // Detect project type and determine build command
+        let buildCommand: (executable: String, arguments: [String])
+
+        if fm.fileExists(atPath: repoPath.appendingPathComponent("package.json").path) {
+            // Node.js project — run npm install + npm run build
+            buildCommand = ("/usr/bin/env", ["npm", "run", "build"])
+            addLog(LogEntry(level: .info, source: "orchestrator", worktree: nil,
+                            message: "Detected Node.js project, running: npm run build"))
+        } else if fm.fileExists(atPath: repoPath.appendingPathComponent("Package.swift").path) {
+            // Swift project
+            buildCommand = ("/usr/bin/env", ["swift", "build"])
+            addLog(LogEntry(level: .info, source: "orchestrator", worktree: nil,
+                            message: "Detected Swift project, running: swift build"))
+        } else if fm.fileExists(atPath: repoPath.appendingPathComponent("Cargo.toml").path) {
+            // Rust project
+            buildCommand = ("/usr/bin/env", ["cargo", "build"])
+            addLog(LogEntry(level: .info, source: "orchestrator", worktree: nil,
+                            message: "Detected Rust project, running: cargo build"))
+        } else if fm.fileExists(atPath: repoPath.appendingPathComponent("pubspec.yaml").path) {
+            // Flutter/Dart project
+            buildCommand = ("/usr/bin/env", ["flutter", "build"])
+            addLog(LogEntry(level: .info, source: "orchestrator", worktree: nil,
+                            message: "Detected Flutter project, running: flutter build"))
+        } else {
+            addLog(LogEntry(level: .info, source: "orchestrator", worktree: nil,
+                            message: "No known build system detected, skipping post-merge validation"))
+            return true
+        }
+
+        do {
+            let result = try await services.processRunner.execute(
+                executable: buildCommand.executable,
+                arguments: buildCommand.arguments,
+                currentDirectory: path
+            )
+            let success = result.exitCode == 0
+            if success {
+                addLog(LogEntry(level: .info, source: "orchestrator", worktree: nil,
+                                message: "Post-merge build succeeded"))
+            } else {
+                addLog(LogEntry(level: .warn, source: "orchestrator", worktree: nil,
+                                message: "Post-merge build failed (exit \(result.exitCode)): \(String(result.stderr.prefix(500)))"))
+            }
+            return success
+        } catch {
+            addLog(LogEntry(level: .warn, source: "orchestrator", worktree: nil,
+                            message: "Post-merge validation error: \(error.localizedDescription)"))
+            return false
+        }
+    }
+
     private func cleanupPostOrchestration(assignments: [WorktreeAssignment], repoPath: URL) async {
         addLog(LogEntry(level: .info, source: "orchestrator", worktree: nil,
                         message: "Cleaning up \(assignments.count) worktrees..."))
@@ -2077,8 +2134,16 @@ final class AppState {
             mergeResult = result
 
             if result.conflicts.isEmpty {
+                addLog(LogEntry(level: .info, source: "orchestrator", worktree: nil, message: "Merge complete! Merged \(result.mergedBranches.count) branches. Running post-merge validation..."))
+
+                // Post-merge integration validation
+                let validationPassed = await runPostMergeValidation(repoPath: repoPath)
+
                 orchestrationState = .complete
-                addLog(LogEntry(level: .info, source: "orchestrator", worktree: nil, message: "Orchestration complete! Merged \(result.mergedBranches.count) branches"))
+                addLog(LogEntry(level: .info, source: "orchestrator", worktree: nil,
+                    message: validationPassed
+                        ? "Post-merge validation passed"
+                        : "Post-merge validation had issues (see logs). Merge is committed — review may be needed."))
 
                 // Save to history
                 let record = buildOrchestrationRecord(baseBranch: result.baseBranch, result: result)

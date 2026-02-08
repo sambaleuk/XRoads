@@ -368,12 +368,59 @@ actor LayeredDispatcher {
         // Launch next layer if there are stories ready
         if !event.nextLayerStories.isEmpty {
             currentPhase = .launchingLayer
+
+            // Merge completed branches into next layer worktrees so agents get prior work
+            await mergeCompletedBranchesIntoNextLayer()
+
             do {
                 try await launchCurrentLayer()
                 currentPhase = .monitoring
             } catch {
                 onError?(error)
             }
+        }
+    }
+
+    /// Merges all completed slot branches into each pending slot's worktree.
+    /// This ensures next-layer agents have code from prior layers.
+    private func mergeCompletedBranchesIntoNextLayer() async {
+        let completedBranches = slotInfos.values
+            .filter { $0.status == .completed }
+            .map { $0.branchName }
+
+        guard !completedBranches.isEmpty else { return }
+
+        // Determine which slots are about to launch in the next layer
+        let nextLayerStoryIds = currentLayerIndex < layers.count ? layers[currentLayerIndex] : []
+        let pendingSlots = slotInfos.filter { (_, info) in
+            info.status == .worktreeCreated || info.status == .pending
+        }.filter { (_, info) in
+            info.storyIds.contains(where: { nextLayerStoryIds.contains($0) })
+        }
+
+        for (slotNumber, info) in pendingSlots {
+            let worktreePath = info.worktreePath.path
+
+            for branch in completedBranches {
+                do {
+                    try await gitService.merge(
+                        branch: branch,
+                        repoPath: worktreePath,
+                        noCommit: false,
+                        noFastForward: true
+                    )
+                    Log.dispatcher.info("Merged \(branch) into slot \(slotNumber)")
+                } catch {
+                    // If merge fails (conflict), abort and log — agent will work from base
+                    try? await gitService.abortMerge(repoPath: worktreePath)
+                    Log.dispatcher.warning("Could not merge \(branch) into slot \(slotNumber): \(error.localizedDescription). Agent will work from base branch.")
+                    emitProgress("Warning: auto-merge of \(branch) into slot \(slotNumber) had conflicts, skipping")
+                }
+            }
+        }
+
+        if !pendingSlots.isEmpty {
+            emitProgress("Merged \(completedBranches.count) completed branch(es) into \(pendingSlots.count) next-layer slot(s)")
         }
     }
 

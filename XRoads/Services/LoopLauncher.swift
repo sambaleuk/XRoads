@@ -319,7 +319,12 @@ actor LoopLauncher {
         let agentPath = worktreePath.appendingPathComponent("AGENT.md")
         try? agentMd.write(to: agentPath, atomically: true, encoding: .utf8)
 
-        // 3. Create progress.txt
+        // 3. Add loop files to .gitignore so they don't create merge conflicts
+        let gitignorePath = worktreePath.appendingPathComponent(".gitignore")
+        let loopIgnoreEntries = ["prd.json", "progress.txt", "AGENT.md", ".xroads-backup/", "logs/"]
+        appendToGitignore(at: gitignorePath, entries: loopIgnoreEntries)
+
+        // 4. Create progress.txt
         let progressPath = worktreePath.appendingPathComponent("progress.txt")
         if !fileManager.fileExists(atPath: progressPath.path) {
             let progressContent = """
@@ -346,6 +351,21 @@ actor LoopLauncher {
 
             """
             try? progressContent.write(to: progressPath, atomically: true, encoding: .utf8)
+        }
+    }
+
+    /// Appends entries to a .gitignore file, creating it if necessary, skipping entries already present.
+    private func appendToGitignore(at path: URL, entries: [String]) {
+        var existing = (try? String(contentsOf: path, encoding: .utf8)) ?? ""
+        let existingLines = Set(existing.components(separatedBy: .newlines))
+        var added = false
+        for entry in entries where !existingLines.contains(entry) {
+            if !existing.hasSuffix("\n") && !existing.isEmpty { existing += "\n" }
+            existing += entry + "\n"
+            added = true
+        }
+        if added {
+            try? existing.write(to: path, atomically: true, encoding: .utf8)
         }
     }
 

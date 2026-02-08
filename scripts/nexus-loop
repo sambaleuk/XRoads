@@ -222,6 +222,9 @@ main() {
         # (agents may be sandboxed and unable to write status.json directly)
         sync_prd_to_status
 
+        # Auto-commit any uncommitted changes the agent left behind
+        auto_commit_if_needed
+
         # Check for completion in log
         if grep -q "$COMPLETION_TOKEN" "$iter_log" 2>/dev/null; then
             show_completion_banner "$i" "$feature_name"

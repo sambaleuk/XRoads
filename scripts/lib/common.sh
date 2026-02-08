@@ -276,6 +276,51 @@ sync_prd_to_status() {
 }
 
 # ============================================================================
+# AUTO-COMMIT
+# ============================================================================
+# After each iteration, commit any uncommitted changes the agent left behind.
+# Some agents (e.g., Gemini) may implement code but forget to git commit.
+# Loop files (prd.json, progress.txt, AGENT.md) are .gitignored so they
+# won't pollute the commit.
+
+auto_commit_if_needed() {
+    # Check if we're in a git repo
+    if ! git rev-parse --is-inside-work-tree &>/dev/null; then
+        return 0
+    fi
+
+    # Check for uncommitted changes (tracked files only)
+    if git diff --quiet HEAD 2>/dev/null && git diff --cached --quiet HEAD 2>/dev/null; then
+        # No changes to tracked files, check for untracked files (excluding loop files)
+        local untracked
+        untracked=$(git ls-files --others --exclude-standard 2>/dev/null | head -1)
+        if [[ -z "$untracked" ]]; then
+            return 0
+        fi
+    fi
+
+    # Stage all changes (respects .gitignore)
+    git add -A 2>/dev/null || return 0
+
+    # Check if there's actually anything staged
+    if git diff --cached --quiet HEAD 2>/dev/null; then
+        return 0
+    fi
+
+    # Get current story ID from prd.json for commit message
+    local story_id="unknown"
+    if [[ -f "$PRD_FILE" ]]; then
+        story_id=$(jq -r '[.user_stories[] | select(.status == "complete")] | last | .id // "WIP"' "$PRD_FILE" 2>/dev/null || echo "WIP")
+    fi
+
+    # Commit with descriptive message
+    git commit -m "feat: auto-commit after iteration ($story_id)" --no-verify 2>/dev/null
+    if [[ $? -eq 0 ]]; then
+        log_info "Auto-committed changes (story: $story_id)"
+    fi
+}
+
+# ============================================================================
 # BANNER
 # ============================================================================
 show_nexus_banner() {

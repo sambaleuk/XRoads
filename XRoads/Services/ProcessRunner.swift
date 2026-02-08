@@ -311,6 +311,61 @@ actor ProcessRunner {
         }
     }
 
+    // MARK: - Run to Completion
+
+    /// Result of a completed process execution
+    struct ExecutionResult: Sendable {
+        let exitCode: Int32
+        let stdout: String
+        let stderr: String
+    }
+
+    /// Runs a command to completion and returns the result.
+    /// Unlike `launch()`, this waits for the process to finish.
+    func execute(
+        executable: String,
+        arguments: [String] = [],
+        currentDirectory: String,
+        environment: [String: String]? = nil
+    ) async throws -> ExecutionResult {
+        if testMode {
+            return ExecutionResult(exitCode: 0, stdout: "", stderr: "")
+        }
+
+        return try await withCheckedThrowingContinuation { continuation in
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: executable)
+            process.arguments = arguments
+            process.currentDirectoryURL = URL(fileURLWithPath: currentDirectory)
+
+            if let environment { process.environment = environment }
+
+            let stdoutPipe = Pipe()
+            let stderrPipe = Pipe()
+            process.standardOutput = stdoutPipe
+            process.standardError = stderrPipe
+
+            process.terminationHandler = { proc in
+                let stdoutData = stdoutPipe.fileHandleForReading.readDataToEndOfFile()
+                let stderrData = stderrPipe.fileHandleForReading.readDataToEndOfFile()
+                continuation.resume(returning: ExecutionResult(
+                    exitCode: proc.terminationStatus,
+                    stdout: String(data: stdoutData, encoding: .utf8) ?? "",
+                    stderr: String(data: stderrData, encoding: .utf8) ?? ""
+                ))
+            }
+
+            do {
+                try process.run()
+            } catch {
+                continuation.resume(throwing: ProcessError.launchFailed(
+                    executable: executable,
+                    reason: error.localizedDescription
+                ))
+            }
+        }
+    }
+
     // MARK: - Private Methods
 
     /// Sets up an output handler for a pipe
