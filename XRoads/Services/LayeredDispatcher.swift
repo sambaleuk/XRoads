@@ -499,6 +499,9 @@ actor LayeredDispatcher {
 
         let stories = prd.userStories.filter { info.storyIds.contains($0.id) }
 
+        // On failover, reuse the existing worktree instead of computing a new path
+        let worktreeOverride: URL? = info.failoverAttempts > 0 ? info.worktreePath : nil
+
         let config = LoopConfiguration(
             slotNumber: slotNumber,
             agentType: info.agentType,
@@ -507,7 +510,8 @@ actor LayeredDispatcher {
             stories: stories,
             fullPRD: prd,
             actionType: info.actionType,
-            statusFilePath: statusFilePath
+            statusFilePath: statusFilePath,
+            worktreePathOverride: worktreeOverride
         )
 
         // Capture the callbacks to avoid actor isolation issues
@@ -536,8 +540,12 @@ actor LayeredDispatcher {
     /// Exit code used by loop scripts to request agent failover (rate-limit threshold exceeded)
     private static let failoverExitCode: Int32 = 42
 
+
+
     /// Handle slot termination and update internal state
     private func handleSlotTermination(slotNumber: Int, exitCode: Int32) async {
+        Log.dispatcher.info("Slot \(slotNumber) terminated with exit code \(exitCode)")
+
         guard var info = slotInfos[slotNumber] else { return }
 
         info.processId = nil
@@ -549,6 +557,7 @@ actor LayeredDispatcher {
 
             // Find an alternative that hasn't already been tried on this slot
             let triedAgents = info.failoverAttempts
+            Log.dispatcher.info("Failover requested: agent=\(originalAgent.rawValue) alternatives=\(alternatives.map(\.rawValue)) tried=\(triedAgents)")
             if triedAgents < alternatives.count {
                 let newAgent = alternatives[triedAgents]
                 info.agentType = newAgent
@@ -558,7 +567,7 @@ actor LayeredDispatcher {
                 onSlotUpdate?(info)
 
                 emitProgress("Slot \(slotNumber): \(originalAgent.displayName) rate-limited → failing over to \(newAgent.displayName)")
-                Log.dispatcher.info("Agent failover: slot \(slotNumber) \(originalAgent.rawValue) → \(newAgent.rawValue) (attempt \(info.failoverAttempts))")
+                Log.dispatcher.info("Failover: slot \(slotNumber) \(originalAgent.rawValue) → \(newAgent.rawValue)")
 
                 // Relaunch slot with new agent
                 do {
@@ -567,16 +576,19 @@ actor LayeredDispatcher {
                     info.status = .running
                     slotInfos[slotNumber] = info
                     onSlotUpdate?(info)
+                    Log.dispatcher.info("Failover: slot \(slotNumber) relaunched with \(newAgent.rawValue)")
                     emitProgress("Slot \(slotNumber) now running with \(newAgent.displayName)")
                     return  // Don't fall through to completion checks
                 } catch {
                     info.status = .failed
                     slotInfos[slotNumber] = info
                     onSlotUpdate?(info)
+                    Log.dispatcher.error("Failover launch failed: \(error)")
                     Log.dispatcher.error("Failover launch failed for slot \(slotNumber): \(error)")
                     emitProgress("Slot \(slotNumber) failover failed: \(error.localizedDescription) ❌")
                 }
             } else {
+                Log.dispatcher.warning("All failover agents exhausted for slot \(slotNumber) (tried=\(triedAgents))")
                 info.status = .failed
                 slotInfos[slotNumber] = info
                 onSlotUpdate?(info)

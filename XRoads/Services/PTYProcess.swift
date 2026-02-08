@@ -250,9 +250,10 @@ final class PTYProcess: @unchecked Sendable {
         parts.append(contentsOf: escapedArgs)
 
         let cmd = parts.joined(separator: " ")
-        // Run the real command, capture its exit code, write to temp file, then exit with it
-        // so that even though `script` ignores exit codes, we can read the file.
-        return "\(cmd); _xr_ec=$?; echo $_xr_ec > \(shellEscape(exitCodeFile)); exit $_xr_ec"
+        // Capture exit code via EXIT trap — runs even when the script calls `exit N`.
+        // We can't use `cmd; echo $?` because `exit` terminates bash immediately.
+        let escapedFile = shellEscape(exitCodeFile)
+        return "trap 'echo $? > \(escapedFile)' EXIT; \(cmd)"
     }
 
     /// Escape a string for shell usage

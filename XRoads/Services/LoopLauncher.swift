@@ -54,11 +54,11 @@ struct LoopConfiguration: Sendable {
     let sleepSeconds: Int
     let statusFilePath: URL?    // Shared status file for dependency tracking
     let additionalSkillIds: [String] // Optional additional skills to load
+    let worktreePathOverride: URL?   // When set, reuse this path instead of computing a new one (failover)
 
-    /// Computed worktree path - uses centralized resolver for consistency
+    /// Worktree path - uses override if set (failover), otherwise computes from slot/agent/stories
     var worktreePath: URL {
-        // Extract story IDs from branch name for path computation
-        // Branch format: xroads/slot-X-agent-us-xxx-us-yyy
+        if let override = worktreePathOverride { return override }
         let storyIds = stories.map { $0.id }
         return WorktreePathResolver.resolve(
             repoPath: repoPath,
@@ -79,7 +79,8 @@ struct LoopConfiguration: Sendable {
         maxIterations: Int = 15,
         sleepSeconds: Int = 5,
         statusFilePath: URL? = nil,
-        additionalSkillIds: [String] = []
+        additionalSkillIds: [String] = [],
+        worktreePathOverride: URL? = nil
     ) {
         self.slotNumber = slotNumber
         self.agentType = agentType
@@ -92,6 +93,7 @@ struct LoopConfiguration: Sendable {
         self.sleepSeconds = sleepSeconds
         self.statusFilePath = statusFilePath
         self.additionalSkillIds = additionalSkillIds
+        self.worktreePathOverride = worktreePathOverride
     }
 }
 
