@@ -192,6 +192,38 @@ prd_tests_get_project_name() {
 }
 
 # ============================================================================
+# PRD PROTECTION
+# ============================================================================
+# Some agents (e.g., Gemini with create-next-app) delete all files in the
+# worktree directory, including prd.json/progress.txt/AGENT.md. We backup
+# these critical files before each iteration and restore if they vanish.
+
+backup_loop_files() {
+    local backup_dir=".xroads-backup"
+    mkdir -p "$backup_dir"
+    for f in "$PRD_FILE" "$PROGRESS_FILE" "$AGENTS_FILE"; do
+        if [[ -f "$f" ]]; then
+            cp "$f" "$backup_dir/"
+        fi
+    done
+}
+
+restore_loop_files() {
+    local backup_dir=".xroads-backup"
+    [[ -d "$backup_dir" ]] || return 0
+    local restored=0
+    for f in "$PRD_FILE" "$PROGRESS_FILE" "$AGENTS_FILE"; do
+        if [[ ! -f "$f" && -f "$backup_dir/$f" ]]; then
+            cp "$backup_dir/$f" "$f"
+            restored=$((restored + 1))
+        fi
+    done
+    if [[ $restored -gt 0 ]]; then
+        log_warn "Restored $restored loop files deleted by agent"
+    fi
+}
+
+# ============================================================================
 # STATUS FILE SYNC
 # ============================================================================
 # Sync completed stories from local prd.json to the central status.json

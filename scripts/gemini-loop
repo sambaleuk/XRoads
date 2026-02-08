@@ -208,6 +208,9 @@ main() {
         echo -e "${AGENT_COLOR}${AGENT_NAME} working...${NC}"
         echo ""
 
+        # Protect loop files from agents that clear the directory
+        backup_loop_files
+
         set +e
         run_agent "$prompt" "$iter_log"
         local exit_code=${PIPESTATUS[0]}
@@ -228,6 +231,9 @@ main() {
             continue
         fi
         consecutive_failures=0
+
+        # Restore loop files if agent deleted them (e.g., create-next-app)
+        restore_loop_files
 
         # Sync completed stories from local prd.json to central status.json
         # (agents may be sandboxed and unable to write status.json directly)
