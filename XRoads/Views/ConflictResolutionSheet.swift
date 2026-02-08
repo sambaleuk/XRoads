@@ -8,22 +8,30 @@ struct ConflictResolutionSheet: View {
     @Environment(\.appState) private var appState
 
     var body: some View {
-        NavigationView {
+        VStack(spacing: 0) {
+            // Header
+            HStack {
+                Text("Resolve Conflicts")
+                    .font(.title2.bold())
+                    .foregroundStyle(Color.textPrimary)
+                Spacer()
+                Button("Close") {
+                    appState.dismissConflictSheet()
+                    dismiss()
+                }
+                .buttonStyle(.bordered)
+            }
+            .padding(Theme.Spacing.md)
+
+            Divider()
+
+            // Content
             HStack(spacing: Theme.Spacing.lg) {
                 conflictList
                     .frame(width: 220)
                 conflictDetail
             }
             .padding(Theme.Spacing.lg)
-            .navigationTitle("Resolve Conflicts")
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Close") {
-                        appState.dismissConflictSheet()
-                        dismiss()
-                    }
-                }
-            }
         }
         .frame(width: 800, height: 520)
         .background(Color.bgApp)
