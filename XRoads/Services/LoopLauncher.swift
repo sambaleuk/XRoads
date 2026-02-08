@@ -475,7 +475,32 @@ actor LoopLauncher {
         ├── AGENT.md (already here)
         └── progress.txt (already here)
         ```
+        ## CRITICAL: No Blocking Commands
+
+        You run in a **non-interactive loop** (no stdin, no display). Commands that block
+        indefinitely will freeze the entire loop. To validate your code, use build and test
+        commands that exit on their own:
+
+        | Instead of (blocks forever) | Use (exits on its own) |
+        |---|---|
+        | `flutter run` | `flutter build` + `flutter test` |
+        | `npm start` / `npm run dev` | `npm run build` + `npm test` |
+        | `python manage.py runserver` | `python -m pytest` |
+        | `rails server` | `rails test` |
+        | `cargo run` (for servers) | `cargo build` + `cargo test` |
+
         \(statusFileInstructions)
+        ## IMPORTANT: Reading Files Outside Your Worktree
+
+        Your MCP filesystem tools are sandboxed to your worktree directory.
+        To read or write files OUTSIDE this worktree (e.g., the central status.json),
+        you MUST use **shell commands** (`cat`, `jq`), NOT the MCP `read_file` tool.
+
+        Example:
+        ```bash
+        cat "\(statusFilePath)" | jq '.stories'
+        ```
+
         ## Your Assigned Stories
 
         \(storyList)
