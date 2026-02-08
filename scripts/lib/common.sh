@@ -192,6 +192,58 @@ prd_tests_get_project_name() {
 }
 
 # ============================================================================
+# STATUS FILE SYNC
+# ============================================================================
+# Sync completed stories from local prd.json to the central status.json
+# This is critical because agents may be sandboxed and unable to write
+# to the central status file directly (e.g., Gemini MCP filesystem).
+# The loop script runs without sandbox, so it can always write.
+sync_prd_to_status() {
+    local status_file="${CROSSROADS_STATUS_FILE:-}"
+    local prd_file="${1:-$PRD_FILE}"
+
+    # Skip if no status file configured (not an XRoads orchestrated run)
+    if [[ -z "$status_file" || ! -f "$status_file" ]]; then
+        return 0
+    fi
+
+    if [[ ! -f "$prd_file" ]]; then
+        return 0
+    fi
+
+    # Get completed story IDs from local prd.json
+    local completed_ids
+    completed_ids=$(jq -r '.user_stories[] | select(.status == "complete") | .id' "$prd_file" 2>/dev/null)
+
+    if [[ -z "$completed_ids" ]]; then
+        return 0
+    fi
+
+    local synced=0
+    local timestamp
+    timestamp=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+    while IFS= read -r story_id; do
+        # Check if already marked complete in status.json
+        local current_status
+        current_status=$(jq -r ".stories[\"$story_id\"].status // \"unknown\"" "$status_file" 2>/dev/null)
+
+        if [[ "$current_status" != "complete" && "$current_status" != "unknown" ]]; then
+            local tmp_file
+            tmp_file=$(mktemp /tmp/status_sync.XXXXXX)
+            jq --arg id "$story_id" --arg ts "$timestamp" \
+              '.stories[$id].status = "complete" | .stories[$id].completedAt = $ts | .updatedAt = $ts' \
+              "$status_file" > "$tmp_file" && mv "$tmp_file" "$status_file"
+            synced=$((synced + 1))
+        fi
+    done <<< "$completed_ids"
+
+    if [[ $synced -gt 0 ]]; then
+        log_info "Synced $synced completed stories to status.json"
+    fi
+}
+
+# ============================================================================
 # BANNER
 # ============================================================================
 show_nexus_banner() {

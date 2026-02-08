@@ -215,6 +215,10 @@ main() {
         fi
         consecutive_failures=0
 
+        # Sync completed stories from local prd.json to central status.json
+        # (agents may be sandboxed and unable to write status.json directly)
+        sync_prd_to_status
+
         # Check for completion in log
         # NOTE: codex exec outputs the full session (prompt + response) to the log.
         # The prompt itself contains the completion token as an instruction.
