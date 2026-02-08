@@ -398,24 +398,43 @@ actor LayeredDispatcher {
             info.storyIds.contains(where: { nextLayerStoryIds.contains($0) })
         }
 
+        let fm = FileManager.default
+        let loopFiles = ["prd.json", "progress.txt", "AGENT.md"]
+
         for (slotNumber, info) in pendingSlots {
-            let worktreePath = info.worktreePath.path
+            let worktreePath = info.worktreePath
+            let worktreeDir = worktreePath.path
+
+            // Backup loop files before merge (incoming branches may overwrite them)
+            var backups: [String: Data] = [:]
+            for file in loopFiles {
+                let filePath = worktreePath.appendingPathComponent(file)
+                if let data = fm.contents(atPath: filePath.path) {
+                    backups[file] = data
+                }
+            }
 
             for branch in completedBranches {
                 do {
                     try await gitService.merge(
                         branch: branch,
-                        repoPath: worktreePath,
+                        repoPath: worktreeDir,
                         noCommit: false,
                         noFastForward: true
                     )
                     Log.dispatcher.info("Merged \(branch) into slot \(slotNumber)")
                 } catch {
                     // If merge fails (conflict), abort and log — agent will work from base
-                    try? await gitService.abortMerge(repoPath: worktreePath)
+                    try? await gitService.abortMerge(repoPath: worktreeDir)
                     Log.dispatcher.warning("Could not merge \(branch) into slot \(slotNumber): \(error.localizedDescription). Agent will work from base branch.")
                     emitProgress("Warning: auto-merge of \(branch) into slot \(slotNumber) had conflicts, skipping")
                 }
+            }
+
+            // Restore loop files that may have been overwritten by the merge
+            for (file, data) in backups {
+                let filePath = worktreePath.appendingPathComponent(file)
+                fm.createFile(atPath: filePath.path, contents: data)
             }
         }
 

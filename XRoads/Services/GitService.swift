@@ -279,6 +279,32 @@ actor GitService {
         try await runGit(arguments: ["add", file], currentDirectory: repoPath)
     }
 
+    /// Removes a file from the index but keeps it on disk
+    func removeFromIndex(file: String, repoPath: String) async throws {
+        try await runGit(arguments: ["rm", "--cached", file], currentDirectory: repoPath)
+    }
+
+    /// Creates a commit with the given message (stages must be done separately)
+    func commit(message: String, repoPath: String, allowEmpty: Bool = false) async throws {
+        var args = ["commit", "-m", message]
+        if allowEmpty { args.append("--allow-empty") }
+        try await runGit(arguments: args, currentDirectory: repoPath)
+    }
+
+    /// Checks if a file is tracked by git
+    func isTracked(file: String, repoPath: String) async -> Bool {
+        if testMode { return false }
+        do {
+            let output = try await runGit(
+                arguments: ["ls-files", "--error-unmatch", file],
+                currentDirectory: repoPath
+            )
+            return !output.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        } catch {
+            return false
+        }
+    }
+
     // MARK: - Repository Initialization
 
     /// Initializes a new git repository at the specified path

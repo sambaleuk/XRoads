@@ -276,6 +276,34 @@ sync_prd_to_status() {
 }
 
 # ============================================================================
+# RATE-LIMIT DETECTION
+# ============================================================================
+# Detect API rate limiting (429) in agent output logs. When detected, the loop
+# should apply a longer cooldown instead of burning iterations with 3s retries.
+# Gemini CLI retries 5x internally, so by the time we see exit code != 0 with
+# 429 in the log, the API has been hammered for minutes already.
+
+RATE_LIMIT_COOLDOWN=${RATE_LIMIT_COOLDOWN:-60}  # seconds to wait after rate limit
+
+detect_rate_limit() {
+    local log_file="$1"
+    [[ -f "$log_file" ]] || return 1
+
+    # Check for common rate-limit patterns across all 3 agents
+    if grep -qi '429\|RESOURCE_EXHAUSTED\|rate.limit\|Too Many Requests\|quota.*exceeded' "$log_file" 2>/dev/null; then
+        return 0  # rate limit detected
+    fi
+    return 1  # no rate limit
+}
+
+handle_rate_limit() {
+    local cooldown="${1:-$RATE_LIMIT_COOLDOWN}"
+    log_warn "API rate limit detected (429). Cooling down for ${cooldown}s..."
+    log_info "Tip: set RATE_LIMIT_COOLDOWN=120 to adjust cooldown duration"
+    sleep "$cooldown"
+}
+
+# ============================================================================
 # AUTO-COMMIT
 # ============================================================================
 # After each iteration, commit any uncommitted changes the agent left behind.

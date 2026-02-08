@@ -28,7 +28,7 @@ fi
 # ---------------------------------------------------------------------------
 APP_NAME="XRoads"
 BUNDLE_ID="io.neurogrid.xroads"
-VERSION=$(grep -o '"[0-9]*\.[0-9]*\.[0-9]*"' "$PROJECT_ROOT/build/XRoads.app/Contents/Info.plist" 2>/dev/null | head -1 | tr -d '"' || echo "1.0.0")
+VERSION=$(/usr/libexec/PlistBuddy -c "Print :CFBundleShortVersionString" "$PROJECT_ROOT/build/XRoads.app/Contents/Info.plist" 2>/dev/null || echo "1.0.0")
 BUILD_DIR="$PROJECT_ROOT/dist"
 APP_BUNDLE="$BUILD_DIR/$APP_NAME.app"
 DMG_NAME="$APP_NAME-$VERSION"

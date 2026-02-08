@@ -319,10 +319,13 @@ actor LoopLauncher {
         let agentPath = worktreePath.appendingPathComponent("AGENT.md")
         try? agentMd.write(to: agentPath, atomically: true, encoding: .utf8)
 
-        // 3. Add loop files to .gitignore so they don't create merge conflicts
+        // 3. Add loop files to .gitignore and untrack them so they don't create merge conflicts
         let gitignorePath = worktreePath.appendingPathComponent(".gitignore")
         let loopIgnoreEntries = ["prd.json", "progress.txt", "AGENT.md", ".xroads-backup/", "logs/"]
         appendToGitignore(at: gitignorePath, entries: loopIgnoreEntries)
+
+        // Untrack loop files (they may be tracked from the base branch) and commit .gitignore
+        await untrackLoopFiles(worktreePath: worktreePath, files: ["prd.json", "progress.txt", "AGENT.md"])
 
         // 4. Create progress.txt
         let progressPath = worktreePath.appendingPathComponent("progress.txt")
@@ -351,6 +354,25 @@ actor LoopLauncher {
 
             """
             try? progressContent.write(to: progressPath, atomically: true, encoding: .utf8)
+        }
+    }
+
+    /// Untracks loop files from git so they don't cause merge conflicts, then commits .gitignore.
+    private func untrackLoopFiles(worktreePath: URL, files: [String]) async {
+        let worktreeDir = worktreePath.path
+        for file in files {
+            // Remove from index if tracked (keeps file on disk)
+            let tracked = await gitService.isTracked(file: file, repoPath: worktreeDir)
+            if tracked {
+                try? await gitService.removeFromIndex(file: file, repoPath: worktreeDir)
+            }
+        }
+        // Commit .gitignore + untracked changes in a single commit
+        do {
+            try await gitService.stageFile(repoPath: worktreeDir, file: ".gitignore")
+            try await gitService.commit(message: "chore: gitignore loop files", repoPath: worktreeDir, allowEmpty: true)
+        } catch {
+            Log.loop.warning("Could not commit .gitignore in worktree: \(error.localizedDescription)")
         }
     }
 

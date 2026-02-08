@@ -203,6 +203,16 @@ main() {
         echo -e "${DIM}---${NC}"
 
         if [ $exit_code -ne 0 ]; then
+            # Check if failure was due to rate limiting
+            if detect_rate_limit "$iter_log"; then
+                handle_rate_limit
+                # Don't count rate limits as consecutive failures (they're transient)
+                # Still auto-commit any partial work done before the rate limit hit
+                restore_loop_files
+                auto_commit_if_needed
+                continue
+            fi
+
             log_warn "$AGENT_NAME exited with code $exit_code"
             consecutive_failures=$((consecutive_failures + 1))
             if [ $consecutive_failures -ge $MAX_CONSECUTIVE_FAILURES ]; then
