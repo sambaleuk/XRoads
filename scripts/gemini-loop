@@ -220,27 +220,27 @@ main() {
         echo ""
         echo -e "${DIM}---${NC}"
 
-        if [ $exit_code -ne 0 ]; then
-            # Check if failure was due to rate limiting
-            if detect_rate_limit "$iter_log"; then
-                rate_limit_count=$((rate_limit_count + 1))
-                log_warn "Rate limit hit ($rate_limit_count/$RATE_LIMIT_FAILOVER_THRESHOLD)"
+        # Check for rate limiting FIRST (some CLIs exit 0 even on 429)
+        if detect_rate_limit "$iter_log"; then
+            rate_limit_count=$((rate_limit_count + 1))
+            log_warn "Rate limit hit ($rate_limit_count/$RATE_LIMIT_FAILOVER_THRESHOLD)"
 
-                # Auto-commit partial work before any cooldown/failover
-                restore_loop_files
-                auto_commit_if_needed
+            # Auto-commit partial work before any cooldown/failover
+            restore_loop_files
+            auto_commit_if_needed
 
-                # Threshold reached → request agent failover from orchestrator
-                if [ $rate_limit_count -ge $RATE_LIMIT_FAILOVER_THRESHOLD ]; then
-                    log_error "Rate limit threshold reached. Requesting agent failover..."
-                    exit $RATE_LIMIT_FAILOVER_EXIT
-                fi
-
-                # Below threshold → cooldown and retry
-                handle_rate_limit
-                continue
+            # Threshold reached → request agent failover from orchestrator
+            if [ $rate_limit_count -ge $RATE_LIMIT_FAILOVER_THRESHOLD ]; then
+                log_error "Rate limit threshold reached. Requesting agent failover..."
+                exit $RATE_LIMIT_FAILOVER_EXIT
             fi
 
+            # Below threshold → cooldown and retry
+            handle_rate_limit
+            continue
+        fi
+
+        if [ $exit_code -ne 0 ]; then
             log_warn "$AGENT_NAME exited with code $exit_code"
             consecutive_failures=$((consecutive_failures + 1))
             if [ $consecutive_failures -ge $MAX_CONSECUTIVE_FAILURES ]; then
@@ -252,6 +252,7 @@ main() {
             continue
         fi
         consecutive_failures=0
+        rate_limit_count=0  # Reset on successful iteration
 
         # Restore loop files if agent deleted them (e.g., create-next-app)
         restore_loop_files
