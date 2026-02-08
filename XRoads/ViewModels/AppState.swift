@@ -1973,6 +1973,11 @@ final class AppState {
         }
 
         activeWorktreeAssignments = []
+
+        // Reset GitMaster to idle after cleanup
+        await services.gitMaster.reset()
+        gitMasterState = await services.gitMaster.state
+
         addLog(LogEntry(level: .info, source: "orchestrator", worktree: nil,
                         message: "Post-orchestration cleanup complete"))
     }
@@ -2135,6 +2140,8 @@ final class AppState {
         }
 
         orchestrationState = .merging
+        gitMasterState.mode = .merging
+        gitMasterState.status = .busy
         addLog(LogEntry(level: .info, source: "orchestrator", worktree: nil, message: "Starting merge coordination..."))
 
         guard let repoPath = orchestrationRepoPath else {
@@ -2156,6 +2163,17 @@ final class AppState {
                 let validationPassed = await runPostMergeValidation(repoPath: repoPath)
 
                 orchestrationState = .complete
+
+                // Update GitMaster: mark merged branches
+                gitMasterState.mode = .idle
+                gitMasterState.status = .success
+                gitMasterState.lastMergeResult = result
+                for i in gitMasterState.trackedBranches.indices {
+                    if result.mergedBranches.contains(gitMasterState.trackedBranches[i].name) {
+                        gitMasterState.trackedBranches[i].status = .merged
+                    }
+                }
+
                 addLog(LogEntry(level: .info, source: "orchestrator", worktree: nil,
                     message: validationPassed
                         ? "Post-merge validation passed"
@@ -2169,8 +2187,28 @@ final class AppState {
                 // Cleanup worktrees and branches
                 await cleanupPostOrchestration(assignments: activeWorktreeAssignments, repoPath: repoPath)
             } else {
+                // Update GitMaster: conflicts detected
+                gitMasterState.mode = .resolving
+                gitMasterState.status = .needsAttention
+                gitMasterState.lastMergeResult = result
+
                 presentConflicts(from: result, repoPath: repoPath)
                 addLog(LogEntry(level: .warn, source: "orchestrator", worktree: nil, message: "Merge conflicts detected in \(result.conflicts.count) files"))
+
+                // Feed conflicts to GitMaster for intelligent analysis
+                Task {
+                    let gitMaster = services.gitMaster
+                    do {
+                        _ = try await gitMaster.analyzeAllConflicts(repoPath: repoPath)
+                        let newState = await gitMaster.state
+                        await MainActor.run {
+                            self.gitMasterState = newState
+                        }
+                    } catch {
+                        addLog(LogEntry(level: .warn, source: "gitmaster", worktree: nil,
+                            message: "Conflict analysis failed: \(error.localizedDescription)"))
+                    }
+                }
             }
         } catch {
             orchestrationState = .error(message: error.localizedDescription)

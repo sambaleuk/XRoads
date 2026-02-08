@@ -373,8 +373,14 @@ struct GitMasterPanel: View {
     // MARK: - Actions
 
     private func performMerge() {
-        guard let projectPath = appState.projectPath else { return }
-        let repoURL = URL(fileURLWithPath: projectPath)
+        let repoURL: URL
+        if let orchPath = appState.orchestrationRepoPath {
+            repoURL = orchPath
+        } else if let projectPath = appState.projectPath {
+            repoURL = URL(fileURLWithPath: projectPath)
+        } else {
+            return
+        }
 
         Task {
             let gitMaster = appState.services.gitMaster
@@ -398,8 +404,14 @@ struct GitMasterPanel: View {
     }
 
     private func resolveAutoConflicts() {
-        guard let projectPath = appState.projectPath else { return }
-        let repoURL = URL(fileURLWithPath: projectPath)
+        let repoURL: URL
+        if let orchPath = appState.orchestrationRepoPath {
+            repoURL = orchPath
+        } else if let projectPath = appState.projectPath {
+            repoURL = URL(fileURLWithPath: projectPath)
+        } else {
+            return
+        }
 
         Task {
             let gitMaster = appState.services.gitMaster
@@ -418,29 +430,26 @@ struct GitMasterPanel: View {
     }
 
     private func refreshStatus() {
-        // Refresh tracked branches status from slots
-        for slot in appState.terminalSlots where slot.worktree != nil {
-            if slot.status == .completed {
-                Task {
-                    await appState.services.gitMaster.markBranchCompleted(
-                        name: slot.worktree!.branch,
-                        lastCommit: nil,
-                        message: slot.currentTask
-                    )
-                    let newState = await appState.services.gitMaster.state
-                    await MainActor.run {
-                        appState.gitMasterState = newState
-                    }
-                }
+        Task {
+            let newState = await appState.services.gitMaster.state
+            await MainActor.run {
+                appState.gitMasterState = newState
             }
         }
     }
 
     private func abortMerge() {
-        guard let projectPath = appState.projectPath else { return }
+        let repoPath: String
+        if let orchPath = appState.orchestrationRepoPath {
+            repoPath = orchPath.path
+        } else if let projectPath = appState.projectPath {
+            repoPath = projectPath
+        } else {
+            return
+        }
 
         Task {
-            try? await appState.services.gitService.abortMerge(repoPath: projectPath)
+            try? await appState.services.gitService.abortMerge(repoPath: repoPath)
             await appState.services.gitMaster.reset()
             let newState = await appState.services.gitMaster.state
             await MainActor.run {

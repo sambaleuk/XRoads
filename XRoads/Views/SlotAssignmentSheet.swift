@@ -724,6 +724,27 @@ struct SlotAssignmentSheet: View {
         appState.activeWorktreeAssignments = worktreeAssignments
         appState.orchestrationState = .monitoring
 
+        // Wire GitMaster: track all dispatch branches
+        Task {
+            let gitMaster = appState.services.gitMaster
+            await gitMaster.reset()
+            let targetBranch = (try? await appState.services.gitService.getCurrentBranch(path: repoPath.path)) ?? "main"
+            await gitMaster.setTargetBranch(targetBranch)
+            for wa in worktreeAssignments {
+                await gitMaster.trackBranch(
+                    name: wa.branchName,
+                    worktreePath: wa.worktreePath.path,
+                    agentType: wa.agentType
+                )
+            }
+            let newState = await gitMaster.state
+            await MainActor.run {
+                appState.gitMasterState = newState
+                appState.gitMasterState.mode = .monitoring
+                appState.gitMasterState.status = .busy
+            }
+        }
+
         // Close the sheet - progress will show in dashboard
         dismiss()
         onComplete?()
@@ -769,6 +790,31 @@ struct SlotAssignmentSheet: View {
                                 appState.terminalSlots[index].status = .completed
                             case .failed:
                                 appState.terminalSlots[index].status = .error
+                            }
+
+                            // Sync GitMaster tracked branch status
+                            if let branchName = appState.terminalSlots[index].worktree?.branch {
+                                let gitMaster = appState.services.gitMaster
+                                Task {
+                                    switch info.status {
+                                    case .running:
+                                        await gitMaster.updateBranchStatus(name: branchName, status: .inProgress)
+                                    case .completed:
+                                        await gitMaster.markBranchCompleted(
+                                            name: branchName,
+                                            lastCommit: nil,
+                                            message: appState.terminalSlots[index].currentTask
+                                        )
+                                    case .failed:
+                                        await gitMaster.updateBranchStatus(name: branchName, status: .error)
+                                    default:
+                                        break
+                                    }
+                                    let newState = await gitMaster.state
+                                    await MainActor.run {
+                                        appState.gitMasterState = newState
+                                    }
+                                }
                             }
                         }
                     }
