@@ -55,6 +55,9 @@ final class PTYProcess: @unchecked Sendable {
     let workingDirectory: String
     let environment: [String: String]?
 
+    /// Temp file where the real exit code is written (script swallows it)
+    private let exitCodeFile: String
+
     var processIdentifier: pid_t {
         lock.lock()
         defer { lock.unlock() }
@@ -81,6 +84,7 @@ final class PTYProcess: @unchecked Sendable {
         self.arguments = arguments
         self.workingDirectory = workingDirectory
         self.environment = environment
+        self.exitCodeFile = NSTemporaryDirectory() + "xroads_exit_\(id.uuidString)"
     }
 
     deinit {
@@ -144,9 +148,20 @@ final class PTYProcess: @unchecked Sendable {
         setupOutputHandler(pipe: stderrPipe, onOutput: onOutput)
 
         // Setup termination handler
+        // NOTE: macOS `script` command does NOT propagate the inner command's exit code.
+        // terminatedProcess.terminationStatus is always 0. We read the real exit code
+        // from a temp file written by our wrapper in buildShellCommand().
+        let exitFile = self.exitCodeFile
         process.terminationHandler = { [weak self] terminatedProcess in
             guard let self = self else { return }
-            let exitCode = terminatedProcess.terminationStatus
+            var exitCode = terminatedProcess.terminationStatus
+            // Read real exit code from temp file
+            if let contents = try? String(contentsOfFile: exitFile, encoding: .utf8).trimmingCharacters(in: .whitespacesAndNewlines),
+               let realCode = Int32(contents) {
+                exitCode = realCode
+            }
+            // Cleanup temp file
+            try? FileManager.default.removeItem(atPath: exitFile)
             self.terminationHandler?(exitCode)
         }
 
@@ -216,11 +231,16 @@ final class PTYProcess: @unchecked Sendable {
                 }
             }
         }
+
+        // Cleanup exit code temp file
+        try? FileManager.default.removeItem(atPath: exitCodeFile)
     }
 
     // MARK: - Private Methods
 
-    /// Build the shell command with proper escaping
+    /// Build the shell command with proper escaping.
+    /// Wraps the real command to capture its exit code into a temp file,
+    /// because macOS `script` does not propagate exit codes.
     private func buildShellCommand() -> String {
         // Escape the executable and arguments for shell
         let escapedExecutable = shellEscape(executable)
@@ -229,7 +249,10 @@ final class PTYProcess: @unchecked Sendable {
         var parts = [escapedExecutable]
         parts.append(contentsOf: escapedArgs)
 
-        return parts.joined(separator: " ")
+        let cmd = parts.joined(separator: " ")
+        // Run the real command, capture its exit code, write to temp file, then exit with it
+        // so that even though `script` ignores exit codes, we can read the file.
+        return "\(cmd); _xr_ec=$?; echo $_xr_ec > \(shellEscape(exitCodeFile)); exit $_xr_ec"
     }
 
     /// Escape a string for shell usage
