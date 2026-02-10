@@ -304,6 +304,7 @@ struct PRDDocument: Codable, Hashable, Sendable, Identifiable {
     var vision: PRDVision?
     var architecture: [String: String]?
     var successMetrics: [String]?
+    var designContext: DesignContext?
 
     init(
         id: UUID = UUID(),
@@ -313,7 +314,8 @@ struct PRDDocument: Codable, Hashable, Sendable, Identifiable {
         author: String = "Nexus",
         templateType: PRDTemplateType = .feature,
         userStories: [PRDUserStory] = [],
-        vision: PRDVision? = nil
+        vision: PRDVision? = nil,
+        designContext: DesignContext? = nil
     ) {
         self.id = id
         self.version = version
@@ -327,6 +329,7 @@ struct PRDDocument: Codable, Hashable, Sendable, Identifiable {
         self.vision = vision
         self.architecture = nil
         self.successMetrics = nil
+        self.designContext = designContext
     }
 
     // MARK: - Computed Properties
@@ -418,6 +421,10 @@ struct PRDDocument: Codable, Hashable, Sendable, Identifiable {
 
         if let metrics = successMetrics {
             dict["success_metrics"] = metrics
+        }
+
+        if let dc = designContext {
+            dict["design_context"] = dc.prdSection
         }
 
         return dict

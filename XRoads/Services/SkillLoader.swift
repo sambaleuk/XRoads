@@ -242,6 +242,9 @@ struct SkillContext: Sendable {
     /// Path to the PRD file (optional)
     let prdPath: String?
 
+    /// Path to art-bible.json if present (optional)
+    let artBiblePath: String?
+
     /// Session ID for tracking (optional)
     let sessionID: String?
 
@@ -265,6 +268,7 @@ struct SkillContext: Sendable {
         worktreePath: String? = nil,
         branch: String? = nil,
         prdPath: String? = nil,
+        artBiblePath: String? = nil,
         sessionID: String? = nil,
         assignedStories: [String] = [],
         taskDescription: String? = nil,
@@ -276,6 +280,7 @@ struct SkillContext: Sendable {
         self.worktreePath = worktreePath
         self.branch = branch
         self.prdPath = prdPath
+        self.artBiblePath = artBiblePath
         self.sessionID = sessionID
         self.assignedStories = assignedStories
         self.taskDescription = taskDescription
@@ -302,6 +307,10 @@ struct SkillContext: Sendable {
 
         if let task = taskDescription {
             lines.append("Task: \(task)")
+        }
+
+        if let artBible = artBiblePath {
+            lines.append("Art Bible: \(artBible)")
         }
 
         for (key, value) in customContext.sorted(by: { $0.key < $1.key }) {

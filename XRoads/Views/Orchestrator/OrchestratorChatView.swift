@@ -71,6 +71,25 @@ struct OrchestratorChatView: View {
             )
         }
         .background(Color.bgApp)
+        .overlay(
+            Group {
+                if viewModel.mode == .artDirector {
+                    RoundedRectangle(cornerRadius: Theme.Radius.lg)
+                        .stroke(
+                            LinearGradient(
+                                colors: [.purple, .pink, .orange, .purple],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            ),
+                            lineWidth: 2
+                        )
+                        .shadow(color: .purple.opacity(0.4), radius: 8)
+                        .shadow(color: .pink.opacity(0.3), radius: 16)
+                        .allowsHitTesting(false)
+                }
+            }
+        )
+        .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: viewModel.mode == .artDirector)
         .task {
             await viewModel.loadContext(from: appState)
         }
@@ -111,7 +130,7 @@ struct OrchestratorChatView: View {
             // Mode indicator
             HStack(spacing: 4) {
                 Circle()
-                    .fill(viewModel.mode == .api ? Color.accentPrimary : Color.terminalCyan)
+                    .fill(modeIndicatorColor)
                     .frame(width: 6, height: 6)
                 Text(viewModel.mode.displayName)
                     .font(.xs)
@@ -227,6 +246,14 @@ struct OrchestratorChatView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.bgApp)
+    }
+
+    private var modeIndicatorColor: Color {
+        switch viewModel.mode {
+        case .api: return Color.accentPrimary
+        case .terminal: return Color.terminalCyan
+        case .artDirector: return Color.purple
+        }
     }
 
     private var quickPrompts: [String] {
@@ -622,6 +649,7 @@ final class OrchestratorChatViewModel: ObservableObject, OrchestratorServiceDele
     @Published var currentBranch: String?
     @Published var lastMessageContent: String = ""
     @Published var detectedPRD: DetectedPRD?
+    @Published var detectedArtBible: String?
 
     private let orchestratorService = OrchestratorService()
     private var context: ChatContext?
@@ -648,19 +676,26 @@ final class OrchestratorChatViewModel: ObservableObject, OrchestratorServiceDele
         var skillIds = Set(allSkillIds)
         skillIds.formUnion(ActionType.universalSkills)
 
+        // Detect art-bible.json for design context
+        var designCtx: DesignContext?
+        if let projectPath = appState.projectPath {
+            designCtx = DesignContext.load(from: projectPath)
+        }
+
         context = ChatContext(
             projectPath: appState.projectPath,
             currentBranch: branch,
             worktrees: worktreeNames,
             availableSkills: Array(skillIds).sorted(),
             mcpServers: ["xroads-mcp"],
-            dashboardMode: appState.dashboardMode == .single ? "single" : "agentic"
+            dashboardMode: appState.dashboardMode == .single ? "single" : "agentic",
+            designContext: designCtx
         )
 
         currentBranch = branch
 
         await orchestratorService.setContext(context!)
-        await orchestratorService.updateSystemPrompt()
+        await orchestratorService.updateSystemPrompt(mode: mode)
         await orchestratorService.setDelegate(self)
 
         // Load API key from Keychain (secure storage)
@@ -678,7 +713,8 @@ final class OrchestratorChatViewModel: ObservableObject, OrchestratorServiceDele
         inputText = ""
         isLoading = true
 
-        await orchestratorService.setMode(mode)
+        await orchestratorService.setMode(mode == .artDirector ? .api : mode)
+        await orchestratorService.updateSystemPrompt(mode: mode)
 
         do {
             // Add user message immediately to UI
@@ -712,6 +748,13 @@ final class OrchestratorChatViewModel: ObservableObject, OrchestratorServiceDele
             if let prd = PRDDetector.detect(in: response.content) {
                 withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
                     detectedPRD = prd
+                }
+            }
+
+            // Detect art-bible in response
+            if let artBibleJSON = ArtBibleDetector.detect(in: response.content) {
+                withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+                    detectedArtBible = artBibleJSON
                 }
             }
 
@@ -807,6 +850,7 @@ final class OrchestratorChatViewModel: ObservableObject, OrchestratorServiceDele
     func clearChat() {
         messages.removeAll()
         detectedPRD = nil
+        detectedArtBible = nil
         Task {
             await orchestratorService.clearConversation()
         }

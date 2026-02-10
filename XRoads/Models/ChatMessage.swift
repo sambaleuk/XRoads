@@ -43,8 +43,9 @@ public enum ChatRole: String, Codable, Sendable, CaseIterable {
 
 /// Operating mode for the orchestrator
 public enum OrchestratorMode: String, Codable, Sendable, CaseIterable {
-    case api      // Fast chat via Anthropic API
-    case terminal // Full execution via Claude CLI
+    case api         // Fast chat via Anthropic API
+    case terminal    // Full execution via Claude CLI
+    case artDirector // Design deep-dive mode
 
     public var displayName: String {
         switch self {
@@ -52,6 +53,8 @@ public enum OrchestratorMode: String, Codable, Sendable, CaseIterable {
             return "API"
         case .terminal:
             return "Terminal"
+        case .artDirector:
+            return "Art Director"
         }
     }
 
@@ -61,6 +64,8 @@ public enum OrchestratorMode: String, Codable, Sendable, CaseIterable {
             return "bolt.fill"
         case .terminal:
             return "terminal.fill"
+        case .artDirector:
+            return "paintbrush.fill"
         }
     }
 
@@ -70,6 +75,8 @@ public enum OrchestratorMode: String, Codable, Sendable, CaseIterable {
             return "Fast responses with tool execution for PRD generation and repo exploration"
         case .terminal:
             return "Full execution with file operations and loop orchestration"
+        case .artDirector:
+            return "Deep-dive into visual DNA, define colors, typography, and design tokens"
         }
     }
 }
@@ -213,6 +220,7 @@ public struct ChatContext: Codable, Sendable {
     public let availableSkills: [String]
     public let mcpServers: [String]
     public let dashboardMode: String
+    public let designContext: DesignContext?
 
     public init(
         projectPath: String? = nil,
@@ -220,7 +228,8 @@ public struct ChatContext: Codable, Sendable {
         worktrees: [String] = [],
         availableSkills: [String] = [],
         mcpServers: [String] = [],
-        dashboardMode: String = "single"
+        dashboardMode: String = "single",
+        designContext: DesignContext? = nil
     ) {
         self.projectPath = projectPath
         self.currentBranch = currentBranch
@@ -228,6 +237,7 @@ public struct ChatContext: Codable, Sendable {
         self.availableSkills = availableSkills
         self.mcpServers = mcpServers
         self.dashboardMode = dashboardMode
+        self.designContext = designContext
     }
 
     /// Generate system prompt context string
@@ -251,6 +261,11 @@ public struct ChatContext: Codable, Sendable {
             lines.append("- MCP Servers: \(mcpServers.joined(separator: ", "))")
         }
         lines.append("- Dashboard Mode: \(dashboardMode)")
+
+        if let dc = designContext {
+            lines.append("")
+            lines.append(dc.systemPromptSection)
+        }
 
         return lines.joined(separator: "\n")
     }

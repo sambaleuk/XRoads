@@ -483,6 +483,9 @@ actor LoopLauncher {
 
         """ : ""
 
+        // Design Direction section (from art-bible.json if present)
+        let designSection = loadDesignContext(repoPath: config.repoPath.path)
+
         return """
         # AGENT BRIEF – \(config.agentType.displayName)
         \(handoffSection)
@@ -494,7 +497,7 @@ actor LoopLauncher {
         - **Main Repo:** \(config.repoPath.path)
         - **Action:** \(config.actionType.displayName)
         - **Category:** \(config.actionType.category.displayName)
-
+        \(designSection.map { "\n\($0)\n" } ?? "")
         ## Mission: \(config.actionType.displayName)
 
         **\(config.actionType.description)**
@@ -663,6 +666,12 @@ actor LoopLauncher {
         }
 
         return sections.joined(separator: "\n")
+    }
+
+    /// Load design context markdown from art-bible.json in the repo
+    private func loadDesignContext(repoPath: String) -> String? {
+        guard let dc = DesignContext.load(from: repoPath) else { return nil }
+        return dc.agentMarkdown
     }
 
     /// Process a prompt template, replacing placeholders with actual values

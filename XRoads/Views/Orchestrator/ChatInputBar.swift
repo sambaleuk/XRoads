@@ -132,6 +132,8 @@ struct ChatInputBar: View {
             return "Ask about features, request PRDs, or get help..."
         case .terminal:
             return "Enter a command for Claude to execute..."
+        case .artDirector:
+            return "Describe your project's visual identity, mood, or references..."
         }
     }
 

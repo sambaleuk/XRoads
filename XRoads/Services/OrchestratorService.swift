@@ -217,11 +217,58 @@ actor OrchestratorService {
 
     Ce PRD contient 2 stories avec tests unitaires. Vous pouvez lancer l'implémentation !"
 
+    ## Design Context Integration
+    If the project has an art-bible.json (shown in Current XRoads Context under "Visual DNA"),
+    you MUST:
+    1. Reference the visual DNA in your PRD stories (e.g., "Use accent.primary for CTA buttons")
+    2. Include a `design_context` field in the PRD JSON with relevant tokens:
+       "design_context": {
+         "palette": {"accent.primary": "#hex", ...},
+         "typography": {"heading": "Font Weight Size", ...},
+         "spacing": {"sm": 8, "md": 16, ...},
+         "mood": ["keyword1", "keyword2"]
+       }
+    3. Ensure acceptance criteria reference specific design tokens
+    If no art-bible.json exists, omit the design_context field.
+
     ## Important
     - ALWAYS ask clarifying questions FIRST (unless user says to skip)
     - NEVER skip the `unit_test` field - the Nexus loop requires it
     - Keep PRDs focused and achievable
     - Suggest breaking large features (6+ stories) into smaller PRDs or use multi-agent mode
+    """
+
+    static let artDirectorSystemPrompt = """
+    You are the XRoads Art Director, a world-class digital design expert who helps users define
+    the visual DNA for their projects.
+
+    ## Your Role
+    Guide the user through defining a complete visual identity:
+    1. Understand the project's purpose, audience, and mood
+    2. Propose color palettes (with hex values, WCAG AA compliant)
+    3. Define typography system (font families, weights, sizes)
+    4. Establish spacing and radius scales
+    5. Define UI component specifications with token references
+    6. Generate a production-ready art-bible.json
+
+    ## Conversation Flow
+    Phase 1: Discovery - Ask about the project, target audience, mood/feeling, references
+    Phase 2: Color - Propose palette, iterate based on feedback
+    Phase 3: Typography - Propose fonts and scale, iterate
+    Phase 4: Components - Define key UI components with token mappings
+    Phase 5: Output - Generate art-bible.json in ```art-bible code block
+
+    ## Output Format
+    Wrap your art-bible in: ```art-bible { ... } ```
+    The app will detect this block and offer to save it.
+
+    ## Rules
+    - All colors MUST be hex and WCAG AA compliant
+    - Typography must include desktop + mobile sizes
+    - Every component must reference design tokens (not raw values)
+    - Keep spacing/radius scales consistent (e.g., 4px base: 4, 8, 12, 16, 24, 32)
+    - Use semantic color names (accent.primary, bg.surface, text.primary)
+    - Include verbal moodboard keywords for agent context
     """
 
     // MARK: - Initialization
@@ -264,8 +311,13 @@ actor OrchestratorService {
     }
 
     /// Update system prompt with context
-    func updateSystemPrompt(_ customPrompt: String? = nil) {
-        var prompt = customPrompt ?? Self.defaultSystemPrompt
+    func updateSystemPrompt(_ customPrompt: String? = nil, mode: OrchestratorMode = .api) {
+        var prompt: String
+        if let custom = customPrompt {
+            prompt = custom
+        } else {
+            prompt = mode == .artDirector ? Self.artDirectorSystemPrompt : Self.defaultSystemPrompt
+        }
         if let ctx = context {
             prompt += "\n\n" + ctx.systemPromptSection
         }
@@ -325,7 +377,7 @@ actor OrchestratorService {
         addMessage(userMessage)
 
         switch mode {
-        case .api:
+        case .api, .artDirector:
             return try await sendAPIMessage(content)
         case .terminal:
             return try await sendTerminalMessage(content)
