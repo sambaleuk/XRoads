@@ -77,6 +77,7 @@ actor OrchestratorService {
 
     private let processRunner: ProcessRunner
     private var terminalProcessId: UUID?
+    private var terminalCancelled = false
     private var toolExecutor: ToolExecutor?
 
     // MARK: - Constants
@@ -666,16 +667,13 @@ actor OrchestratorService {
         }
 
         var responseContent = ""
+        terminalCancelled = false
         let workingDirectory = context?.projectPath ?? FileManager.default.currentDirectoryPath
 
         // Build prompt with conversation history (terminal mode is stateless per invocation)
         let terminalPrompt = buildTerminalPrompt(content, excludingId: responseMessage.id)
 
         // Build arguments for Claude CLI in print mode
-        // --dangerously-skip-permissions: Required for non-interactive mode
-        // --output-format text: Get plain text output (not JSON)
-        // --system-prompt: Inject the same orchestrator system prompt as API mode
-        // -p: Print mode - execute prompt and exit
         let arguments = [
             "--dangerously-skip-permissions",
             "--output-format", "text",
@@ -697,51 +695,85 @@ actor OrchestratorService {
 
         // Launch Claude CLI with the message
         do {
+            // AsyncStream channel for output chunks — eliminates data race on responseContent
+            let (stream, continuation) = AsyncStream.makeStream(of: String.self)
+
             let processId = try await processRunner.launch(
                 executable: claudePath,
                 arguments: arguments,
                 workingDirectory: workingDirectory,
                 closeStdinImmediately: true  // Claude -p mode needs EOF on stdin
-            ) { [weak self] output in
-                guard let self = self else { return }
+            ) { output in
                 Log.orchestrator.debug("Received output chunk: \(output.prefix(100))...")
-                Task {
-                    responseContent += output
-                    await self.delegate?.orchestratorDidReceiveChunk(self, chunk: output)
-                    await self.updateMessage(id: responseMessage.id, content: responseContent)
-                }
+                continuation.yield(output)
             }
 
             terminalProcessId = processId
             Log.orchestrator.info("Process launched with ID: \(processId)")
 
-            // Wait for process to complete with timeout (5 minutes max)
-            let timeoutSeconds = 300
-            var elapsedSeconds = 0
-            Log.orchestrator.info("Waiting for process to complete...")
-            while await processRunner.isRunning(id: processId) {
-                try await Task.sleep(nanoseconds: 100_000_000) // 100ms
-                elapsedSeconds += 1
-                if elapsedSeconds % 50 == 0 { // Log every 5 seconds
-                    Log.orchestrator.debug("Still waiting... elapsed: \(elapsedSeconds / 10)s, isRunning: true")
-                }
-                if elapsedSeconds >= timeoutSeconds * 10 { // 100ms intervals
-                    // Timeout - terminate the process
-                    try? await processRunner.terminate(id: processId)
-                    terminalProcessId = nil
-                    updateMessage(id: responseMessage.id, content: responseContent + "\n\n[Timeout: Process terminated after 5 minutes]", status: .complete)
-                    await delegate?.orchestratorDidFinishStreaming(self)
-                    return ChatMessage(
-                        id: responseMessage.id,
-                        role: .assistant,
-                        content: responseContent + "\n\n[Timeout: Process terminated after 5 minutes]",
-                        timestamp: responseMessage.timestamp,
-                        status: .complete
-                    )
+            // Single consumer task drains chunks sequentially — no concurrent mutation.
+            // This task is always awaited before the method returns, so self stays alive.
+            let consumerTask = Task {
+                for await chunk in stream {
+                    responseContent += chunk
+                    await self.delegate?.orchestratorDidReceiveChunk(self, chunk: chunk)
+                    self.updateMessage(id: responseMessage.id, content: responseContent)
                 }
             }
 
+            // Wait for process to complete with wall-clock timeout (5 minutes)
+            let startTime = Date()
+            let timeoutInterval: TimeInterval = 300
+            var timedOut = false
+            Log.orchestrator.info("Waiting for process to complete...")
+
+            while await processRunner.isRunning(id: processId) && !terminalCancelled {
+                try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                let elapsed = Date().timeIntervalSince(startTime)
+                if Int(elapsed) % 5 == 0 && Int(elapsed) > 0 && Int(elapsed * 10) % 50 == 0 {
+                    Log.orchestrator.debug("Still waiting... elapsed: \(Int(elapsed))s, isRunning: true")
+                }
+                if elapsed >= timeoutInterval {
+                    timedOut = true
+                    try? await processRunner.terminate(id: processId)
+                    break
+                }
+            }
+
+            // Signal end of stream and wait for all chunks to be consumed
+            continuation.finish()
+            await consumerTask.value
+
             terminalProcessId = nil
+
+            // Handle timeout
+            if timedOut {
+                let finalContent = responseContent + "\n\n[Timeout: Process terminated after 5 minutes]"
+                updateMessage(id: responseMessage.id, content: finalContent, status: .complete)
+                await delegate?.orchestratorDidFinishStreaming(self)
+                return ChatMessage(
+                    id: responseMessage.id,
+                    role: .assistant,
+                    content: finalContent,
+                    timestamp: responseMessage.timestamp,
+                    status: .complete
+                )
+            }
+
+            // Handle user cancellation
+            if terminalCancelled {
+                terminalCancelled = false
+                let finalContent = responseContent + "\n\n*[Generation stopped]*"
+                updateMessage(id: responseMessage.id, content: finalContent, status: .complete)
+                await delegate?.orchestratorDidFinishStreaming(self)
+                return ChatMessage(
+                    id: responseMessage.id,
+                    role: .assistant,
+                    content: finalContent,
+                    timestamp: responseMessage.timestamp,
+                    status: .complete
+                )
+            }
 
             // Finalize message
             updateMessage(id: responseMessage.id, content: responseContent, status: .complete)
@@ -766,6 +798,7 @@ actor OrchestratorService {
     /// Stop the current terminal process if running
     func stopTerminalProcess() async {
         guard let processId = terminalProcessId else { return }
+        terminalCancelled = true
         try? await processRunner.terminate(id: processId)
         terminalProcessId = nil
     }
