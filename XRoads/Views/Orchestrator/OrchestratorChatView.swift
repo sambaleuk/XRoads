@@ -74,22 +74,12 @@ struct OrchestratorChatView: View {
         .overlay(
             Group {
                 if viewModel.mode == .artDirector {
-                    RoundedRectangle(cornerRadius: Theme.Radius.lg)
-                        .stroke(
-                            LinearGradient(
-                                colors: [.purple, .pink, .orange, .purple],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            ),
-                            lineWidth: 2
-                        )
-                        .shadow(color: .purple.opacity(0.4), radius: 8)
-                        .shadow(color: .pink.opacity(0.3), radius: 16)
+                    ArtDirectorGlowBorder()
                         .allowsHitTesting(false)
                 }
             }
         )
-        .animation(.easeInOut(duration: 2).repeatForever(autoreverses: true), value: viewModel.mode == .artDirector)
+        .animation(.easeInOut(duration: 0.3), value: viewModel.mode)
         .task {
             await viewModel.loadContext(from: appState)
         }
@@ -713,7 +703,7 @@ final class OrchestratorChatViewModel: ObservableObject, OrchestratorServiceDele
         inputText = ""
         isLoading = true
 
-        await orchestratorService.setMode(mode == .artDirector ? .api : mode)
+        await orchestratorService.setMode(mode)
         await orchestratorService.updateSystemPrompt(mode: mode)
 
         do {
@@ -868,6 +858,34 @@ final class OrchestratorChatViewModel: ObservableObject, OrchestratorServiceDele
             metadata: ["type": "system"]
         )
         messages.append(systemMessage)
+    }
+}
+
+// MARK: - Art Director Glow Border
+
+/// Self-contained pulsing glow border for Art Director mode.
+/// Uses its own @State animation toggle to avoid SwiftUI layout loop issues
+/// that occur with `.animation(.repeatForever, value:)` on parent views.
+private struct ArtDirectorGlowBorder: View {
+    @State private var glowIntensity: Bool = false
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: Theme.Radius.lg)
+            .stroke(
+                LinearGradient(
+                    colors: [.purple, .pink, .orange, .purple],
+                    startPoint: .topLeading,
+                    endPoint: .bottomTrailing
+                ),
+                lineWidth: 2
+            )
+            .shadow(color: .purple.opacity(glowIntensity ? 0.5 : 0.2), radius: glowIntensity ? 12 : 4)
+            .shadow(color: .pink.opacity(glowIntensity ? 0.4 : 0.1), radius: glowIntensity ? 20 : 8)
+            .onAppear {
+                withAnimation(.easeInOut(duration: 2).repeatForever(autoreverses: true)) {
+                    glowIntensity = true
+                }
+            }
     }
 }
 
