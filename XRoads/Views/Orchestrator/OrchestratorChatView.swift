@@ -799,6 +799,11 @@ final class OrchestratorChatViewModel: ObservableObject, OrchestratorServiceDele
         streamingMessageId = nil
     }
 
+    func orchestratorDidExecuteTool(_ service: OrchestratorService, name: String, input: String, output: String) {
+        // Tool execution is shown inline via streaming chunks from OrchestratorService
+        // This callback is available for additional UI feedback if needed
+    }
+
     func clearChat() {
         messages.removeAll()
         detectedPRD = nil

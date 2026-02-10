@@ -67,7 +67,7 @@ public enum OrchestratorMode: String, Codable, Sendable, CaseIterable {
     public var description: String {
         switch self {
         case .api:
-            return "Fast responses for PRD generation and quick questions"
+            return "Fast responses with tool execution for PRD generation and repo exploration"
         case .terminal:
             return "Full execution with file operations and loop orchestration"
         }

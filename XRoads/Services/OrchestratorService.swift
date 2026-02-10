@@ -58,6 +58,7 @@ protocol OrchestratorServiceDelegate: AnyObject {
     func orchestratorDidReceiveChunk(_ service: OrchestratorService, chunk: String)
     func orchestratorDidFinishStreaming(_ service: OrchestratorService)
     func orchestratorDidEncounterError(_ service: OrchestratorService, error: OrchestratorChatError)
+    func orchestratorDidExecuteTool(_ service: OrchestratorService, name: String, input: String, output: String)
 }
 
 // MARK: - OrchestratorService
@@ -76,6 +77,7 @@ actor OrchestratorService {
 
     private let processRunner: ProcessRunner
     private var terminalProcessId: UUID?
+    private var toolExecutor: ToolExecutor?
 
     // MARK: - Constants
 
@@ -248,6 +250,12 @@ actor OrchestratorService {
     /// Set the chat context
     func setContext(_ context: ChatContext) {
         self.context = context
+        if let path = context.projectPath {
+            self.toolExecutor = ToolExecutor(
+                processRunner: processRunner,
+                workingDirectory: path
+            )
+        }
     }
 
     /// Set the delegate for receiving events
@@ -337,74 +345,223 @@ actor OrchestratorService {
 
         await delegate?.orchestratorDidStartStreaming(self)
 
-        // Build request
-        var request = URLRequest(url: Self.apiURL)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
-        request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-
-        // Build messages array (excluding system messages and the placeholder)
-        let apiMessages: [[String: Any]] = conversationHistory
-            .filter { $0.role != .system && $0.id != responseMessage.id }
-            .map { message in
-                [
-                    "role": message.role == .user ? "user" : "assistant",
-                    "content": message.content
-                ]
-            }
-
-        let body: [String: Any] = [
-            "model": Self.defaultModel,
-            "max_tokens": Self.maxTokens,
-            "system": systemPrompt,
-            "messages": apiMessages,
-            "stream": true
-        ]
-
-        guard let jsonData = try? JSONSerialization.data(withJSONObject: body) else {
-            throw OrchestratorChatError.encodingFailed
-        }
-        request.httpBody = jsonData
-
-        // Make streaming request
         var responseContent = ""
+        var iteration = 0
 
         do {
-            let (bytes, response) = try await URLSession.shared.bytes(for: request)
+            // Tool-use loop: iterate until we get a final text response (stop_reason != "tool_use")
+            while iteration < ToolExecutor.maxToolIterations {
+                iteration += 1
 
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw OrchestratorChatError.invalidResponse
-            }
+                // Build request
+                var request = URLRequest(url: Self.apiURL)
+                request.httpMethod = "POST"
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+                request.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
 
-            guard httpResponse.statusCode == 200 else {
-                if httpResponse.statusCode == 429 {
-                    throw OrchestratorChatError.rateLimited
+                // Build messages array (excluding system messages and the placeholder)
+                let apiMessages: [[String: Any]] = conversationHistory
+                    .filter { $0.role != .system && $0.id != responseMessage.id }
+                    .map { message in
+                        // Messages with structured content blocks (tool_use / tool_result)
+                        if let meta = message.metadata,
+                           let contentJSON = meta["_contentBlocks"],
+                           let data = contentJSON.data(using: .utf8),
+                           let blocks = try? JSONSerialization.jsonObject(with: data) {
+                            return [
+                                "role": message.role == .user ? "user" : "assistant",
+                                "content": blocks
+                            ]
+                        }
+                        return [
+                            "role": message.role == .user ? "user" : "assistant",
+                            "content": message.content
+                        ]
+                    }
+
+                var body: [String: Any] = [
+                    "model": Self.defaultModel,
+                    "max_tokens": Self.maxTokens,
+                    "system": systemPrompt,
+                    "messages": apiMessages,
+                    "stream": true
+                ]
+
+                // Add tool definitions if executor is available
+                if toolExecutor != nil {
+                    body["tools"] = ToolExecutor.toolDefinitions
                 }
-                throw OrchestratorChatError.serverError(httpResponse.statusCode, "API request failed")
-            }
 
-            // Process SSE stream
-            for try await line in bytes.lines {
-                if line.hasPrefix("data: ") {
+                guard let jsonData = try? JSONSerialization.data(withJSONObject: body) else {
+                    throw OrchestratorChatError.encodingFailed
+                }
+                request.httpBody = jsonData
+
+                // SSE streaming state
+                var currentToolUseId: String?
+                var currentToolName: String?
+                var toolInputJSON = ""
+                var pendingToolCalls: [(id: String, name: String, input: [String: Any])] = []
+                var stopReason: String?
+                var textContent = ""
+                var assistantContentBlocks: [[String: Any]] = []
+
+                let (bytes, response) = try await URLSession.shared.bytes(for: request)
+
+                guard let httpResponse = response as? HTTPURLResponse else {
+                    throw OrchestratorChatError.invalidResponse
+                }
+
+                guard httpResponse.statusCode == 200 else {
+                    if httpResponse.statusCode == 429 {
+                        throw OrchestratorChatError.rateLimited
+                    }
+                    throw OrchestratorChatError.serverError(httpResponse.statusCode, "API request failed")
+                }
+
+                // Process SSE stream
+                for try await line in bytes.lines {
+                    guard line.hasPrefix("data: ") else { continue }
                     let jsonString = String(line.dropFirst(6))
-                    if jsonString == "[DONE]" {
+                    if jsonString == "[DONE]" { break }
+
+                    guard let data = jsonString.data(using: .utf8),
+                          let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                          let type = json["type"] as? String else { continue }
+
+                    switch type {
+                    case "content_block_start":
+                        if let block = json["content_block"] as? [String: Any],
+                           let blockType = block["type"] as? String {
+                            if blockType == "tool_use" {
+                                currentToolUseId = block["id"] as? String
+                                currentToolName = block["name"] as? String
+                                toolInputJSON = ""
+                            }
+                        }
+
+                    case "content_block_delta":
+                        if let delta = json["delta"] as? [String: Any],
+                           let deltaType = delta["type"] as? String {
+                            if deltaType == "text_delta", let text = delta["text"] as? String {
+                                textContent += text
+                                responseContent += text
+                                await delegate?.orchestratorDidReceiveChunk(self, chunk: text)
+                                updateMessage(id: responseMessage.id, content: responseContent)
+                            } else if deltaType == "input_json_delta",
+                                      let partial = delta["partial_json"] as? String {
+                                toolInputJSON += partial
+                            }
+                        }
+
+                    case "content_block_stop":
+                        // Finalize a tool_use block
+                        if let toolId = currentToolUseId, let toolName = currentToolName {
+                            let parsedInput: [String: Any]
+                            if let inputData = toolInputJSON.data(using: .utf8),
+                               let parsed = try? JSONSerialization.jsonObject(with: inputData) as? [String: Any] {
+                                parsedInput = parsed
+                            } else {
+                                parsedInput = [:]
+                            }
+                            pendingToolCalls.append((id: toolId, name: toolName, input: parsedInput))
+                            assistantContentBlocks.append([
+                                "type": "tool_use",
+                                "id": toolId,
+                                "name": toolName,
+                                "input": parsedInput
+                            ])
+                            currentToolUseId = nil
+                            currentToolName = nil
+                            toolInputJSON = ""
+                        }
+                        // Also capture text blocks for the assistant message
+                        if !textContent.isEmpty && currentToolUseId == nil {
+                            // Text block was finalized; already captured via textContent
+                        }
+
+                    case "message_delta":
+                        if let delta = json["delta"] as? [String: Any],
+                           let reason = delta["stop_reason"] as? String {
+                            stopReason = reason
+                        }
+
+                    default:
                         break
                     }
-
-                    if let data = jsonString.data(using: .utf8),
-                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                       let type = json["type"] as? String {
-
-                        if type == "content_block_delta",
-                           let delta = json["delta"] as? [String: Any],
-                           let text = delta["text"] as? String {
-                            responseContent += text
-                            await delegate?.orchestratorDidReceiveChunk(self, chunk: text)
-                            updateMessage(id: responseMessage.id, content: responseContent)
-                        }
-                    }
                 }
+
+                // If there was text content, add it to the content blocks
+                if !textContent.isEmpty {
+                    assistantContentBlocks.insert(["type": "text", "text": textContent], at: 0)
+                }
+
+                // Check if we need to execute tools
+                if stopReason == "tool_use" && !pendingToolCalls.isEmpty {
+                    // Store the assistant message with tool_use blocks in conversation history
+                    let blocksJSON = try? JSONSerialization.data(withJSONObject: assistantContentBlocks)
+                    let blocksString = blocksJSON.flatMap { String(data: $0, encoding: .utf8) }
+                    let assistantMsg = ChatMessage(
+                        role: .assistant,
+                        content: textContent,
+                        metadata: blocksString.map { ["_contentBlocks": $0] }
+                    )
+                    addMessage(assistantMsg)
+
+                    // Execute each tool call and build tool_result blocks
+                    var toolResultBlocks: [[String: Any]] = []
+                    for call in pendingToolCalls {
+                        let inputDesc = (call.input["command"] as? String)
+                            ?? (call.input["path"] as? String)
+                            ?? ""
+
+                        // Show tool execution in chat
+                        let toolIndicator = "\n> **\(call.name)**: `\(inputDesc.prefix(100))`\n"
+                        responseContent += toolIndicator
+                        await delegate?.orchestratorDidReceiveChunk(self, chunk: toolIndicator)
+                        updateMessage(id: responseMessage.id, content: responseContent)
+
+                        // Execute the tool
+                        var result: (content: String, isError: Bool) = ("Tool executor not available", true)
+                        if let executor = toolExecutor {
+                            result = await executor.execute(toolName: call.name, input: call.input)
+                        }
+
+                        await delegate?.orchestratorDidExecuteTool(
+                            self,
+                            name: call.name,
+                            input: inputDesc,
+                            output: String(result.content.prefix(200))
+                        )
+
+                        var toolResultBlock: [String: Any] = [
+                            "type": "tool_result",
+                            "tool_use_id": call.id,
+                            "content": result.content
+                        ]
+                        if result.isError {
+                            toolResultBlock["is_error"] = true
+                        }
+                        toolResultBlocks.append(toolResultBlock)
+                    }
+
+                    // Store the tool_result message in conversation history
+                    let resultBlocksJSON = try? JSONSerialization.data(withJSONObject: toolResultBlocks)
+                    let resultBlocksString = resultBlocksJSON.flatMap { String(data: $0, encoding: .utf8) }
+                    let toolResultMsg = ChatMessage(
+                        role: .user,
+                        content: "",
+                        metadata: resultBlocksString.map { ["_contentBlocks": $0] }
+                    )
+                    addMessage(toolResultMsg)
+
+                    // Loop back to make another API call
+                    continue
+                }
+
+                // No more tool calls -- we're done
+                break
             }
 
             // Finalize message
