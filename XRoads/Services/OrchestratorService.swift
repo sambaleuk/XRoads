@@ -231,6 +231,17 @@ actor OrchestratorService {
     3. Ensure acceptance criteria reference specific design tokens
     If no art-bible.json exists, omit the design_context field.
 
+    ## Available Modes
+    The user can switch between modes using the dropdown in the input bar (bottom-left):
+    - **API** (current): Fast chat for PRD generation, questions, and repo exploration
+    - **Terminal**: Full execution with file operations via Claude CLI
+    - **Art Director**: Design deep-dive for creating visual identities and art-bible.json
+
+    If the user asks to "switch to art director mode", "enter design mode", or anything similar,
+    tell them: "You can switch to Art Director mode using the mode selector (dropdown) at the
+    bottom-left of the chat input. Select 'Art Director' from the menu."
+    Do NOT try to run commands, scripts, or tools to activate modes — mode switching is a UI action.
+
     ## Important
     - ALWAYS ask clarifying questions FIRST (unless user says to skip)
     - NEVER skip the `unit_test` field - the Nexus loop requires it
