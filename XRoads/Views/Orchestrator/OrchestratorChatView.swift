@@ -69,6 +69,32 @@ struct OrchestratorChatView: View {
                     openSlotAssignment(for: prd)
                 }
             )
+
+            // Art Bible Proposal Overlay
+            ArtBibleProposalOverlay(
+                detectedArtBible: viewModel.detectedArtBible,
+                projectPath: appState.projectPath,
+                onDismiss: {
+                    withAnimation { viewModel.dismissArtBibleProposal() }
+                },
+                onSaved: {
+                    withAnimation { viewModel.dismissArtBibleProposal() }
+                    // Reload context so DesignContext pipeline activates immediately
+                    Task {
+                        await viewModel.loadContext(from: appState)
+                    }
+                    viewModel.addSystemMessage("""
+                        art-bible.json sauvegard\u{00e9} avec succ\u{00e8}s.
+
+                        Les design tokens sont maintenant actifs. Ils seront automatiquement inject\u{00e9}s dans :
+                        \u{2022} Le **system prompt** de l'orchestrateur
+                        \u{2022} Les fichiers **AGENT.md** de chaque worktree
+                        \u{2022} Les **PRD** g\u{00e9}n\u{00e9}r\u{00e9}s (section `design_context`)
+
+                        Vous pouvez maintenant cr\u{00e9}er un PRD design-aware en mode API.
+                        """)
+                }
+            )
         }
         .background(Color.bgApp)
         .overlay(
@@ -848,6 +874,10 @@ final class OrchestratorChatViewModel: ObservableObject, OrchestratorServiceDele
 
     func dismissPRDProposal() {
         detectedPRD = nil
+    }
+
+    func dismissArtBibleProposal() {
+        detectedArtBible = nil
     }
 
     func addSystemMessage(_ content: String) {
