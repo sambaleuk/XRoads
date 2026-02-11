@@ -351,6 +351,8 @@ extension ActionType {
             return "Docs"
         case .custom:
             return "Custom"
+        case .debug:
+            return "Debug"
         }
     }
 }

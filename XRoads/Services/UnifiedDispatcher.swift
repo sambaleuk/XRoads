@@ -15,6 +15,7 @@ import Foundation
 enum DispatchMode: String, Sendable {
     case single     // Single slot, no PRD, no dependencies
     case prd        // PRD-based multi-slot with dependency layers
+    case debug      // Debug workflow: BugReport → debug PRD → layered dispatch
     case chat       // Chat-initiated action (future)
     case quickAction // Quick action button (future)
 }
@@ -39,6 +40,9 @@ struct DispatchRequest: Sendable {
     let slotAssignments: [Int: (agentType: AgentType, actionType: ActionType, storyIds: [String])]?
     let repoPath: URL?
 
+    // Debug mode params
+    let bugReport: BugReport?
+
     // Chat mode params (future)
     let chatIntent: String?
 
@@ -57,6 +61,7 @@ struct DispatchRequest: Sendable {
         prd: PRDDocument? = nil,
         slotAssignments: [Int: (agentType: AgentType, actionType: ActionType, storyIds: [String])]? = nil,
         repoPath: URL? = nil,
+        bugReport: BugReport? = nil,
         chatIntent: String? = nil,
         resumeMode: Bool = false
     ) {
@@ -71,6 +76,7 @@ struct DispatchRequest: Sendable {
         self.prd = prd
         self.slotAssignments = slotAssignments
         self.repoPath = repoPath
+        self.bugReport = bugReport
         self.chatIntent = chatIntent
         self.resumeMode = resumeMode
     }
@@ -110,6 +116,21 @@ struct DispatchRequest: Sendable {
             slotAssignments: slotAssignments,
             repoPath: repoPath,
             resumeMode: resumeMode
+        )
+    }
+
+    /// Create a debug dispatch request from a bug report
+    static func debug(
+        report: BugReport,
+        slotCount: Int,
+        repoPath: URL,
+        source: DispatchSource = .quickAction
+    ) -> DispatchRequest {
+        DispatchRequest(
+            mode: .debug,
+            source: source,
+            repoPath: repoPath,
+            bugReport: report
         )
     }
 
@@ -187,6 +208,7 @@ actor UnifiedDispatcher {
     private let layeredDispatcher: LayeredDispatcher
     private let actionRunner: ActionRunner
     private let gitService: GitService
+    private let debugDispatcher: DebugDispatcher
 
     // MARK: - State
 
@@ -198,11 +220,13 @@ actor UnifiedDispatcher {
     init(
         layeredDispatcher: LayeredDispatcher? = nil,
         actionRunner: ActionRunner? = nil,
-        gitService: GitService? = nil
+        gitService: GitService? = nil,
+        debugDispatcher: DebugDispatcher? = nil
     ) {
         self.layeredDispatcher = layeredDispatcher ?? LayeredDispatcher()
         self.actionRunner = actionRunner ?? ActionRunner()
         self.gitService = gitService ?? GitService()
+        self.debugDispatcher = debugDispatcher ?? DebugDispatcher()
     }
 
     // MARK: - Public API
@@ -237,6 +261,9 @@ actor UnifiedDispatcher {
             case .prd:
                 result = try await dispatchPRD(request, callbacks: callbacks)
 
+            case .debug:
+                result = try await dispatchDebug(request, callbacks: callbacks)
+
             case .chat:
                 result = try await dispatchChat(request, callbacks: callbacks)
 
@@ -246,9 +273,9 @@ actor UnifiedDispatcher {
 
             requestResults[request.id] = result
 
-            // For PRD mode, onComplete is deferred to LayeredDispatcher
+            // For PRD/debug mode, onComplete is deferred to LayeredDispatcher
             // (fires when all slots actually finish, not when launch returns)
-            if request.mode != .prd {
+            if request.mode != .prd && request.mode != .debug {
                 callbacks.onComplete()
             }
 
@@ -276,7 +303,7 @@ actor UnifiedDispatcher {
         guard let request = activeRequests[requestId] else { return }
 
         switch request.mode {
-        case .prd:
+        case .prd, .debug:
             await layeredDispatcher.stopAll()
         case .single:
             // Stop via ActionRunner if process ID is tracked
@@ -417,6 +444,52 @@ actor UnifiedDispatcher {
             startedAt: startedAt,
             mode: .prd
         )
+    }
+
+    // MARK: - Private: Debug Mode Dispatch
+
+    private func dispatchDebug(
+        _ request: DispatchRequest,
+        callbacks: DispatchCallbacks
+    ) async throws -> DispatchResult {
+        guard let report = request.bugReport,
+              let repoPath = request.repoPath else {
+            throw UnifiedDispatcherError.missingParameters(mode: .debug)
+        }
+
+        // If PRD + assignments are already provided (pre-generated), use them directly
+        if let prd = request.prd, let assignments = request.slotAssignments {
+            let prdRequest = DispatchRequest.prd(
+                prd: prd,
+                slotAssignments: assignments,
+                repoPath: repoPath,
+                source: request.source
+            )
+            return try await dispatchPRD(prdRequest, callbacks: callbacks)
+        }
+
+        // Otherwise generate the debug PRD from the bug report
+        let slotCount = request.slotAssignments?.count ?? 3
+        let (prd, assignments) = await debugDispatcher.generateDebugPRD(
+            report: report,
+            slotCount: slotCount
+        )
+
+        callbacks.onLog(LogEntry(
+            level: .info,
+            source: "dispatcher",
+            worktree: nil,
+            message: "[debug] Generated debug PRD with \(prd.userStories.count) stories across \(assignments.count) slots"
+        ))
+
+        let prdRequest = DispatchRequest.prd(
+            prd: prd,
+            slotAssignments: assignments,
+            repoPath: repoPath,
+            source: request.source
+        )
+
+        return try await dispatchPRD(prdRequest, callbacks: callbacks)
     }
 
     // MARK: - Private: Chat Mode Dispatch

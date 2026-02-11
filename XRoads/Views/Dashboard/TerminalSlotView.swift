@@ -944,6 +944,7 @@ private struct ActionTypeBadge: View {
         case .integrationTest: return "TST"
         case .write: return "DOC"
         case .custom: return "CUS"
+        case .debug: return "DBG"
         }
     }
 

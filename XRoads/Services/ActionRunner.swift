@@ -375,6 +375,10 @@ actor ActionRunner {
             if let task = request.taskDescription {
                 instructions.append("Task: \(task)")
             }
+
+        case .debug:
+            instructions.append("Read AGENT.md for your debug mission brief.")
+            instructions.append("Follow the debug workflow: reproduce, diagnose, fix, verify.")
         }
 
         // Add skill references
@@ -422,6 +426,15 @@ actor ActionRunner {
         case .custom:
             return [
                 "Task completed as specified in AGENT.md"
+            ]
+
+        case .debug:
+            return [
+                "Bug reproduced with failing test",
+                "Root cause identified",
+                "Minimal fix implemented",
+                "Reproduction test passes",
+                "Non-regression tests added"
             ]
         }
     }

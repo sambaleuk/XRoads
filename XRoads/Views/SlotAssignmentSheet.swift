@@ -490,6 +490,7 @@ struct SlotAssignmentSheet: View {
         case .integrationTest: return Color.statusWarning
         case .write: return Color(hex: "#bc8cff")
         case .custom: return Color.textSecondary
+        case .debug: return Color.statusError
         }
     }
 

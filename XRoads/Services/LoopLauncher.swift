@@ -505,7 +505,7 @@ actor LoopLauncher {
         **\(config.actionType.description)**
 
         \(skillsSection)
-
+        \(debugRoleInstructions(config: config))
         ## CRITICAL: Working Directory
 
         **YOU MUST WORK AT THE ROOT OF THIS WORKTREE.**
@@ -726,6 +726,162 @@ actor LoopLauncher {
     private func loadDesignContext(repoPath: String) -> String? {
         guard let dc = DesignContext.load(from: repoPath) else { return nil }
         return dc.agentMarkdown
+    }
+
+    // MARK: - Debug Role Instructions
+
+    /// Generate debug role-specific instructions for AGENT.md when actionType is .debug.
+    /// Returns an empty string for non-debug actions.
+    private func debugRoleInstructions(config: LoopConfiguration) -> String {
+        guard config.actionType == .debug else { return "" }
+
+        let bugContext = config.fullPRD.bugReport.map { report in
+            """
+
+            ## Bug Context
+
+            - **Signal:** \(report.signal)
+            - **Expected:** \(report.expected)
+            - **Actual:** \(report.actual)
+            - **Severity:** \(report.severity.displayName)
+            - **Reproducibility:** \(report.reproducibility.displayName)
+            \(report.affectedFiles.isEmpty ? "" : "- **Affected files:** \(report.affectedFiles.joined(separator: ", "))")
+            \(report.stackTrace.map { "- **Stack trace:**\n```\n\($0)\n```" } ?? "")
+            \(report.suspectCommit.map { "- **Suspect commit:** \($0)" } ?? "")
+
+            """
+        } ?? ""
+
+        // Generate role-specific instructions based on story ID prefixes
+        let roleInstructions = config.stories.map { story -> String in
+            let instructions = roleInstructionsForStory(storyId: story.id)
+            return """
+            ### Role: \(story.id)
+            \(instructions)
+            """
+        }.joined(separator: "\n\n")
+
+        return """
+
+        ## Debug Workflow Instructions
+        \(bugContext)
+        \(roleInstructions)
+
+        """
+    }
+
+    /// Map a story ID prefix to role-specific instructions
+    private func roleInstructionsForStory(storyId: String) -> String {
+        if storyId.hasPrefix("BUG-REPRO") {
+            return """
+            **Your mission: Reproduce this bug with a minimal failing test.**
+
+            1. Read the bug signal and stack trace carefully
+            2. Identify the minimal code path that triggers the bug
+            3. Write a focused test that FAILS, demonstrating the exact symptom
+            4. The test name should describe the bug (e.g., `test_crash_when_nil_input`)
+            5. Commit the failing test with message: `test: reproduce bug [BUG-REPRO]`
+            6. Do NOT fix the bug — only reproduce it
+            """
+        }
+        if storyId.hasPrefix("BUG-BLAST") {
+            return """
+            **Your mission: Map the blast radius of the affected code.**
+
+            1. Identify ALL callers of the affected function/method
+            2. Check which contracts (protocols, interfaces) are involved
+            3. List all files that import or depend on the affected module
+            4. Check test coverage: which callers have tests? Which don't?
+            5. Document findings in `progress.txt`
+            6. Commit analysis with message: `docs: blast radius analysis [BUG-BLAST]`
+            """
+        }
+        if storyId.hasPrefix("BUG-REGR") {
+            return """
+            **Your mission: Detect the regression origin.**
+
+            1. Use `git log` and `git blame` on the affected files
+            2. Look for recent changes that could have introduced the bug
+            3. If a suspect commit exists, analyze what it changed
+            4. Document the likely introduction point in `progress.txt`
+            5. Commit findings with message: `docs: regression analysis [BUG-REGR]`
+            """
+        }
+        if storyId.hasPrefix("BUG-H") {
+            return """
+            **Your mission: Investigate a root-cause hypothesis.**
+
+            1. Read the reproduction test and blast radius analysis from other agents
+            2. Form a specific hypothesis about the root cause
+            3. Write diagnostic code or additional tests to confirm/deny your hypothesis
+            4. Document your hypothesis and evidence in `progress.txt`
+            5. If confirmed, describe the exact fix needed
+            6. Commit with message: `docs: hypothesis investigation [BUG-H*]`
+            """
+        }
+        if storyId.hasPrefix("BUG-FIX") {
+            return """
+            **Your mission: Implement the minimal fix.**
+
+            1. Read the confirmed hypothesis from diagnosis phase
+            2. Implement the MINIMAL change that fixes the root cause
+            3. The reproduction test MUST now pass (go GREEN)
+            4. Do NOT refactor surrounding code — fix only the bug
+            5. Run the repro test to verify: the failing test must now PASS
+            6. Commit with message: `fix: <concise description> [BUG-FIX]`
+            """
+        }
+        if storyId.hasPrefix("BUG-GUARD") {
+            return """
+            **Your mission: Write non-regression tests.**
+
+            1. Read the blast radius analysis to identify callers and edge cases
+            2. Write tests for each caller that exercises the fixed code path
+            3. Write edge-case tests (nil inputs, empty collections, boundary values)
+            4. All tests must PASS with the fix applied
+            5. Commit with message: `test: non-regression guards [BUG-GUARD]`
+            """
+        }
+        if storyId.hasPrefix("BUG-SUITE") {
+            return """
+            **Your mission: Run the full test suite.**
+
+            1. Run `swift build` — it must compile without errors
+            2. Run `swift test` — all tests must pass
+            3. If any test fails, document which test and why in `progress.txt`
+            4. Report the total test count and pass/fail summary
+            5. Commit any test fixes with message: `test: suite verification [BUG-SUITE]`
+            """
+        }
+        if storyId.hasPrefix("BUG-SCAN") {
+            return """
+            **Your mission: Scan the codebase for the same anti-pattern.**
+
+            1. Identify the specific pattern that caused this bug
+            2. Search the ENTIRE codebase for similar patterns (grep, find)
+            3. For each occurrence, assess if it has the same vulnerability
+            4. Create a list of locations that need the same fix
+            5. Document findings in `progress.txt`
+            6. Commit with message: `docs: anti-pattern scan [BUG-SCAN]`
+            """
+        }
+        if storyId.hasPrefix("BUG-RETEX") {
+            return """
+            **Your mission: Write a RETEX (lessons learned) document.**
+
+            1. Read all `progress.txt` files from other agents
+            2. Summarize: root cause, fix applied, blast radius
+            3. Write a RETEX document at `docs/retex/BUG-<date>.md` with:
+               - **What happened**: symptom and impact
+               - **Root cause**: why it happened
+               - **Fix**: what was changed
+               - **Prevention**: how to prevent similar bugs
+               - **Detection**: how to catch this earlier
+            4. Commit with message: `docs: RETEX for bug fix [BUG-RETEX]`
+            """
+        }
+        // Fallback for unknown debug story IDs
+        return "Follow the debug workflow as described in the bug context above."
     }
 
     /// Process a prompt template, replacing placeholders with actual values

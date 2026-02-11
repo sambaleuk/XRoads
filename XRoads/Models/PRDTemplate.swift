@@ -305,6 +305,7 @@ struct PRDDocument: Codable, Hashable, Sendable, Identifiable {
     var architecture: [String: String]?
     var successMetrics: [String]?
     var designContext: DesignContext?
+    var bugReport: BugReport?
 
     init(
         id: UUID = UUID(),
@@ -315,7 +316,8 @@ struct PRDDocument: Codable, Hashable, Sendable, Identifiable {
         templateType: PRDTemplateType = .feature,
         userStories: [PRDUserStory] = [],
         vision: PRDVision? = nil,
-        designContext: DesignContext? = nil
+        designContext: DesignContext? = nil,
+        bugReport: BugReport? = nil
     ) {
         self.id = id
         self.version = version
@@ -330,6 +332,7 @@ struct PRDDocument: Codable, Hashable, Sendable, Identifiable {
         self.architecture = nil
         self.successMetrics = nil
         self.designContext = designContext
+        self.bugReport = bugReport
     }
 
     // MARK: - Computed Properties

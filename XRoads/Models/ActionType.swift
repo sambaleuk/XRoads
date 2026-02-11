@@ -8,6 +8,7 @@ enum ActionType: String, Codable, Hashable, Sendable, CaseIterable {
     case integrationTest
     case write
     case custom
+    case debug
 
     /// Human-readable display name for the action
     var displayName: String {
@@ -17,6 +18,7 @@ enum ActionType: String, Codable, Hashable, Sendable, CaseIterable {
         case .integrationTest: return "Integration Test"
         case .write: return "Write Docs"
         case .custom: return "Custom"
+        case .debug: return "Debug"
         }
     }
 
@@ -28,6 +30,7 @@ enum ActionType: String, Codable, Hashable, Sendable, CaseIterable {
         case .integrationTest: return "testtube.2"
         case .write: return "doc.text.fill"
         case .custom: return "gearshape.fill"
+        case .debug: return "ladybug.fill"
         }
     }
 
@@ -44,6 +47,8 @@ enum ActionType: String, Codable, Hashable, Sendable, CaseIterable {
             return "Generate documentation, README, API docs"
         case .custom:
             return "Custom action with user-defined skills"
+        case .debug:
+            return "Systematic bug reproduction, diagnosis, fix, and verification"
         }
     }
 
@@ -60,6 +65,8 @@ enum ActionType: String, Codable, Hashable, Sendable, CaseIterable {
             return ["doc-generator"]
         case .custom:
             return [] // Custom actions have user-defined skills
+        case .debug:
+            return ["bug-reproducer", "code-reviewer", "commit"]
         }
     }
 
@@ -73,7 +80,7 @@ enum ActionType: String, Codable, Hashable, Sendable, CaseIterable {
         switch self {
         case .implement, .review:
             return .dev
-        case .integrationTest:
+        case .integrationTest, .debug:
             return .qa
         case .write, .custom:
             return .ops
@@ -83,7 +90,7 @@ enum ActionType: String, Codable, Hashable, Sendable, CaseIterable {
     /// Whether this action includes unit tests as part of its workflow
     var includesUnitTests: Bool {
         switch self {
-        case .implement:
+        case .implement, .debug:
             return true
         case .review, .integrationTest, .write, .custom:
             return false

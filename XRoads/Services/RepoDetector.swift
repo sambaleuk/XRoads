@@ -264,6 +264,8 @@ actor RepoDetector {
             prefix = "docs"
         case .custom:
             prefix = "task"
+        case .debug:
+            prefix = "fix"
         }
 
         let timestamp = Int(Date().timeIntervalSince1970) % 10000
