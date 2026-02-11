@@ -94,11 +94,14 @@ actor LayeredDispatcher {
 
     // MARK: - Public API
 
-    /// Start the layered dispatch process
+    /// Start the layered dispatch process.
+    /// When `resumeMode` is true, the existing status.json is preserved (not overwritten)
+    /// and dispatch begins from the first layer that still has incomplete stories.
     func startDispatch(
         prd: PRDDocument,
         slotAssignments: [Int: (agentType: AgentType, actionType: ActionType, storyIds: [String])],
         repoPath: URL,
+        resumeMode: Bool = false,
         onProgress: @escaping (DispatchProgress) -> Void,
         onSlotUpdate: @escaping (SlotLaunchInfo) -> Void,
         onSlotOutput: @escaping (Int, String) -> Void,
@@ -125,15 +128,16 @@ actor LayeredDispatcher {
                 .map { $0.storyIds }
             emitProgress("Computed \(layers.count) dependency layer(s) with \(prd.userStories.count) stories")
 
-            // Initialize status file
+            // Initialize status file (in resume mode, preserves existing completions)
             let sessionId = UUID()
-            emitProgress("Phase 1/6: Creating status file...")
+            emitProgress(resumeMode ? "Phase 1/6: Reusing existing status file..." : "Phase 1/6: Creating status file...")
             statusFilePath = try await loopLauncher.initializeSession(
                 repoPath: repoPath,
                 sessionId: sessionId,
-                prd: prd
+                prd: prd,
+                resumeIfExists: resumeMode
             )
-            emitProgress("Status file created at \(statusFilePath?.lastPathComponent ?? "unknown")")
+            emitProgress("Status file at \(statusFilePath?.lastPathComponent ?? "unknown")")
 
             // Phase 2: Create all worktrees upfront
             emitProgress("Phase 2/6: Creating \(slotAssignments.count) worktrees...")
@@ -148,10 +152,18 @@ actor LayeredDispatcher {
             emitProgress("Phase 4/6: Starting status monitor...")
             await startStatusMonitor()
 
-            // Phase 5: Launch first layer
+            // Phase 5: Launch from the correct layer
             currentPhase = .launchingLayer
-            currentLayerIndex = 0
-            emitProgress("Phase 5/6: Launching layer 1/\(layers.count)...")
+
+            // In resume mode, skip layers where all stories are already complete
+            if resumeMode {
+                currentLayerIndex = findFirstIncompleteLayer()
+                emitProgress("Phase 5/6: Resuming from layer \(currentLayerIndex + 1)/\(layers.count)...")
+            } else {
+                currentLayerIndex = 0
+                emitProgress("Phase 5/6: Launching layer 1/\(layers.count)...")
+            }
+
             try await launchCurrentLayer()
 
             // Phase 6: Now in monitoring mode
@@ -164,6 +176,29 @@ actor LayeredDispatcher {
             emitProgress("DISPATCH FAILED: \(error.localizedDescription)")
             onError(error)
         }
+    }
+
+    /// Find the first layer that has at least one incomplete story (for resume mode).
+    private func findFirstIncompleteLayer() -> Int {
+        guard let path = statusFilePath,
+              let data = try? Data(contentsOf: path),
+              let statusFile = try? {
+                  let decoder = JSONDecoder()
+                  decoder.dateDecodingStrategy = .iso8601
+                  return try decoder.decode(OrchestrationStatusFile.self, from: data)
+              }() else {
+            return 0
+        }
+
+        for (index, layerStoryIds) in layers.enumerated() {
+            let allComplete = layerStoryIds.allSatisfy { storyId in
+                statusFile.stories[storyId]?.status == .complete
+            }
+            if !allComplete {
+                return index
+            }
+        }
+        return 0
     }
 
     /// Stop all running loops

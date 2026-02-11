@@ -256,6 +256,16 @@ final class AppState {
     var activePRDURL: URL? { orchestration.activePRDURL }
     var activePRDName: String? { orchestration.activePRDName }
 
+    var recoveredOrchestration: RecoveredOrchestration? {
+        get { orchestration.recoveredOrchestration }
+        set { orchestration.recoveredOrchestration = newValue }
+    }
+
+    var showRecoverySlotAssignment: Bool {
+        get { orchestration.showRecoverySlotAssignment }
+        set { orchestration.showRecoverySlotAssignment = newValue }
+    }
+
     var dashboardEntries: [AgentDashboardEntry] { orchestration.dashboardEntries }
     var globalDashboardProgress: Double { orchestration.globalDashboardProgress }
 
@@ -1680,6 +1690,29 @@ final class AppState {
         if isGitRepository {
             await loadRecentCommits()
         }
+
+        // Check for interrupted orchestration to offer recovery
+        let repoURL = URL(fileURLWithPath: path)
+        let recovery = await services.orchestrationRecovery.checkForRecovery(repoPath: repoURL)
+        await MainActor.run { self.orchestration.recoveredOrchestration = recovery }
+    }
+
+    /// Dismiss the recovery banner without resuming.
+    func dismissRecovery() {
+        orchestration.recoveredOrchestration = nil
+    }
+
+    /// Resume an interrupted orchestration by opening the slot assignment sheet
+    /// with only the remaining (incomplete) stories pre-selected.
+    func resumeOrchestration() {
+        guard let recovery = orchestration.recoveredOrchestration else { return }
+
+        // Store the recovery info so the dispatch flow knows to use resume mode
+        orchestration.pendingRecovery = recovery
+        orchestration.orchestrationRepoPath = recovery.repoPath
+
+        // Signal the UI to open the recovery slot assignment sheet
+        orchestration.showRecoverySlotAssignment = true
     }
 
     /// Loads recent commits for the current project

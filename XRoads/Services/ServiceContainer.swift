@@ -49,6 +49,9 @@ protocol ServiceContainer: Sendable {
 
     /// Session persistence for repo-level session storage
     var sessionPersistence: SessionPersistenceService { get }
+
+    /// Orchestration recovery for detecting interrupted sessions on launch
+    var orchestrationRecovery: OrchestrationRecoveryService { get }
 }
 
 // MARK: - DefaultServiceContainer
@@ -76,6 +79,7 @@ final class DefaultServiceContainer: ServiceContainer, @unchecked Sendable {
     let unifiedDispatcher: UnifiedDispatcher
     let orchestrator: ClaudeOrchestrator
     let sessionPersistence: SessionPersistenceService
+    let orchestrationRecovery: OrchestrationRecoveryService
 
     init(
         gitService: GitService = GitService(),
@@ -114,6 +118,7 @@ final class DefaultServiceContainer: ServiceContainer, @unchecked Sendable {
             agentEventBus: agentEventBus,
             mergeCoordinator: mergeCoordinator
         )
+        self.orchestrationRecovery = OrchestrationRecoveryService()
     }
 }
 
@@ -147,6 +152,7 @@ final class MockServiceContainer: ServiceContainer, @unchecked Sendable {
     let unifiedDispatcher: UnifiedDispatcher
     let orchestrator: ClaudeOrchestrator
     let sessionPersistence: SessionPersistenceService
+    let orchestrationRecovery: OrchestrationRecoveryService
 
     init() {
         // Critical services initialized with testMode to prevent real I/O
@@ -180,5 +186,6 @@ final class MockServiceContainer: ServiceContainer, @unchecked Sendable {
             agentEventBus: agentEventBus,
             mergeCoordinator: mergeCoordinator
         )
+        self.orchestrationRecovery = OrchestrationRecoveryService()
     }
 }

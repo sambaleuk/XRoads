@@ -42,6 +42,9 @@ struct DispatchRequest: Sendable {
     // Chat mode params (future)
     let chatIntent: String?
 
+    // Resume mode: preserve existing status.json and skip completed layers
+    let resumeMode: Bool
+
     init(
         id: UUID = UUID(),
         mode: DispatchMode,
@@ -54,7 +57,8 @@ struct DispatchRequest: Sendable {
         prd: PRDDocument? = nil,
         slotAssignments: [Int: (agentType: AgentType, actionType: ActionType, storyIds: [String])]? = nil,
         repoPath: URL? = nil,
-        chatIntent: String? = nil
+        chatIntent: String? = nil,
+        resumeMode: Bool = false
     ) {
         self.id = id
         self.mode = mode
@@ -68,6 +72,7 @@ struct DispatchRequest: Sendable {
         self.slotAssignments = slotAssignments
         self.repoPath = repoPath
         self.chatIntent = chatIntent
+        self.resumeMode = resumeMode
     }
 
     /// Create a single slot dispatch request
@@ -95,14 +100,16 @@ struct DispatchRequest: Sendable {
         prd: PRDDocument,
         slotAssignments: [Int: (agentType: AgentType, actionType: ActionType, storyIds: [String])],
         repoPath: URL,
-        source: DispatchSource = .prdLoader
+        source: DispatchSource = .prdLoader,
+        resumeMode: Bool = false
     ) -> DispatchRequest {
         DispatchRequest(
             mode: .prd,
             source: source,
             prd: prd,
             slotAssignments: slotAssignments,
-            repoPath: repoPath
+            repoPath: repoPath,
+            resumeMode: resumeMode
         )
     }
 
@@ -357,6 +364,7 @@ actor UnifiedDispatcher {
             prd: prd,
             slotAssignments: slotAssignments,
             repoPath: repoPath,
+            resumeMode: request.resumeMode,
             onProgress: { progress in
                 callbacks.onProgress(progress)
             },

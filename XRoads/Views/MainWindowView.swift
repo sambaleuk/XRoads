@@ -102,6 +102,15 @@ struct MainWindowView: View {
     @ViewBuilder
     private var agenticModeLayout: some View {
         VStack(spacing: 0) {
+            // Recovery banner (shown when interrupted orchestration detected)
+            if let recovery = appState.recoveredOrchestration {
+                OrchestrationRecoveryBanner(
+                    recovery: recovery,
+                    onResume: { appState.resumeOrchestration() },
+                    onDismiss: { appState.dismissRecovery() }
+                )
+            }
+
             // Main content
             HStack(spacing: 0) {
                 // Left: Orchestrator Chat Panel (US-V4-015)
@@ -979,6 +988,42 @@ private struct SheetsModifier: ViewModifier {
             .sheet(isPresented: historySheetBinding) {
                 OrchestrationHistorySheet()
             }
+            .sheet(isPresented: recoverySlotBinding) {
+                if let recovery = appState.orchestration.pendingRecovery,
+                   let prd = buildRecoveryPRD(from: recovery) {
+                    SlotAssignmentSheet(prd: prd, repoPath: recovery.repoPath, resumeMode: true) {
+                        appState.dismissRecovery()
+                    }
+                }
+            }
+    }
+
+    private var recoverySlotBinding: Binding<Bool> {
+        Binding(
+            get: { appState.showRecoverySlotAssignment },
+            set: { appState.showRecoverySlotAssignment = $0 }
+        )
+    }
+
+    /// Build a PRDDocument containing only remaining stories from a recovered orchestration.
+    private func buildRecoveryPRD(from recovery: RecoveredOrchestration) -> PRDDocument? {
+        let remainingIds = Set(recovery.remainingStories.map(\.id))
+        let stories = recovery.remainingStories.map { story in
+            PRDUserStory(
+                id: story.id,
+                title: story.id,
+                description: "Resumed from interrupted orchestration",
+                priority: .medium,
+                acceptanceCriteria: [],
+                dependsOn: story.dependsOn.filter { remainingIds.contains($0) }
+            )
+        }
+        guard !stories.isEmpty else { return nil }
+        return PRDDocument(
+            featureName: recovery.prdName + " (Resume)",
+            description: "Resuming \(recovery.remainingStories.count) remaining stories from interrupted orchestration.",
+            userStories: stories
+        )
     }
 }
 

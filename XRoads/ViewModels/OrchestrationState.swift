@@ -58,6 +58,17 @@ final class OrchestrationSubState {
     var selectedConflictFile: String?
     var isConflictSheetPresented: Bool = false
 
+    // MARK: - Recovery
+
+    /// Detected interrupted orchestration from a previous session (set on app launch)
+    var recoveredOrchestration: RecoveredOrchestration?
+
+    /// When set, the next dispatch should operate in resume mode using this recovery data.
+    var pendingRecovery: RecoveredOrchestration?
+
+    /// Triggers the slot assignment sheet in recovery mode.
+    var showRecoverySlotAssignment: Bool = false
+
     // MARK: - History & PRD
 
     var historyRecords: [OrchestrationRecord] = []

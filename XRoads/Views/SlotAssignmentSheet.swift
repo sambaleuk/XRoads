@@ -22,6 +22,7 @@ struct SlotStoryAssignment: Identifiable {
 struct SlotAssignmentSheet: View {
     let prd: PRDDocument
     let repoPath: URL
+    var resumeMode: Bool = false
     var onComplete: (() -> Void)?
 
     @Environment(\.dismiss) private var dismiss
@@ -756,7 +757,8 @@ struct SlotAssignmentSheet: View {
                 prd: prd,
                 slotAssignments: slotAssignmentsTyped,
                 repoPath: repoPath,
-                source: .prdLoader
+                source: .prdLoader,
+                resumeMode: resumeMode
             )
 
             // Create unified callbacks that route to AppState

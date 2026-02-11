@@ -143,17 +143,28 @@ actor DependencyTracker {
 
     // MARK: - Status File Management
 
-    /// Initialize the status file for an orchestration session
+    /// Initialize the status file for an orchestration session.
+    /// When `resumeIfExists` is true and a valid status.json already exists, it is reused
+    /// rather than overwritten — preserving prior story completions for resumed orchestrations.
     func initializeStatusFile(
         repoPath: URL,
         sessionId: UUID,
-        prd: PRDDocument
+        prd: PRDDocument,
+        resumeIfExists: Bool = false
     ) throws -> URL {
         let crossroadsDir = repoPath.appendingPathComponent(".crossroads")
         try fileManager.createDirectory(at: crossroadsDir, withIntermediateDirectories: true)
 
         let statusPath = crossroadsDir.appendingPathComponent("status.json")
         self.statusFilePath = statusPath
+
+        // In resume mode, reuse the existing status file if it's valid
+        if resumeIfExists, fileManager.fileExists(atPath: statusPath.path) {
+            if let existing = try? readStatusFile(from: statusPath, forceRefresh: true) {
+                cachedStatus = existing
+                return statusPath
+            }
+        }
 
         // Calculate layers
         let layers = calculateLayers(stories: prd.userStories)
