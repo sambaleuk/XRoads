@@ -192,6 +192,7 @@ struct NeedsInputOverlay: View {
 struct ErrorOverlay: View {
     let isVisible: Bool
     let errorMessage: String?
+    var onTap: (() -> Void)? = nil
 
     @State private var shimmer: Double = 0.0
 
@@ -218,6 +219,7 @@ struct ErrorOverlay: View {
                         .background(Color.statusError)
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                         .padding(4)
+                        .onTapGesture { onTap?() }
                     }
                     Spacer()
                 }
@@ -231,6 +233,7 @@ struct ErrorOverlay: View {
 /// A subtle overlay for completed state
 struct CompletedOverlay: View {
     let isVisible: Bool
+    var onTap: (() -> Void)? = nil
 
     var body: some View {
         if isVisible {
@@ -250,6 +253,7 @@ struct CompletedOverlay: View {
                     .background(Color.accentPrimary)
                     .clipShape(RoundedRectangle(cornerRadius: 4))
                     .padding(4)
+                    .onTapGesture { onTap?() }
                 }
                 Spacer()
             }

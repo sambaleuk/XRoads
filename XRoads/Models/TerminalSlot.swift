@@ -195,11 +195,11 @@ struct TerminalSlot: Identifiable, Sendable {
         Array(logs.suffix(8))
     }
 
-    /// Add a log entry, keeping only the last 50
+    /// Add a log entry, keeping only the last 500
     mutating func addLog(_ entry: LogEntry) {
         logs.append(entry)
-        if logs.count > 50 {
-            logs.removeFirst(logs.count - 50)
+        if logs.count > 500 {
+            logs.removeFirst(logs.count - 500)
         }
     }
 

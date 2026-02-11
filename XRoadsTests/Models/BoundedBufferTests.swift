@@ -103,16 +103,16 @@ final class BoundedBufferTests: XCTestCase {
         XCTAssertEqual(orch.agentTimelineEvents.capacity, 1000, "OrchestrationSubState.agentTimelineEvents should use BoundedBuffer with capacity 1000")
     }
 
-    // MARK: - Integration: TerminalSlot.addLog caps at 50
+    // MARK: - Integration: TerminalSlot.addLog caps at 500
 
-    func test_terminalSlotAddLog_capsAt50() {
+    func test_terminalSlotAddLog_capsAt500() {
         var slot = TerminalSlot(slotNumber: 1)
-        for i in 0..<60 {
+        for i in 0..<600 {
             slot.addLog(LogEntry(level: .info, source: "test", message: "log \(i)"))
         }
-        XCTAssertEqual(slot.logs.count, 50, "TerminalSlot.logs should cap at 50")
-        XCTAssertEqual(slot.logs.first?.message, "log 10", "Oldest logs should be evicted")
-        XCTAssertEqual(slot.logs.last?.message, "log 59", "Newest logs should be retained")
+        XCTAssertEqual(slot.logs.count, 500, "TerminalSlot.logs should cap at 500")
+        XCTAssertEqual(slot.logs.first?.message, "log 100", "Oldest logs should be evicted")
+        XCTAssertEqual(slot.logs.last?.message, "log 599", "Newest logs should be retained")
     }
 
     // MARK: - Integration: AppState.addLog no inline eviction

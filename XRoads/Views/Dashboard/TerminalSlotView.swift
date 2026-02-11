@@ -23,6 +23,7 @@ struct TerminalSlotView: View {
     @State private var isHovered: Bool = false
     @State private var showConfigPopover: Bool = false
     @State private var selectedAction: ActionType? = nil
+    @State private var showLogViewer: Bool = false
 
     // Neon colors matching the brain
     private let neonCyan = Color(red: 0.0, green: 0.9, blue: 1.0)
@@ -78,8 +79,8 @@ struct TerminalSlotView: View {
 
             // State Overlays
             NeedsInputOverlay(isVisible: slot.status.isWaitingForInput)
-            ErrorOverlay(isVisible: slot.status == .error, errorMessage: nil)
-            CompletedOverlay(isVisible: slot.status == .completed)
+            ErrorOverlay(isVisible: slot.status == .error, errorMessage: nil, onTap: { showLogViewer = true })
+            CompletedOverlay(isVisible: slot.status == .completed, onTap: { showLogViewer = true })
         }
         .shadow(
             color: shadowColor,
@@ -89,6 +90,9 @@ struct TerminalSlotView: View {
         .animation(.easeInOut(duration: Theme.Animation.normal), value: isHovered)
         .animation(.easeInOut(duration: Theme.Animation.normal), value: slot.status)
         .onHover { isHovered = $0 }
+        .sheet(isPresented: $showLogViewer) {
+            SlotLogViewerSheet(slot: slot)
+        }
     }
 
     // MARK: - Computed Colors
@@ -169,6 +173,18 @@ struct TerminalSlotView: View {
     @ViewBuilder
     private var headerActionButton: some View {
         HStack(spacing: Theme.Spacing.xs) {
+            // Log viewer button — visible when slot has any logs
+            if !slot.logs.isEmpty {
+                Button { showLogViewer = true } label: {
+                    Image(systemName: "text.line.last.and.arrowtriangle.forward")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundStyle(Color.textTertiary)
+                        .frame(width: 20, height: 20)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+            }
+
             // Config/gear button - only when not active
             if !slot.status.isActive {
                 Button {
