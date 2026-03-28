@@ -4,7 +4,7 @@
   "description": "Activation du mode Cockpit sur XRoads. Lecture du contexte projet, délibération Chairman via cockpit-council, assignation des slots avec MetierSkill. Gestion du cycle de vie CockpitSession.",
   "branch": "feat/cockpit-01-conductor",
   "created_at": "2026-03-28T00:00:00Z",
-  "status": "in_progress",
+  "status": "complete",
   "goals": [
     "Implémenter la persistance SQLite de CockpitSession et AgentSlot",
     "Implémenter le Conductor : lecture contexte projet → appel cockpit-council → slot assignment",
