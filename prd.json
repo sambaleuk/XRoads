@@ -4,7 +4,7 @@
   "description": "Intégration de SafeExecutor comme middleware de gouvernance dans XRoads. Chaque opération sensible déclenchée par un agent est interceptée, évaluée, dry-runnée, et présentée à l'humain via une approval card dans le slot concerné. Non-bypassable.",
   "branch": "feat/cockpit-03-safeexecutor",
   "created_at": "2026-03-28T00:00:00Z",
-  "status": "in_progress",
+  "status": "complete",
   "goals": [
     "Implémenter ExecutionGate persistence + cycle de vie ExecutionGateLifecycle",
     "Implémenter SafeExecutorInterceptor dans PTYProcessRunner",
@@ -191,7 +191,7 @@
       "title": "Audit trail display in Cockpit",
       "description": "As a user, I need to see the full audit trail of all ExecutionGates for the active CockpitSession so I can review what agents did, what was approved, and what was rolled back.",
       "priority": "high",
-      "status": "pending",
+      "status": "complete",
       "depends_on": [
         "US-003"
       ],
@@ -235,10 +235,10 @@
           "should expand row to show full audit_entry JSON",
           "should write immutable audit_entry on gate completion"
         ],
-        "status": "pending"
+        "status": "passing"
       },
       "technical_notes": "AuditTrailView as sheet/panel. audit_entry immutable: written once on success or rolled_back, never updated after.",
-      "completed_at": null,
+      "completed_at": "2026-03-28T20:01:00Z",
       "blocked_reason": null
     }
   ],

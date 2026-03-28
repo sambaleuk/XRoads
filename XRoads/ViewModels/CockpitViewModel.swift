@@ -40,6 +40,9 @@ final class CockpitViewModel {
     /// Populated by gate polling or interceptor callbacks.
     var slotProcessIds: [UUID: UUID] = [:]
 
+    /// US-004: Whether the audit trail panel is shown
+    var showAuditTrail: Bool = false
+
     /// Latest chairman brief text, auto-refreshed from session
     var chairmanBrief: String? {
         session?.chairmanBrief
@@ -63,7 +66,8 @@ final class CockpitViewModel {
     private let repository: CockpitSessionRepository
     private let bus: MessageBusService
     private let ptyRunner: ProcessRunner?
-    private let gateRepo: ExecutionGateRepository?
+    /// US-004: Exposed for AuditTrailView sheet creation
+    let gateRepo: ExecutionGateRepository?
     private let logger = Logger(subsystem: "com.xroads", category: "CockpitVM")
 
     /// Task for chairman brief polling

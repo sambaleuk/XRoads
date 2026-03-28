@@ -2871,3 +2871,80 @@ Acceptance Criteria Met:
 - First SAFEEXEC payload per chunk is intercepted (one gate at a time)
 - Process suspension uses SIGSTOP via kill() — gracefully skipped when PTY is in testMode
 - Slot transition is direct DB write (not via a separate state machine) since AgentSlotLifecycle.gate_triggered action is `suspend_process` which is exactly what we do
+
+---
+
+### Iteration 3 — US-003: Approval Card UI per slot (2026-03-28)
+
+**Status**: COMPLETE — 11/11 tests passing, build green.
+
+### What was implemented
+- **ApprovalCardView.swift**: SwiftUI overlay card showing operation_type, raw_intent (monospaced), risk_level badge (color-coded: low=green, medium=yellow, high=orange, critical=red), estimated_impact, and approve/reject buttons
+- **CockpitSlotCardView.swift**: Added `pendingGate`, `onApproveGate`, `onRejectGate` parameters. Approval card renders when slot.status == .waitingApproval and a pending gate exists
+- **CockpitModeView.swift**: Passes pendingGates and approve/reject callbacks from CockpitViewModel to each slot card
+- **CockpitViewModel.swift**: Added `pendingGates` dictionary, `slotProcessIds` mapping, `gateRepo` dependency, `approveGate()` (transitions gate awaiting_approval->executing via approved_by_human guard, sends SIGCONT, transitions slot->running), `rejectGate()` (transitions gate->rejected, sends [SAFEEXEC_REJECTED] via stdin, resumes process, transitions slot->running), and `startGatePolling()` for periodic pending gate refresh
+- **ApprovalCardViewTests.swift**: 11 tests covering all acceptance criteria and PRD tests
+
+### Files touched
+- `XRoads/Views/Cockpit/ApprovalCardView.swift` (NEW)
+- `XRoads/Views/Cockpit/CockpitSlotCardView.swift` (MODIFIED)
+- `XRoads/Views/Cockpit/CockpitModeView.swift` (MODIFIED)
+- `XRoads/ViewModels/CockpitViewModel.swift` (MODIFIED)
+- `XRoadsTests/ApprovalCardViewTests.swift` (NEW)
+- `prd.json` — US-003 status: complete, unit_test.status: passing
+
+### Test results
+- Build: swift build PASS
+- Tests: swift test --filter ApprovalCardViewTests PASS (11/11)
+  - Display: approval card shown when slot waiting_approval
+  - Risk: RiskLevel enum parses all 4 levels, preserved through lifecycle
+  - Approve: gate transitions awaiting_approval->executing, approved_by_human guard enforced, slot returns to running
+  - Reject: gate transitions awaiting_approval->rejected, denied_reason persisted, slot returns to running
+  - State machine: 3 direct state machine tests for approve/reject/guard_violation
+
+### Key decisions
+- Gate polling every 2 seconds refreshes pendingGates for waiting_approval slots
+- SIGCONT sent to resume suspended agent process after approve or reject
+- Rejection notifies agent via stdin with [SAFEEXEC_REJECTED] before SIGCONT
+- slotProcessIds tracks PTY process UUID per slot for resume operations
+
+---
+
+## Iteration 4 — US-004: Audit trail display in Cockpit
+### Date: 2026-03-28
+### Status: COMPLETE (all 11 tests passing)
+
+### What was done
+- Added `fetchGatesForSession(sessionId:)` to ExecutionGateRepository — joins ExecutionGate with AgentSlot via GRDB association to filter by CockpitSession
+- Created `AuditTrailViewModel` — loads all gates for session, supports expand/collapse, pretty-prints audit_entry JSON, computes duration strings
+- Created `AuditTrailView` with `AuditTrailRowView` — scrollable list showing slot_index, operation_type, risk_level badge, status badge, approved_by, duration, timestamp per gate; expandable rows reveal full audit_entry JSON
+- Added "Audit Trail" button to CockpitModeView toolbar (visible when session is active or paused)
+- Audit trail opens as a sheet with the full gate history for the active session
+- Exposed `gateRepo` on CockpitViewModel (was private) for AuditTrailView sheet creation
+
+### Files touched
+- XRoads/Services/ExecutionGateRepository.swift (added fetchGatesForSession)
+- XRoads/ViewModels/AuditTrailViewModel.swift (NEW)
+- XRoads/ViewModels/CockpitViewModel.swift (added showAuditTrail state, exposed gateRepo)
+- XRoads/Views/Cockpit/AuditTrailView.swift (NEW)
+- XRoads/Views/Cockpit/CockpitModeView.swift (added audit trail button + sheet)
+- XRoadsTests/AuditTrailViewTests.swift (NEW — 11 tests)
+
+### Tests (11/11 passing)
+- Session gate listing: fetchGatesForSession returns all gates sorted desc, isolates by session
+- Status distinction: completed vs rolled_back gates have distinct statuses
+- Audit JSON: AuditEntry decodable with all fields, rolled_back path tested
+- Immutability: writeAudit throws auditAlreadyWritten on second call
+- State machine: executing->completed (success), executing->rolled_back (anomaly)
+- ViewModel: loadGates populates gates array, expand/collapse toggle, prettyAuditJSON works
+
+### Key decisions
+- Used GRDB association join (ExecutionGate.agentSlot) to query gates across all slots of a session
+- AuditTrailView is a sheet (not inline panel) to keep cockpit main view uncluttered
+- Row expand/collapse via Set<UUID> in ViewModel for simple state management
+- Duration formatted as ms/seconds based on magnitude
+- All risk/status badges reuse existing color scheme from ApprovalCardView
+
+### PRD status
+- US-001: complete, US-002: complete, US-003: complete, US-004: complete
+- Root PRD status: complete — all stories done

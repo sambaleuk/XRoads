@@ -174,4 +174,19 @@ actor ExecutionGateRepository {
                 .fetchAll(db)
         }
     }
+
+    /// Fetch all gates for a CockpitSession (across all its slots), sorted by created_at desc.
+    /// US-004: Used by AuditTrailView to display full session audit trail.
+    func fetchGatesForSession(sessionId: UUID, dbQueue externalQueue: DatabaseQueue? = nil) throws -> [ExecutionGate] {
+        let queue = externalQueue ?? dbQueue
+        return try queue.read { db in
+            // Join ExecutionGate with AgentSlot to filter by session
+            let slotAlias = TableAlias(name: "slot")
+            return try ExecutionGate
+                .joining(required: ExecutionGate.agentSlot.aliased(slotAlias))
+                .filter(slotAlias[AgentSlot.Columns.cockpitSessionId] == sessionId)
+                .order(ExecutionGate.Columns.createdAt.desc)
+                .fetchAll(db)
+        }
+    }
 }

@@ -3,9 +3,10 @@ import SwiftUI
 // MARK: - CockpitModeView
 
 /// Main Cockpit Mode panel. Shows session status, slot cards with sequential
-/// reveal animation, Chairman Feed sidebar, and Pause/Resume/Close controls.
+/// reveal animation, Chairman Feed sidebar, Pause/Resume/Close controls,
+/// and Audit Trail panel access.
 ///
-/// US-004: Added Chairman Feed panel and per-slot chat integration.
+/// US-004: Added audit trail toolbar button and sheet.
 struct CockpitModeView: View {
     @Bindable var viewModel: CockpitViewModel
 
@@ -37,6 +38,16 @@ struct CockpitModeView: View {
             }
         }
         .background(Color.bgCanvas)
+        .sheet(isPresented: $viewModel.showAuditTrail) {
+            if let session = viewModel.session, let gateRepo = viewModel.gateRepo {
+                let auditVM = AuditTrailViewModel(gateRepo: gateRepo, sessionId: session.id)
+                let slotMap = Dictionary(
+                    uniqueKeysWithValues: viewModel.slots.map { ($0.id, $0.slotIndex) }
+                )
+                AuditTrailView(viewModel: auditVM, slotIndexMap: slotMap)
+                    .frame(minWidth: 600, minHeight: 400)
+            }
+        }
     }
 
     // MARK: - Header
@@ -80,6 +91,18 @@ struct CockpitModeView: View {
     @ViewBuilder
     private var sessionControls: some View {
         HStack(spacing: Theme.Spacing.sm) {
+            // US-004: Audit Trail button (visible when session is active or paused)
+            if viewModel.sessionStatus == .active || viewModel.sessionStatus == .paused {
+                Button {
+                    viewModel.showAuditTrail = true
+                } label: {
+                    Label("Audit Trail", systemImage: "list.clipboard")
+                        .font(.system(size: 11, weight: .medium))
+                }
+                .buttonStyle(.bordered)
+                .controlSize(.small)
+            }
+
             switch viewModel.sessionStatus {
             case .active:
                 Button {
