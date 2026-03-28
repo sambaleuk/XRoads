@@ -2560,3 +2560,36 @@ Acceptance Criteria Met:
   - Semver sorting by splitting into Int arrays and comparing lexicographically handles all standard Node.js version formats
 
 ## ALL PRD STORIES COMPLETE (10/10) - Code Review Refactoring PRD fully delivered
+
+---
+
+## Feature: Cockpit Mode — Conductor + Session Lifecycle
+## PRD: prd.json (feat/cockpit-01-conductor)
+## Started: 2026-03-28
+
+### Iteration 1 — US-001: CockpitSession persistence layer (SQLite)
+- Added GRDB.swift 7.x dependency to Package.swift
+- Created CockpitSession model (XRoads/Models/CockpitSession.swift)
+  - Maps CockpitLifecycle states: idle, initializing, active, paused, closed
+  - GRDB FetchableRecord + PersistableRecord conformance
+  - hasMany relationship to AgentSlot
+- Created AgentSlot model (XRoads/Models/AgentSlot.swift)
+  - Maps AgentSlotLifecycle states: empty, provisioning, running, waiting_approval, paused, done, error
+  - belongsTo CockpitSession with cascade delete FK
+  - hasSkillAssigned guard for provision transition
+- Created CockpitDatabaseManager actor (XRoads/Services/CockpitDatabaseManager.swift)
+  - Versioned migration v1_create_cockpit_tables
+  - Unique partial index on (projectPath, status) WHERE status != 'closed'
+  - FK cascade delete on agent_slot → cockpit_session
+  - In-memory constructor for testing
+- Created CockpitSessionRepository actor (XRoads/Services/CockpitSessionRepository.swift)
+  - Full CRUD for CockpitSession and AgentSlot
+  - Active session uniqueness enforced at repository level
+  - Guard validation for has_skill_assigned
+  - fetchSessionWithSlots composite query
+- Tests: 9/9 passing (CockpitSessionRepositoryTests.swift)
+  - Persistence, unique constraint, cascade delete, slot CRUD, guard validation
+- Build: swift build PASS
+- Learnings:
+  - GRDB 7.x partial unique index via `condition:` parameter on create(index:) works well for "one active per project" constraint
+  - In-memory DatabaseQueue is ideal for isolated test runs — no cleanup needed
