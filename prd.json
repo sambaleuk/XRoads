@@ -1,105 +1,103 @@
 {
   "$schema": "../Modragor/schemas/prd.schema.json",
-  "feature_name": "Cockpit Mode — SafeExecutor Integration + Approval UI",
-  "description": "Intégration de SafeExecutor comme middleware de gouvernance dans XRoads. Chaque opération sensible déclenchée par un agent est interceptée, évaluée, dry-runnée, et présentée à l'humain via une approval card dans le slot concerné. Non-bypassable.",
-  "branch": "feat/cockpit-03-safeexecutor",
+  "feature_name": "Agents Métier — Ops (Finance, Legal, HR/Wiki)",
+  "description": "MetierSkill famille Ops. Finance Analyst (Stripe reports, modèle financier, alertes anomalies), Legal Clerk (contrats MSA/SOW/NDA depuis templates, GDPR basique), HR/Wiki Manager (onboarding employé, SOPs, wiki interne). MCP: Google Drive, Gmail, Notion, Stripe (webhook).",
+  "branch": "feat/metier-04-ops",
   "created_at": "2026-03-28T00:00:00Z",
-  "status": "complete",
+  "status": "in_progress",
   "goals": [
-    "Implémenter ExecutionGate persistence + cycle de vie ExecutionGateLifecycle",
-    "Implémenter SafeExecutorInterceptor dans PTYProcessRunner",
-    "Implémenter l'approval card UI dans chaque slot avec approve/reject en un clic",
-    "Afficher l'audit trail par session dans le Cockpit"
+    "Créer les 3 SKILL.md famille ops avec processus complets",
+    "Implémenter SafeExecutor gates spécifiques aux opérations financières et légales",
+    "Valider Finance Analyst sur les données Stripe réelles Neurogrid",
+    "Intégrer skills ops dans le catalogue Conductor"
   ],
   "non_goals": [
-    "Implémenter SafeExecutor NPM package lui-même (déjà fait)",
-    "Webhook Slack approval (roadmap SafeExecutor, hors scope XRoads v1)",
-    "Multi-humain approval workflow"
+    "Comptabilité certifiée ou audit légal (hors scope IA)",
+    "Paiements automatisés sans gate SafeExecutor (non-négociable)",
+    "Intégration ERP (roadmap NeuBooks — projet séparé)"
   ],
   "user_stories": [
     {
       "id": "US-001",
-      "title": "ExecutionGate persistence + lifecycle",
-      "description": "As SafeExecutor, I need ExecutionGate persisted in SQLite with its full lifecycle so that every gate request is tracked, audited, and non-bypassable.",
+      "title": "Finance Analyst skill — Stripe reports + anomaly alerts + financial model",
+      "description": "As a Finance Analyst agent, I need a SKILL.md that reads Stripe transaction data, generates revenue reports, flags anomalies, and maintains a 3-year financial projection model.",
       "priority": "critical",
       "status": "complete",
       "depends_on": [],
-      "touches": [
-        "ExecutionGate",
-        "AgentSlot"
-      ],
-      "transition": "ExecutionGateLifecycle.policy_deny",
+      "touches": ["MetierSkill", "AgentSlot", "ExecutionGate"],
+      "transition": "AgentSlotLifecycle.ready",
       "acceptance_criteria": [
-        "ExecutionGate table created with FK to AgentSlot",
-        "ExecutionGateRepository actor exposes create, updateStatus, writeAudit methods",
-        "Gate status follows ExecutionGateLifecycle strictly — no direct status override",
-        "audit_entry written as immutable JSON on completion or rollback"
+        "skills/ops/finance-analyst.md créé: data fetch → analyse → rapport → alertes → modèle",
+        "Required MCPs: Google Drive (Sheets), Gmail, web_search",
+        "Produit: Google Sheets rapport MRR/ARR/Churn + alertes anomalies (email draft) + Google Sheets modèle financier 3 ans",
+        "Anomalie = variation > 20% vs période précédente ou charge > seuil configuré",
+        "Gate SafeExecutor CRITIQUE avant tout accès données financières sensibles — risk_level=critical",
+        "Finance Analyst ne déclenche aucun paiement — lecture seule sur Stripe via webhook events"
       ],
       "tests": [
         {
-          "desc": "Should keep ExecutionGate linked to AgentSlot",
-          "type": "relation_integrity",
-          "entity": "ExecutionGate",
-          "relation": "requested_by",
-          "target": "AgentSlot"
+          "desc": "Should transition AgentSlot from provisioning to running after Finance Analyst injection",
+          "type": "state_transition",
+          "machine": "AgentSlotLifecycle",
+          "from": "provisioning",
+          "event": "ready",
+          "expected": "running"
         },
         {
-          "desc": "Should transition ExecutionGate from pending to dry_run when policy allows with dry-run",
+          "desc": "Should trigger critical SafeExecutor gate before financial data access",
           "type": "state_transition",
-          "machine": "ExecutionGateLifecycle",
-          "from": "pending",
-          "event": "policy_allow",
-          "expected": "dry_run"
+          "machine": "AgentSlotLifecycle",
+          "from": "running",
+          "event": "gate_triggered",
+          "expected": "waiting_approval"
         },
         {
-          "desc": "Should reject gate when policy denies",
-          "type": "state_transition",
+          "desc": "Should block direct financial data access without ExecutionGate approval",
+          "type": "guard_violation",
           "machine": "ExecutionGateLifecycle",
-          "from": "pending",
-          "event": "policy_deny",
-          "expected": "rejected"
+          "event": "approve",
+          "guard": "approved_by_human"
         }
       ],
       "unit_test": {
-        "file": "XRoadsTests/ExecutionGateRepositoryTests.swift",
-        "name": "test_execution_gate_persistence",
-        "description": "Validates ExecutionGate SQLite persistence and lifecycle transitions",
+        "file": "XRoadsTests/FinanceAnalystSkillTests.swift",
+        "name": "test_finance_analyst_skill",
+        "description": "Validates Finance Analyst SKILL.md and financial report artifacts",
         "assertions": [
-          "should create ExecutionGate with FK to AgentSlot",
-          "should transition through lifecycle states correctly",
-          "should write immutable audit_entry on completion",
-          "should reject direct status override bypassing lifecycle"
+          "should have Google Drive and Gmail as required_mcps",
+          "should produce Google Sheets MRR/ARR report",
+          "should produce anomaly alert email draft",
+          "should produce 3-year financial model",
+          "should require critical gate before financial data access",
+          "should never trigger payment operations"
         ],
         "status": "passing"
       },
-      "technical_notes": "ExecutionGateRepository as Swift actor. GRDB.swift. audit_entry: Codable JSON blob. Lifecycle transitions via ExecutionGateStateMachine service.",
-      "completed_at": "2026-03-28T19:40:00Z",
+      "technical_notes": "Stripe data via webhook events (lecture seule, pas d'API key directe). Gate: op_type=api, risk_level=critical pour tout accès données Stripe. Google Sheets via Drive MCP. Modèle financier: hypothèses + projection mensuelle sur 36 mois.",
+      "completed_at": "2026-03-28T20:17:00Z",
       "blocked_reason": null
     },
     {
       "id": "US-002",
-      "title": "SafeExecutorInterceptor in PTYProcessRunner",
-      "description": "As the orchestrator, I need PTYProcessRunner to intercept sensitive operations from agent stdout before they execute, create an ExecutionGate, and suspend the agent process pending approval.",
-      "priority": "critical",
-      "status": "complete",
-      "depends_on": [
-        "US-001"
-      ],
-      "touches": [
-        "ExecutionGate",
-        "AgentSlot"
-      ],
+      "title": "Legal Clerk skill — contracts MSA/SOW/NDA from templates",
+      "description": "As a Legal Clerk agent, I need a SKILL.md that generates custom contracts from templates (MSA, SOW, NDA), fills in client-specific variables, and produces signature-ready Google Docs.",
+      "priority": "high",
+      "status": "pending",
+      "depends_on": [],
+      "touches": ["MetierSkill", "AgentSlot"],
       "transition": "AgentSlotLifecycle.gate_triggered",
       "acceptance_criteria": [
-        "PTYProcessRunner detects [SAFEEXEC:{...}] prefixed lines from agent stdout",
-        "SafeExecutorInterceptor creates ExecutionGate record from parsed intent",
-        "Agent process suspended (SIGSTOP or stdin blocked) immediately on gate creation",
-        "AgentSlot transitions from running to waiting_approval",
-        "Slot card in UI shows waiting_approval badge and approval card"
+        "skills/ops/legal-clerk.md créé: brief client → sélection template → remplissage variables → review → doc final",
+        "Required MCPs: Google Drive, Gmail, Notion",
+        "Templates: MSA (Master Service Agreement), SOW (Statement of Work), NDA — stockés dans Google Drive templates/",
+        "Produit: Google Docs contrat personnalisé prêt à signature + email de couverture draft",
+        "Variables remplies: nom client, périmètre, montant, dates, clauses spécifiques",
+        "Gate SafeExecutor avant envoi contrat — operation_type=api, risk_level=high",
+        "Clause RGPD basique incluse dans MSA par défaut"
       ],
       "tests": [
         {
-          "desc": "Should transition AgentSlot from running to waiting_approval on gate trigger",
+          "desc": "Should trigger SafeExecutor gate before contract email dispatch",
           "type": "state_transition",
           "machine": "AgentSlotLifecycle",
           "from": "running",
@@ -108,168 +106,87 @@
         }
       ],
       "unit_test": {
-        "file": "XRoadsTests/SafeExecutorInterceptorTests.swift",
-        "name": "test_safe_executor_interceptor",
-        "description": "Validates stdout interception, gate creation, and agent suspension",
+        "file": "XRoadsTests/LegalClerkSkillTests.swift",
+        "name": "test_legal_clerk_skill",
+        "description": "Validates Legal Clerk SKILL.md and contract generation artifacts",
         "assertions": [
-          "should detect [SAFEEXEC:] prefix in agent stdout",
-          "should create ExecutionGate from parsed intent",
-          "should suspend agent process on gate creation",
-          "should transition AgentSlot to waiting_approval"
+          "should have Google Drive and Gmail as required_mcps",
+          "should read template from Drive templates/ directory",
+          "should fill all client-specific variables",
+          "should produce signature-ready Google Docs contract",
+          "should draft cover email without sending",
+          "should require SafeExecutor gate before dispatch"
         ],
-        "status": "passing"
+        "status": "pending"
       },
-      "technical_notes": "SKILL.md injects SafeExecutor protocol: agent emits [SAFEEXEC:{op_type, raw_intent, risk_level}] before any sensitive operation. Interceptor parses with Codable JSON. Process suspension via PTY signal.",
-      "completed_at": "2026-03-28T19:46:00Z",
+      "technical_notes": "Templates Neurogrid dans Drive templates/ folder. Variables extraction: Notion client brief → contract fields mapping. RGPD clause: article 28 RGPD pour sous-traitance de données. Validation sur contrat Ndèye Fatou MBOW (green economy consulting).",
+      "completed_at": null,
       "blocked_reason": null
     },
     {
       "id": "US-003",
-      "title": "Approval Card UI per slot — one-click approve or reject",
-      "description": "As a user (the Board), I need an approval card to appear in the slot UI when an ExecutionGate is pending, showing the operation details and risk level, with approve and reject buttons.",
-      "priority": "critical",
-      "status": "complete",
-      "depends_on": [
-        "US-002"
-      ],
-      "touches": [
-        "ExecutionGate",
-        "AgentSlot"
-      ],
-      "transition": "ExecutionGateLifecycle.approve",
+      "title": "HR/Wiki Manager skill — employee onboarding + SOPs + internal wiki",
+      "description": "As an HR/Wiki Manager agent, I need a SKILL.md that produces employee onboarding packages, writes SOPs from process descriptions, and maintains a structured internal wiki in Notion.",
+      "priority": "high",
+      "status": "pending",
+      "depends_on": [],
+      "touches": ["MetierSkill", "AgentSlot"],
+      "transition": "AgentSlotLifecycle.complete",
       "acceptance_criteria": [
-        "Approval card overlays slot terminal when AgentSlot is in waiting_approval state",
-        "Card shows: operation_type, raw_intent, risk_level badge, dry_run_result summary, estimated impact",
-        "Approve button: transitions gate to executing, resumes agent process",
-        "Reject button: transitions gate to rejected, notifies agent via stdin",
-        "AgentSlot transitions back to running on gate_approved or gate_rejected"
+        "skills/ops/hr-wiki-manager.md créé: brief rôle → onboarding doc → SOP rédaction → wiki structuration",
+        "Required MCPs: Notion, Google Drive, Gmail",
+        "Produit onboarding: Notion page structurée avec plan 30/60/90j, accès requis, contacts clés, ressources",
+        "Produit SOP: Notion page SOP avec: objectif, prérequis, étapes numérotées, cas d'erreur, owner",
+        "Produit wiki: architecture Notion avec sections: Produit, Tech, Ops, Marketing, Legal",
+        "Gate SafeExecutor avant envoi email onboarding à nouvel employé — risk_level=medium",
+        "AgentSlot transitions to done on wiki structure completion"
       ],
       "tests": [
         {
-          "desc": "Should transition ExecutionGate from awaiting_approval to executing on approve",
-          "type": "state_transition",
-          "machine": "ExecutionGateLifecycle",
-          "from": "awaiting_approval",
-          "event": "approve",
-          "expected": "executing"
-        },
-        {
-          "desc": "Should block approval without human confirmation",
-          "type": "guard_violation",
-          "machine": "ExecutionGateLifecycle",
-          "event": "approve",
-          "guard": "approved_by_human"
-        },
-        {
-          "desc": "Should transition AgentSlot back to running after gate resolved",
+          "desc": "Should transition AgentSlot to done on wiki structure completion",
           "type": "state_transition",
           "machine": "AgentSlotLifecycle",
-          "from": "waiting_approval",
-          "event": "gate_approved",
-          "expected": "running"
+          "from": "running",
+          "event": "complete",
+          "expected": "done"
         }
       ],
       "unit_test": {
-        "file": "XRoadsTests/ApprovalCardViewTests.swift",
-        "name": "test_approval_card_ui",
-        "description": "Validates approval card display, approve/reject flow, and lifecycle transitions",
+        "file": "XRoadsTests/HRWikiManagerSkillTests.swift",
+        "name": "test_hr_wiki_manager_skill",
+        "description": "Validates HR/Wiki Manager SKILL.md and onboarding/wiki artifacts",
         "assertions": [
-          "should display approval card when slot is in waiting_approval",
-          "should show risk_level badge with appropriate color",
-          "should call approve and transition gate to executing",
-          "should resume agent process after approval",
-          "should transition slot back to running"
+          "should have Notion and Google Drive as required_mcps",
+          "should produce Notion onboarding page with 30/60/90j plan",
+          "should produce SOP with numbered steps and error cases",
+          "should produce structured Notion wiki architecture",
+          "should require gate before onboarding email send",
+          "should transition slot to done on wiki completion"
         ],
-        "status": "passing"
+        "status": "pending"
       },
-      "technical_notes": "ApprovalCardView as SwiftUI overlay on TerminalSlotView. Risk color: low=green, medium=yellow, high=orange, critical=red.",
-      "completed_at": "2026-03-28T19:53:00Z",
-      "blocked_reason": null
-    },
-    {
-      "id": "US-004",
-      "title": "Audit trail display in Cockpit",
-      "description": "As a user, I need to see the full audit trail of all ExecutionGates for the active CockpitSession so I can review what agents did, what was approved, and what was rolled back.",
-      "priority": "high",
-      "status": "complete",
-      "depends_on": [
-        "US-003"
-      ],
-      "touches": [
-        "ExecutionGate",
-        "CockpitSession"
-      ],
-      "transition": "ExecutionGateLifecycle.success",
-      "acceptance_criteria": [
-        "Audit Trail panel accessible from Cockpit toolbar",
-        "Lists all ExecutionGates for active CockpitSession, sorted by created_at desc",
-        "Each entry shows: slot_index, operation_type, risk_level, status, approved_by, duration",
-        "Expandable row shows full audit_entry JSON",
-        "ExecutionGate transitions to completed with immutable audit_entry written"
-      ],
-      "tests": [
-        {
-          "desc": "Should transition ExecutionGate from executing to completed on success",
-          "type": "state_transition",
-          "machine": "ExecutionGateLifecycle",
-          "from": "executing",
-          "event": "success",
-          "expected": "completed"
-        },
-        {
-          "desc": "Should transition ExecutionGate to rolled_back on anomaly",
-          "type": "state_transition",
-          "machine": "ExecutionGateLifecycle",
-          "from": "executing",
-          "event": "anomaly",
-          "expected": "rolled_back"
-        }
-      ],
-      "unit_test": {
-        "file": "XRoadsTests/AuditTrailViewTests.swift",
-        "name": "test_audit_trail_display",
-        "description": "Validates audit trail panel display and gate status rendering",
-        "assertions": [
-          "should list all gates for active session sorted desc",
-          "should show completed and rolled_back gates distinctly",
-          "should expand row to show full audit_entry JSON",
-          "should write immutable audit_entry on gate completion"
-        ],
-        "status": "passing"
-      },
-      "technical_notes": "AuditTrailView as sheet/panel. audit_entry immutable: written once on success or rolled_back, never updated after.",
-      "completed_at": "2026-03-28T20:01:00Z",
+      "technical_notes": "Notion comme plateforme wiki centrale. Google Drive pour docs PDF onboarding. SOP format: inspiré Atlassian Confluence template. Wiki sections: Produit / Tech / Ops / Marketing / Legal / RH. Validation sur onboarding Ousmane MBODJ process Neurogrid.",
+      "completed_at": null,
       "blocked_reason": null
     }
   ],
   "functional_requirements": [
-    {
-      "id": "FR-1",
-      "description": "Aucune opération sensible ne s'exécute sans passer par ExecutionGateLifecycle complet"
-    },
-    {
-      "id": "FR-2",
-      "description": "L'approval card est non-bypassable : pas de --force, pas de skip"
-    },
-    {
-      "id": "FR-3",
-      "description": "L'audit trail est immutable : audit_entry ne peut être modifié après écriture"
-    },
-    {
-      "id": "FR-4",
-      "description": "Le rollback est automatique sur anomalie d'exécution — sans intervention humaine"
-    }
+    { "id": "FR-1", "description": "Finance Analyst = lecture seule sur données financières — aucun paiement, jamais" },
+    { "id": "FR-2", "description": "Gates SafeExecutor obligatoires pour toutes opérations ops sensibles: finance (critical), legal (high), HR (medium)" },
+    { "id": "FR-3", "description": "Contrats générés par Legal Clerk sont des drafts — validation humaine obligatoire avant signature" },
+    { "id": "FR-4", "description": "Tous les artefacts ops dans Notion ou Google Drive — aucun donnée sensible en stdout" }
   ],
   "technical_considerations": [
-    "SafeExecutor NPM package déjà disponible à /Users/birahimmbow/Projets/SafeExecutor",
-    "Protocol stdout SKILL.md : agent émet [SAFEEXEC:{...}] avant toute opération sensible",
-    "AST parser universel dans SafeExecutor — intent normalisé quelle que soit la source",
-    "XRoads appelle SafeExecutor via IPC ou HTTP local sur port dédié"
+    "Stripe: accès via webhook events uniquement — pas d'API key directe dans SKILL.md",
+    "Google Drive MCP pour Sheets (finance), Docs (contrats, onboarding)",
+    "Notion MCP pour wiki, SOPs, tracking",
+    "Gmail MCP pour drafts uniquement — envoi bloqué par SafeExecutor",
+    "Templates légaux stockés dans Drive templates/ — non-modifiables par l'agent sans gate"
   ],
   "success_metrics": [
-    "0 opération sensible exécutée sans approval card affichée",
-    "Approval card affichée en moins de 1 seconde après interception",
-    "100% des gates auditées avec audit_entry complet",
-    "Rollback automatique déclenché en moins de 500ms sur anomalie"
+    "Finance Analyst produit rapport MRR/ARR + alertes en moins de 10 minutes",
+    "Legal Clerk génère un contrat personnalisé en moins de 8 minutes",
+    "HR/Wiki Manager produit un package onboarding complet en moins de 15 minutes",
+    "0 paiement, 0 envoi email sensible sans gate SafeExecutor approuvée"
   ]
 }

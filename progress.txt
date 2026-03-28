@@ -2948,3 +2948,34 @@ Acceptance Criteria Met:
 ### PRD status
 - US-001: complete, US-002: complete, US-003: complete, US-004: complete
 - Root PRD status: complete — all stories done
+
+---
+
+## Feature: Agents Métier — Ops (Finance, Legal, HR/Wiki)
+## PRD: prd.json (feat/metier-04-ops)
+## Started: 2026-03-28
+
+### Iteration 1 - US-001 (Finance Analyst skill)
+- Created `skills/ops/finance-analyst.md` — complete SKILL.md with 6 workflow phases: data fetch, revenue analysis, anomaly detection, Sheets report, anomaly alerts, 3-year financial model
+- Required MCPs: Google Drive (Sheets), Gmail, web_search
+- SafeExecutor gates: 4 gates defined (Stripe data fetch critical, Sheets write critical, model write critical, Gmail draft high)
+- Anomaly thresholds: MRR/Churn >20% variation, single charge >10K EUR, payment failure >15%, refund >10%
+- Financial model: 36-month projection with base/optimistic/pessimistic scenarios + sensitivity analysis
+- Constraints: read-only on Stripe (webhook events only), no API keys, no payment triggers, draft-only emails
+- Created `XRoadsTests/FinanceAnalystSkillTests.swift` — 11 tests all passing:
+  - SKILL.md content validation (MCPs, MRR/ARR report, anomaly alerts, financial model, payment prohibition)
+  - State machine transitions: provisioning→running, running→waiting_approval on gate_triggered
+  - ExecutionGateStateMachine guard: approved_by_human blocks unapproved financial data access
+  - MetierSkill entity persistence in GRDB
+- Build: swift build passes
+- Tests: 11/11 passing, 0 failures
+
+Files created:
+- skills/ops/finance-analyst.md
+- XRoadsTests/FinanceAnalystSkillTests.swift
+
+### PRD status
+- US-001: complete (unit_test: passing)
+- US-002: pending
+- US-003: pending
+- Root PRD status: in_progress
