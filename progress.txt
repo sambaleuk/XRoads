@@ -2974,8 +2974,50 @@ Files created:
 - skills/ops/finance-analyst.md
 - XRoadsTests/FinanceAnalystSkillTests.swift
 
+### Iteration 2 - US-002 (Legal Clerk skill — contracts MSA/SOW/NDA)
+- Created `skills/ops/legal-clerk.md` — complete SKILL.md with 6-phase workflow: client brief extraction, template selection, variable filling, contract doc creation, cover email draft, review checklist
+- Required MCPs: Google Drive, Gmail, Notion
+- Templates: MSA (Master Service Agreement), SOW (Statement of Work), NDA — stored in Google Drive templates/
+- SafeExecutor gates: 4 gates defined (Notion read medium, template read medium, contract write high, email draft high)
+- Client variables: 15 placeholders (CLIENT_LEGAL_NAME, PROJECT_SCOPE, CONTRACT_AMOUNT, dates, payment terms, etc.)
+- RGPD Article 28 data processing clause included by default in MSA contracts
+- Constraints: templates read-only, draft-only emails, no auto-send, contracts are drafts requiring human review
+- Created `XRoadsTests/LegalClerkSkillTests.swift` — 9 tests all passing:
+  - SKILL.md content validation (MCPs, templates, variables, Google Docs, email draft, SafeExecutor gates)
+  - State machine transitions: running→waiting_approval on gate_triggered
+  - ExecutionGateStateMachine guard: approved_by_human blocks unapproved contract dispatch
+  - MetierSkill entity persistence in GRDB
+- Build: swift build passes
+- Tests: 9/9 passing, 0 failures
+
+Files created:
+- skills/ops/legal-clerk.md
+- XRoadsTests/LegalClerkSkillTests.swift
+
 ### PRD status
 - US-001: complete (unit_test: passing)
-- US-002: pending
+- US-002: complete (unit_test: passing)
 - US-003: pending
 - Root PRD status: in_progress
+
+### Iteration 3 — US-003 (HR/Wiki Manager skill — employee onboarding + SOPs + internal wiki)
+- Created skills/ops/hr-wiki-manager.md: full SKILL.md with 5 phases (role brief → onboarding → email → SOP → wiki)
+- Onboarding: Notion page with 30/60/90 day plan, required access table, key contacts, resources
+- SOP: Notion page format with objective, prerequisites, numbered steps, error cases with resolution/escalation, owner field
+- Wiki: 6-section Notion architecture (Produit, Tech, Ops, Marketing, Legal, RH) with SOPs sub-sections
+- SafeExecutor gates: risk_level=medium for onboarding email, employee data access, wiki structure changes
+- Gmail draft-only constraint enforced, no auto-send
+- State machine: AgentSlot running → complete → done on wiki structure completion
+- Unit tests: 8/8 passing (MCPs, onboarding 30/60/90j, SOP structure, wiki architecture, gate before email, slot→done transition, MetierSkill entity)
+- Build: swift build passes
+- Tests: 8/8 passing, 0 failures
+
+Files created:
+- skills/ops/hr-wiki-manager.md
+- XRoadsTests/HRWikiManagerSkillTests.swift
+
+### PRD status (final)
+- US-001: complete (unit_test: passing)
+- US-002: complete (unit_test: passing)
+- US-003: complete (unit_test: passing)
+- Root PRD status: complete — ALL STORIES DONE

@@ -4,7 +4,7 @@
   "description": "MetierSkill famille Ops. Finance Analyst (Stripe reports, modèle financier, alertes anomalies), Legal Clerk (contrats MSA/SOW/NDA depuis templates, GDPR basique), HR/Wiki Manager (onboarding employé, SOPs, wiki interne). MCP: Google Drive, Gmail, Notion, Stripe (webhook).",
   "branch": "feat/metier-04-ops",
   "created_at": "2026-03-28T00:00:00Z",
-  "status": "in_progress",
+  "status": "complete",
   "goals": [
     "Créer les 3 SKILL.md famille ops avec processus complets",
     "Implémenter SafeExecutor gates spécifiques aux opérations financières et légales",
@@ -135,7 +135,7 @@
       "title": "HR/Wiki Manager skill — employee onboarding + SOPs + internal wiki",
       "description": "As an HR/Wiki Manager agent, I need a SKILL.md that produces employee onboarding packages, writes SOPs from process descriptions, and maintains a structured internal wiki in Notion.",
       "priority": "high",
-      "status": "pending",
+      "status": "complete",
       "depends_on": [],
       "touches": [
         "MetierSkill",
@@ -173,10 +173,10 @@
           "should require gate before onboarding email send",
           "should transition slot to done on wiki completion"
         ],
-        "status": "pending"
+        "status": "passing"
       },
       "technical_notes": "Notion comme plateforme wiki centrale. Google Drive pour docs PDF onboarding. SOP format: inspiré Atlassian Confluence template. Wiki sections: Produit / Tech / Ops / Marketing / Legal / RH. Validation sur onboarding Ousmane MBODJ process Neurogrid.",
-      "completed_at": null,
+      "completed_at": "2026-03-28T20:25:00Z",
       "blocked_reason": null
     }
   ],
