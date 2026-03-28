@@ -213,7 +213,10 @@ final class CockpitViewModel {
               current.status == .active || current.status == .paused else { return }
 
         do {
-            let closed = try await lifecycleManager.close(session: current)
+            let closed = try await lifecycleManager.close(
+                session: current,
+                hasPendingGates: !pendingGates.isEmpty
+            )
             session = closed
             slots = []
             revealedSlotIds = []

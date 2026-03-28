@@ -40,7 +40,7 @@ final class SlotChatViewModel {
     private let logger = Logger(subsystem: "com.xroads", category: "SlotChat")
 
     /// Subscription task for real-time updates
-    nonisolated(unsafe) private var subscriptionTask: Task<Void, Never>?
+    private var subscriptionTask: Task<Void, Never>?
 
     // MARK: - Init
 

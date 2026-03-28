@@ -253,6 +253,9 @@ actor ChairmanFeedService {
 
     /// Start monitoring a session's message bus for synthesis triggers.
     func start(sessionId: UUID) async throws {
+        // Cancel any existing feed task to prevent leaks on double-start
+        feedTask?.cancel()
+
         // Validate session exists and is active
         guard let session = try await repository.fetchSession(id: sessionId) else {
             throw ChairmanFeedError.sessionNotFound(sessionId)

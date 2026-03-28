@@ -151,9 +151,10 @@ final class ClaudeOrchestratorMergeTests: XCTestCase {
             repoPath: tempRepoPath
         )
 
-        // Branch A should merge fine, Branch B should conflict
+        // Branch B conflicts → rollback undoes all merges (including Branch A)
         XCTAssertFalse(result.success, "Merge should fail due to conflicts")
-        XCTAssertEqual(result.mergedBranches.count, 1, "Only first branch should merge")
+        XCTAssertEqual(result.mergedBranches.count, 0, "All branches rolled back on partial failure")
+        XCTAssertTrue(result.rolledBack, "Should have rolled back merged branches")
         XCTAssertFalse(result.conflicts.isEmpty, "Should have conflicts from second branch")
 
         let state = await orchestrator.state
