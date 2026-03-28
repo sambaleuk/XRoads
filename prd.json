@@ -128,7 +128,7 @@
       "title": "Approval Card UI per slot — one-click approve or reject",
       "description": "As a user (the Board), I need an approval card to appear in the slot UI when an ExecutionGate is pending, showing the operation details and risk level, with approve and reject buttons.",
       "priority": "critical",
-      "status": "pending",
+      "status": "complete",
       "depends_on": [
         "US-002"
       ],
@@ -180,10 +180,10 @@
           "should resume agent process after approval",
           "should transition slot back to running"
         ],
-        "status": "pending"
+        "status": "passing"
       },
       "technical_notes": "ApprovalCardView as SwiftUI overlay on TerminalSlotView. Risk color: low=green, medium=yellow, high=orange, critical=red.",
-      "completed_at": null,
+      "completed_at": "2026-03-28T19:53:00Z",
       "blocked_reason": null
     },
     {

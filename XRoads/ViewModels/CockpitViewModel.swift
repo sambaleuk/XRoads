@@ -7,6 +7,7 @@ import os
 /// per-slot chat view models, and Chairman brief observation.
 ///
 /// US-004: Added chatViewModels, chairmanBrief, and chairman feed subscription.
+/// US-003: Added pendingGates, approveGate/rejectGate for approval card flow.
 @MainActor
 @Observable
 final class CockpitViewModel {
@@ -31,6 +32,14 @@ final class CockpitViewModel {
     /// Per-slot chat view models, keyed by slot ID
     var chatViewModels: [UUID: SlotChatViewModel] = [:]
 
+    /// US-003: Pending ExecutionGates per slot (keyed by slot ID).
+    /// Only gates in `awaiting_approval` state are tracked here.
+    var pendingGates: [UUID: ExecutionGate] = [:]
+
+    /// US-003: Process IDs for slots with pending gates (keyed by slot ID).
+    /// Populated by gate polling or interceptor callbacks.
+    var slotProcessIds: [UUID: UUID] = [:]
+
     /// Latest chairman brief text, auto-refreshed from session
     var chairmanBrief: String? {
         session?.chairmanBrief
@@ -54,10 +63,13 @@ final class CockpitViewModel {
     private let repository: CockpitSessionRepository
     private let bus: MessageBusService
     private let ptyRunner: ProcessRunner?
+    private let gateRepo: ExecutionGateRepository?
     private let logger = Logger(subsystem: "com.xroads", category: "CockpitVM")
 
     /// Task for chairman brief polling
     private var chairmanBriefTask: Task<Void, Never>?
+    /// Task for pending gate polling (US-003)
+    private var gatePollTask: Task<Void, Never>?
 
     // MARK: - Init
 
@@ -66,13 +78,15 @@ final class CockpitViewModel {
         conductorService: ConductorService,
         repository: CockpitSessionRepository,
         bus: MessageBusService,
-        ptyRunner: ProcessRunner? = nil
+        ptyRunner: ProcessRunner? = nil,
+        gateRepo: ExecutionGateRepository? = nil
     ) {
         self.lifecycleManager = lifecycleManager
         self.conductorService = conductorService
         self.repository = repository
         self.bus = bus
         self.ptyRunner = ptyRunner
+        self.gateRepo = gateRepo
     }
 
     // MARK: - Activate Cockpit Mode
@@ -111,6 +125,9 @@ final class CockpitViewModel {
 
             // Step 6: Start chairman brief refresh loop
             startChairmanBriefRefresh()
+
+            // Step 7: Start gate polling for approval cards (US-003)
+            startGatePolling()
 
             isLoading = false
             logger.info("Cockpit activated with \(assignedSlots.count) slots")
@@ -204,11 +221,168 @@ final class CockpitViewModel {
             chatViewModels = [:]
             chairmanBriefTask?.cancel()
             chairmanBriefTask = nil
+            gatePollTask?.cancel()
+            gatePollTask = nil
+            pendingGates = [:]
+            slotProcessIds = [:]
 
             logger.info("Cockpit session closed")
         } catch {
             errorMessage = error.localizedDescription
             logger.error("Close failed: \(error.localizedDescription)")
+        }
+    }
+
+    // MARK: - US-003: Approve Gate
+
+    /// Approves a pending ExecutionGate:
+    /// 1. Transitions gate from awaiting_approval -> executing via state machine (guard: approved_by_human)
+    /// 2. Resumes the suspended agent process (SIGCONT)
+    /// 3. Transitions AgentSlot from waiting_approval -> running (gate_approved event)
+    func approveGate(_ gate: ExecutionGate) async {
+        guard let gateRepo else {
+            logger.error("Cannot approve gate: gateRepo not available")
+            return
+        }
+
+        do {
+            // 1. Transition gate: awaiting_approval -> executing
+            let context = ExecutionGateGuardContext(approvedByHuman: true)
+            let updated = try await gateRepo.updateStatus(
+                gateId: gate.id,
+                event: .approve,
+                context: context,
+                approvedBy: "board_user"
+            )
+
+            // 2. Resume agent process via SIGCONT
+            if let slot = slots.first(where: { $0.id == gate.agentSlotId }) {
+                await resumeAgentProcess(for: slot)
+            }
+
+            // 3. Transition slot: waiting_approval -> running
+            try await transitionSlot(id: gate.agentSlotId, to: .running)
+
+            // 4. Remove from pending gates
+            pendingGates.removeValue(forKey: gate.agentSlotId)
+
+            logger.info("Gate \(gate.id) approved, slot \(gate.agentSlotId) resumed -> running")
+            _ = updated // silence unused warning
+        } catch {
+            let msg = error.localizedDescription
+            errorMessage = msg
+            logger.error("Approve gate failed: \(msg)")
+        }
+    }
+
+    // MARK: - US-003: Reject Gate
+
+    /// Rejects a pending ExecutionGate:
+    /// 1. Transitions gate from awaiting_approval -> rejected
+    /// 2. Notifies agent via stdin that the operation was rejected
+    /// 3. Resumes the agent process (SIGCONT) so it can continue with rejection
+    /// 4. Transitions AgentSlot from waiting_approval -> running (gate_rejected event)
+    func rejectGate(_ gate: ExecutionGate) async {
+        guard let gateRepo else {
+            logger.error("Cannot reject gate: gateRepo not available")
+            return
+        }
+
+        do {
+            // 1. Transition gate: awaiting_approval -> rejected
+            let updated = try await gateRepo.updateStatus(
+                gateId: gate.id,
+                event: .reject,
+                deniedReason: "Rejected by board user"
+            )
+
+            // 2. Notify agent and resume process
+            if let slot = slots.first(where: { $0.id == gate.agentSlotId }) {
+                // Send rejection message via stdin before resuming
+                if let processId = slotProcessIds[slot.id],
+                   let runner = ptyRunner as? PTYProcessRunner {
+                    try? await runner.sendInput(id: processId, text: "[SAFEEXEC_REJECTED]\n")
+                }
+                await resumeAgentProcess(for: slot)
+            }
+
+            // 3. Transition slot: waiting_approval -> running
+            try await transitionSlot(id: gate.agentSlotId, to: .running)
+
+            // 4. Remove from pending gates
+            pendingGates.removeValue(forKey: gate.agentSlotId)
+
+            logger.info("Gate \(gate.id) rejected, slot \(gate.agentSlotId) resumed -> running")
+            _ = updated
+        } catch {
+            let msg = error.localizedDescription
+            errorMessage = msg
+            logger.error("Reject gate failed: \(msg)")
+        }
+    }
+
+    // MARK: - US-003: Gate Polling
+
+    /// Starts polling for pending gates on waiting_approval slots.
+    /// Called when cockpit activates or when loading existing sessions.
+    func startGatePolling() {
+        gatePollTask?.cancel()
+        gatePollTask = Task { [weak self] in
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(2))
+                await self?.refreshPendingGates()
+            }
+        }
+    }
+
+    /// Fetches the latest awaiting_approval gate for each slot that is in waiting_approval state.
+    private func refreshPendingGates() async {
+        guard let gateRepo else { return }
+
+        for slot in slots where slot.status == .waitingApproval {
+            do {
+                let gates = try await gateRepo.fetchGates(slotId: slot.id)
+                if let pending = gates.first(where: { $0.status == .awaitingApproval }) {
+                    pendingGates[slot.id] = pending
+                }
+            } catch {
+                // Non-fatal: gate fetch failure
+            }
+        }
+
+        // Remove stale pending gates for slots no longer in waiting_approval
+        for slotId in pendingGates.keys {
+            if !slots.contains(where: { $0.id == slotId && $0.status == .waitingApproval }) {
+                pendingGates.removeValue(forKey: slotId)
+            }
+        }
+    }
+
+    // MARK: - US-003: Private Helpers
+
+    /// Resume an agent process by sending SIGCONT via the PTY runner.
+    private func resumeAgentProcess(for slot: AgentSlot) async {
+        guard let runner = ptyRunner as? PTYProcessRunner,
+              let processId = slotProcessIds[slot.id] else {
+            logger.warning("No process ID found for slot \(slot.id) — cannot resume")
+            return
+        }
+
+        if let info = await runner.getProcessInfo(id: processId) {
+            let pid = info.pid
+            if pid > 0 {
+                kill(pid, SIGCONT)
+                logger.info("SIGCONT sent to pid \(pid) for slot \(slot.id)")
+            }
+        }
+    }
+
+    /// Persist a slot status transition in the database and update local state.
+    private func transitionSlot(id: UUID, to newStatus: AgentSlotStatus) async throws {
+        if let index = slots.firstIndex(where: { $0.id == id }) {
+            slots[index].status = newStatus
+            slots[index].updatedAt = Date()
+            _ = try await repository.updateSlot(slots[index])
         }
     }
 
@@ -226,6 +400,8 @@ final class CockpitViewModel {
                 buildChatViewModels(for: slots)
                 // Start chairman brief refresh
                 startChairmanBriefRefresh()
+                // Start gate polling (US-003)
+                startGatePolling()
             }
         } catch {
             logger.error("Failed to load existing session: \(error.localizedDescription)")

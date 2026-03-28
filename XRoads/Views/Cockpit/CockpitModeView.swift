@@ -140,7 +140,14 @@ struct CockpitModeView: View {
                             slot: slot,
                             skillName: skillName(for: slot),
                             isRevealed: viewModel.revealedSlotIds.contains(slot.id),
-                            chatViewModel: chatVM
+                            chatViewModel: chatVM,
+                            pendingGate: viewModel.pendingGates[slot.id],
+                            onApproveGate: { gate in
+                                Task { await viewModel.approveGate(gate) }
+                            },
+                            onRejectGate: { gate in
+                                Task { await viewModel.rejectGate(gate) }
+                            }
                         )
                     }
                 }

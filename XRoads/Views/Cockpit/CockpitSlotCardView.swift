@@ -6,11 +6,18 @@ import SwiftUI
 /// Shows: skill name, agent type, status badge, unread message count, and expandable chat panel.
 ///
 /// US-004: Added expandable chat panel and unread badge.
+/// US-003: Added approval card overlay when slot is in waiting_approval state.
 struct CockpitSlotCardView: View {
     let slot: AgentSlot
     let skillName: String
     let isRevealed: Bool
     @Bindable var chatViewModel: SlotChatViewModel
+    /// Pending gate to display approval card (nil when no gate awaiting approval)
+    var pendingGate: ExecutionGate?
+    /// Callback when user approves the pending gate
+    var onApproveGate: ((ExecutionGate) -> Void)?
+    /// Callback when user rejects the pending gate
+    var onRejectGate: ((ExecutionGate) -> Void)?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -32,7 +39,19 @@ struct CockpitSlotCardView: View {
                 SlotChatPanelView(viewModel: chatViewModel)
                     .transition(.move(edge: .top).combined(with: .opacity))
             }
+
+            // US-003: Approval card overlay when gate is awaiting approval
+            if let gate = pendingGate, slot.status == .waitingApproval {
+                ApprovalCardView(
+                    gate: gate,
+                    onApprove: { onApproveGate?(gate) },
+                    onReject: { onRejectGate?(gate) }
+                )
+                .padding(Theme.Spacing.sm)
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
+        .animation(.spring(response: 0.3, dampingFraction: 0.8), value: pendingGate?.id)
         .background(Color.bgSurface)
         .clipShape(RoundedRectangle(cornerRadius: Theme.Radius.md))
         .overlay(
