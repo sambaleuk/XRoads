@@ -13,6 +13,8 @@ struct CockpitSlotCardView: View {
     let isRevealed: Bool
     @Bindable var chatViewModel: SlotChatViewModel
     /// Pending gate to display approval card (nil when no gate awaiting approval)
+    /// Cost summary for this slot
+    var costSummary: UsageSummary?
     var pendingGate: ExecutionGate?
     /// Callback when user approves the pending gate
     var onApproveGate: ((ExecutionGate) -> Void)?
@@ -115,6 +117,11 @@ struct CockpitSlotCardView: View {
                 Text(slot.agentType)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundStyle(Color.textSecondary)
+            }
+
+            // Cost badge
+            if let cost = costSummary {
+                CostBadgeView(summary: cost)
             }
 
             // Branch name (if assigned)

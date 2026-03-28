@@ -77,6 +77,9 @@ struct CockpitModeView: View {
 
             Spacer()
 
+            // Session cost summary
+            SessionCostSummaryView(summary: viewModel.sessionCost)
+
             // Session controls
             if viewModel.isLoading {
                 ProgressView()
@@ -164,6 +167,7 @@ struct CockpitModeView: View {
                             skillName: skillName(for: slot),
                             isRevealed: viewModel.revealedSlotIds.contains(slot.id),
                             chatViewModel: chatVM,
+                            costSummary: viewModel.slotCosts[slot.id],
                             pendingGate: viewModel.pendingGates[slot.id],
                             onApproveGate: { gate in
                                 Task { await viewModel.approveGate(gate) }

@@ -43,6 +43,12 @@ final class CockpitViewModel {
     /// US-004: Whether the audit trail panel is shown
     var showAuditTrail: Bool = false
 
+    /// Per-slot cost summaries, keyed by slot ID
+    var slotCosts: [UUID: UsageSummary] = [:]
+
+    /// Session-wide cost summary
+    var sessionCost: UsageSummary = .zero
+
     /// Latest chairman brief text, auto-refreshed from session
     var chairmanBrief: String? {
         session?.chairmanBrief
@@ -68,12 +74,16 @@ final class CockpitViewModel {
     private let ptyRunner: ProcessRunner?
     /// US-004: Exposed for AuditTrailView sheet creation
     let gateRepo: ExecutionGateRepository?
+    /// Cost tracking repository
+    let costRepo: CostEventRepository?
     private let logger = Logger(subsystem: "com.xroads", category: "CockpitVM")
 
     /// Task for chairman brief polling
     private var chairmanBriefTask: Task<Void, Never>?
     /// Task for pending gate polling (US-003)
     private var gatePollTask: Task<Void, Never>?
+    /// Task for cost summary polling
+    private var costPollTask: Task<Void, Never>?
 
     // MARK: - Init
 
@@ -83,7 +93,8 @@ final class CockpitViewModel {
         repository: CockpitSessionRepository,
         bus: MessageBusService,
         ptyRunner: ProcessRunner? = nil,
-        gateRepo: ExecutionGateRepository? = nil
+        gateRepo: ExecutionGateRepository? = nil,
+        costRepo: CostEventRepository? = nil
     ) {
         self.lifecycleManager = lifecycleManager
         self.conductorService = conductorService
@@ -91,6 +102,7 @@ final class CockpitViewModel {
         self.bus = bus
         self.ptyRunner = ptyRunner
         self.gateRepo = gateRepo
+        self.costRepo = costRepo
     }
 
     // MARK: - Activate Cockpit Mode
@@ -132,6 +144,9 @@ final class CockpitViewModel {
 
             // Step 7: Start gate polling for approval cards (US-003)
             startGatePolling()
+
+            // Step 8: Start cost summary polling
+            startCostPolling()
 
             isLoading = false
             logger.info("Cockpit activated with \(assignedSlots.count) slots")
@@ -230,8 +245,12 @@ final class CockpitViewModel {
             chairmanBriefTask = nil
             gatePollTask?.cancel()
             gatePollTask = nil
+            costPollTask?.cancel()
+            costPollTask = nil
             pendingGates = [:]
             slotProcessIds = [:]
+            slotCosts = [:]
+            sessionCost = .zero
 
             logger.info("Cockpit session closed")
         } catch {
@@ -409,6 +428,8 @@ final class CockpitViewModel {
                 startChairmanBriefRefresh()
                 // Start gate polling (US-003)
                 startGatePolling()
+                // Start cost polling
+                startCostPolling()
             }
         } catch {
             logger.error("Failed to load existing session: \(error.localizedDescription)")
@@ -449,6 +470,53 @@ final class CockpitViewModel {
                     // Non-fatal: chairman brief refresh failure
                 }
             }
+        }
+    }
+
+    // MARK: - Cost Tracking
+
+    /// Records a cost event for a slot. Called by loop output parsers or API clients.
+    func recordCost(
+        slotId: UUID,
+        provider: String,
+        model: String,
+        inputTokens: Int,
+        outputTokens: Int
+    ) async {
+        guard let costRepo else { return }
+        do {
+            try await costRepo.recordUsage(
+                slotId: slotId,
+                provider: provider,
+                model: model,
+                inputTokens: inputTokens,
+                outputTokens: outputTokens
+            )
+            await refreshCosts()
+        } catch {
+            logger.error("Failed to record cost: \(error.localizedDescription)")
+        }
+    }
+
+    /// Starts polling cost summaries every 5 seconds.
+    private func startCostPolling() {
+        costPollTask?.cancel()
+        costPollTask = Task { [weak self] in
+            while !Task.isCancelled {
+                await self?.refreshCosts()
+                try? await Task.sleep(for: .seconds(5))
+            }
+        }
+    }
+
+    /// Refreshes cost summaries from the database.
+    private func refreshCosts() async {
+        guard let costRepo, let sessionId = session?.id else { return }
+        do {
+            sessionCost = try await costRepo.summaryForSession(sessionId: sessionId)
+            slotCosts = try await costRepo.breakdownForSession(sessionId: sessionId)
+        } catch {
+            // Non-fatal
         }
     }
 

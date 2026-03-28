@@ -194,6 +194,32 @@ actor CockpitDatabaseManager {
             )
         }
 
+        migrator.registerMigration("v6_create_cost_event") { db in
+            try db.create(table: "cost_event") { t in
+                t.primaryKey("id", .text).notNull()
+                t.column("agentSlotId", .text)
+                    .notNull()
+                    .references("agent_slot", onDelete: .cascade)
+                t.column("provider", .text).notNull()
+                t.column("model", .text).notNull()
+                t.column("inputTokens", .integer).notNull()
+                t.column("outputTokens", .integer).notNull()
+                t.column("costCents", .integer).notNull().defaults(to: 0)
+                t.column("createdAt", .datetime).notNull()
+            }
+
+            try db.create(
+                index: "idx_cost_event_slot",
+                on: "cost_event",
+                columns: ["agentSlotId"]
+            )
+            try db.create(
+                index: "idx_cost_event_created_at",
+                on: "cost_event",
+                columns: ["createdAt"]
+            )
+        }
+
         return migrator
     }
 

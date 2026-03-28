@@ -108,13 +108,15 @@ final class AppState {
                 )
                 let bus = MessageBusService(dbQueue: dbQueue)
                 let gateRepo = ExecutionGateRepository(dbQueue: dbQueue)
+                let costRepo = CostEventRepository(dbQueue: dbQueue)
 
                 let vm = CockpitViewModel(
                     lifecycleManager: lifecycleManager,
                     conductorService: conductorService,
                     repository: repository,
                     bus: bus,
-                    gateRepo: gateRepo
+                    gateRepo: gateRepo,
+                    costRepo: costRepo
                 )
                 cockpitViewModel = vm
 
