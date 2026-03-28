@@ -24,7 +24,11 @@
       "priority": "critical",
       "status": "complete",
       "depends_on": [],
-      "touches": ["MetierSkill", "AgentSlot", "ExecutionGate"],
+      "touches": [
+        "MetierSkill",
+        "AgentSlot",
+        "ExecutionGate"
+      ],
       "transition": "AgentSlotLifecycle.ready",
       "acceptance_criteria": [
         "skills/ops/finance-analyst.md créé: data fetch → analyse → rapport → alertes → modèle",
@@ -82,9 +86,12 @@
       "title": "Legal Clerk skill — contracts MSA/SOW/NDA from templates",
       "description": "As a Legal Clerk agent, I need a SKILL.md that generates custom contracts from templates (MSA, SOW, NDA), fills in client-specific variables, and produces signature-ready Google Docs.",
       "priority": "high",
-      "status": "pending",
+      "status": "complete",
       "depends_on": [],
-      "touches": ["MetierSkill", "AgentSlot"],
+      "touches": [
+        "MetierSkill",
+        "AgentSlot"
+      ],
       "transition": "AgentSlotLifecycle.gate_triggered",
       "acceptance_criteria": [
         "skills/ops/legal-clerk.md créé: brief client → sélection template → remplissage variables → review → doc final",
@@ -117,10 +124,10 @@
           "should draft cover email without sending",
           "should require SafeExecutor gate before dispatch"
         ],
-        "status": "pending"
+        "status": "passing"
       },
       "technical_notes": "Templates Neurogrid dans Drive templates/ folder. Variables extraction: Notion client brief → contract fields mapping. RGPD clause: article 28 RGPD pour sous-traitance de données. Validation sur contrat Ndèye Fatou MBOW (green economy consulting).",
-      "completed_at": null,
+      "completed_at": "2026-03-28T20:21:00Z",
       "blocked_reason": null
     },
     {
@@ -130,7 +137,10 @@
       "priority": "high",
       "status": "pending",
       "depends_on": [],
-      "touches": ["MetierSkill", "AgentSlot"],
+      "touches": [
+        "MetierSkill",
+        "AgentSlot"
+      ],
       "transition": "AgentSlotLifecycle.complete",
       "acceptance_criteria": [
         "skills/ops/hr-wiki-manager.md créé: brief rôle → onboarding doc → SOP rédaction → wiki structuration",
@@ -171,10 +181,22 @@
     }
   ],
   "functional_requirements": [
-    { "id": "FR-1", "description": "Finance Analyst = lecture seule sur données financières — aucun paiement, jamais" },
-    { "id": "FR-2", "description": "Gates SafeExecutor obligatoires pour toutes opérations ops sensibles: finance (critical), legal (high), HR (medium)" },
-    { "id": "FR-3", "description": "Contrats générés par Legal Clerk sont des drafts — validation humaine obligatoire avant signature" },
-    { "id": "FR-4", "description": "Tous les artefacts ops dans Notion ou Google Drive — aucun donnée sensible en stdout" }
+    {
+      "id": "FR-1",
+      "description": "Finance Analyst = lecture seule sur données financières — aucun paiement, jamais"
+    },
+    {
+      "id": "FR-2",
+      "description": "Gates SafeExecutor obligatoires pour toutes opérations ops sensibles: finance (critical), legal (high), HR (medium)"
+    },
+    {
+      "id": "FR-3",
+      "description": "Contrats générés par Legal Clerk sont des drafts — validation humaine obligatoire avant signature"
+    },
+    {
+      "id": "FR-4",
+      "description": "Tous les artefacts ops dans Notion ou Google Drive — aucun donnée sensible en stdout"
+    }
   ],
   "technical_considerations": [
     "Stripe: accès via webhook events uniquement — pas d'API key directe dans SKILL.md",
