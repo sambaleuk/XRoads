@@ -115,6 +115,40 @@ actor CockpitDatabaseManager {
             )
         }
 
+        migrator.registerMigration("v3_create_agent_message") { db in
+            // AgentMessage table with FK to AgentSlot (emitted_by, cascade delete)
+            try db.create(table: "agent_message") { t in
+                t.primaryKey("id", .text).notNull()
+                t.column("content", .text).notNull()
+                t.column("messageType", .text).notNull()
+                t.column("fromSlotId", .text)
+                    .notNull()
+                    .references("agent_slot", onDelete: .cascade)
+                t.column("toSlotId", .text)
+                    .references("agent_slot", onDelete: .cascade)
+                t.column("isBroadcast", .boolean).notNull().defaults(to: false)
+                t.column("readAt", .datetime)
+                t.column("createdAt", .datetime).notNull()
+            }
+
+            // Indexes from model.json
+            try db.create(
+                index: "idx_agent_message_from_slot",
+                on: "agent_message",
+                columns: ["fromSlotId"]
+            )
+            try db.create(
+                index: "idx_agent_message_to_slot",
+                on: "agent_message",
+                columns: ["toSlotId"]
+            )
+            try db.create(
+                index: "idx_agent_message_created_at",
+                on: "agent_message",
+                columns: ["createdAt"]
+            )
+        }
+
         return migrator
     }
 

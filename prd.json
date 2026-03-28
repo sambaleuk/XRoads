@@ -1,268 +1,199 @@
 {
   "$schema": "../Modragor/schemas/prd.schema.json",
-  "feature_name": "Cockpit Mode — Conductor + Session Lifecycle",
-  "description": "Activation du mode Cockpit sur XRoads. Lecture du contexte projet, délibération Chairman via cockpit-council, assignation des slots avec MetierSkill. Gestion du cycle de vie CockpitSession.",
-  "branch": "feat/cockpit-01-conductor",
+  "feature_name": "Cockpit Mode — Inter-Slot Message Bus + Chairman Feed",
+  "description": "Bus de messages SQLite permettant aux AgentSlots de communiquer entre eux. Feed Chairman en temps réel synthétisant l'état global du projet. Les agents ne sont plus sourds l'un à l'autre.",
+  "branch": "feat/cockpit-02-bus",
   "created_at": "2026-03-28T00:00:00Z",
-  "status": "complete",
+  "status": "in_progress",
   "goals": [
-    "Implémenter la persistance SQLite de CockpitSession et AgentSlot",
-    "Implémenter le Conductor : lecture contexte projet → appel cockpit-council → slot assignment",
-    "Implémenter le cycle de vie CockpitLifecycle complet (idle → initializing → active → paused → closed)",
-    "Exposer le bouton Cockpit Mode dans l'UI XRoads avec feedback visuel séquentiel de démarrage"
+    "Implémenter AgentMessage persistence + MessageBusService actor",
+    "Permettre à chaque slot de publier et recevoir des messages typés",
+    "Implémenter le Chairman Feed : agrégation des messages → synthesis en temps réel",
+    "Afficher le feed et le chat par slot dans l'UI Cockpit"
   ],
   "non_goals": [
-    "Inter-slot message bus (PRD 02)",
     "SafeExecutor integration (PRD 03)",
-    "Métier skills au-delà de l'assignation (PRDs 04-07)"
+    "Communication réseau entre machines distinctes",
+    "Historique inter-sessions (hors scope v1)"
   ],
   "user_stories": [
     {
       "id": "US-001",
-      "title": "CockpitSession persistence layer (SQLite)",
-      "description": "As an orchestrator, I need CockpitSession and AgentSlot persisted in SQLite so that cockpit state survives app restarts and is queryable.",
+      "title": "AgentMessage persistence + MessageBusService",
+      "description": "As the message bus, I need AgentMessage persisted in SQLite and a MessageBusService actor that handles publish/subscribe for all active slots.",
       "priority": "critical",
       "status": "complete",
       "depends_on": [],
-      "touches": [
-        "CockpitSession",
-        "AgentSlot"
-      ],
+      "touches": ["AgentMessage", "AgentSlot", "CockpitSession"],
       "transition": "AgentSlotLifecycle.provision",
       "acceptance_criteria": [
-        "CockpitSession table created with all schema attributes",
-        "AgentSlot table created with FK to CockpitSession (cascade delete)",
-        "One active CockpitSession max per project_path (unique index enforced)",
-        "CRUD operations available via CockpitSessionRepository actor"
+        "AgentMessage table created with FK to AgentSlot and CockpitSession (cascade delete)",
+        "MessageBusService actor exposes publish(message:fromSlot:) and subscribe(toSession:) methods",
+        "Messages typed: status, question, blocker, completion, chairman_brief",
+        "Subscribers notified via AsyncStream on new messages"
       ],
       "tests": [
         {
-          "desc": "Should keep AgentSlot linked to CockpitSession with cascade delete",
+          "desc": "Should keep AgentMessage linked to AgentSlot",
           "type": "relation_integrity",
-          "entity": "AgentSlot",
-          "relation": "belongs_to",
-          "target": "CockpitSession"
+          "entity": "AgentMessage",
+          "relation": "emitted_by",
+          "target": "AgentSlot"
         },
         {
-          "desc": "Should block AgentSlot provisioning if no skill assigned",
-          "type": "guard_violation",
-          "machine": "AgentSlotLifecycle",
-          "event": "provision",
-          "guard": "has_skill_assigned"
+          "desc": "Should keep AgentMessage linked to CockpitSession with cascade delete",
+          "type": "relation_integrity",
+          "entity": "AgentMessage",
+          "relation": "belongs_to",
+          "target": "CockpitSession"
         }
       ],
       "unit_test": {
-        "file": "XRoadsTests/CockpitSessionRepositoryTests.swift",
-        "name": "test_cockpit_session_persistence",
-        "description": "Validates SQLite persistence of CockpitSession and AgentSlot with cascade",
+        "file": "XRoadsTests/MessageBusServiceTests.swift",
+        "name": "test_message_bus_publish_subscribe",
+        "description": "Validates AgentMessage persistence and pub/sub mechanics",
         "assertions": [
-          "should create CockpitSession and persist to SQLite",
-          "should enforce unique project_path constraint",
-          "should cascade delete slots on session removal"
+          "should persist AgentMessage to SQLite on publish",
+          "should notify subscribers via AsyncStream on new message",
+          "should cascade delete messages on slot removal",
+          "should filter messages by CockpitSession"
         ],
         "status": "passing"
       },
-      "technical_notes": "Use GRDB.swift for SQLite. Actor-based CockpitSessionRepository. Schema migration versioned.",
-      "completed_at": "2026-03-28T17:55:00Z",
+      "technical_notes": "MessageBusService as Swift actor with GRDB.swift. AsyncStream<AgentMessage> per session subscription. message_type enum enforced at DB level.",
+      "completed_at": "2026-03-28T18:44:00Z",
       "blocked_reason": null
     },
     {
       "id": "US-002",
-      "title": "Project context reader for Chairman deliberation",
-      "description": "As the Conductor, I need to read the project context (git log, PRD actif, issues ouvertes, dernière session) and package it for cockpit-council Chairman deliberation.",
+      "title": "Slot message publisher — agent emits structured messages",
+      "description": "As an AgentSlot, I need to emit structured messages on the bus so that other slots and the Chairman can react to my status, blockers, and completions.",
       "priority": "critical",
-      "status": "complete",
-      "depends_on": [
-        "US-001"
-      ],
-      "touches": [
-        "CockpitSession"
-      ],
-      "transition": "CockpitLifecycle.activate",
+      "status": "pending",
+      "depends_on": ["US-001"],
+      "touches": ["AgentMessage", "AgentSlot"],
+      "transition": "AgentSlotLifecycle.ready",
       "acceptance_criteria": [
-        "ProjectContextReader reads git log (last 20 commits), active PRD JSON, open branches",
-        "Context packaged as ChairmanInput struct",
-        "CockpitSession transitions from idle to initializing on activation",
-        "Activation blocked if no valid git repo at project_path (guard: has_valid_project)"
+        "PTYProcessRunner parses agent stdout for structured message patterns (JSON lines prefixed with [XROADS:])",
+        "Parsed messages published to MessageBusService automatically",
+        "AgentSlot.current_task updated on status message type",
+        "Blocker message type triggers slot status display update in UI"
       ],
       "tests": [
         {
-          "desc": "Should transition CockpitSession from idle to initializing on valid project",
-          "type": "state_transition",
-          "machine": "CockpitLifecycle",
-          "from": "idle",
-          "event": "activate",
-          "expected": "initializing"
-        },
-        {
-          "desc": "Should block activation if project_path has no git repo",
-          "type": "guard_violation",
-          "machine": "CockpitLifecycle",
-          "event": "activate",
-          "guard": "has_valid_project"
+          "desc": "Should parse and publish structured message from agent stdout",
+          "type": "functional"
         }
       ],
       "unit_test": {
-        "file": "XRoadsTests/ProjectContextReaderTests.swift",
-        "name": "test_project_context_reader",
-        "description": "Validates context reading and CockpitLifecycle activation",
+        "file": "XRoadsTests/SlotMessagePublisherTests.swift",
+        "name": "test_slot_message_publisher",
+        "description": "Validates structured message extraction from agent stdout",
         "assertions": [
-          "should read git log and package as ChairmanInput",
-          "should transition to initializing on valid project",
-          "should reject activation on invalid project path"
+          "should detect [XROADS:] prefix in stdout line",
+          "should parse JSON payload and create AgentMessage",
+          "should publish message to MessageBusService",
+          "should update AgentSlot.current_task on status message"
         ],
-        "status": "passing"
+        "status": "pending"
       },
-      "technical_notes": "ProjectContextReader as Swift actor. ChairmanInput: Codable struct with gitLog, prdSummary, openBranches, lastSession.",
-      "completed_at": "2026-03-28T18:00:00Z",
+      "technical_notes": "SKILL.md injects instruction: emit [XROADS:{type:status|blocker|completion|question, content:string}] lines. PTYOutputParser extracts these. No regex — swift Codable JSON decode.",
+      "completed_at": null,
       "blocked_reason": null
     },
     {
       "id": "US-003",
-      "title": "Conductor — Chairman output to slot assignment",
-      "description": "As the Conductor, I need to send ChairmanInput to cockpit-council, receive the Chairman synthesis, and assign MetierSkill to each AgentSlot based on the decision.",
-      "priority": "critical",
-      "status": "complete",
-      "depends_on": [
-        "US-002"
-      ],
-      "touches": [
-        "CockpitSession",
-        "AgentSlot",
-        "MetierSkill"
-      ],
-      "transition": "CockpitLifecycle.slots_assigned",
+      "title": "Chairman Feed aggregator — real-time project synthesis",
+      "description": "As the Chairman, I need to read all AgentMessages from active slots, synthesize the project state, and produce a chairman_brief message every N messages or on demand.",
+      "priority": "high",
+      "status": "pending",
+      "depends_on": ["US-002"],
+      "touches": ["AgentMessage", "CockpitSession"],
+      "transition": "CockpitLifecycle.pause",
       "acceptance_criteria": [
-        "CockpitCouncilClient sends ChairmanInput to cockpit-council Python library",
-        "Chairman output parsed into SlotAssignment array (slot_index, skill_name, agent_type, branch, task_description)",
-        "AgentSlot records created and persisted for each assignment",
-        "CockpitSession transitions from initializing to active (guard: at_least_one_slot_configured)",
-        "Slots light up sequentially in UI (not all at once)"
+        "ChairmanFeedService subscribes to MessageBusService for the active CockpitSession",
+        "Every 5 new messages or on blocker: call cockpit-council Chairman with context",
+        "Chairman synthesis published as AgentMessage type chairman_brief",
+        "Chairman brief stored in CockpitSession.chairman_brief field",
+        "Brief includes: active agents status, blockers, decisions recommended, action items"
       ],
       "tests": [
         {
-          "desc": "Should transition CockpitSession from initializing to active when slots assigned",
-          "type": "state_transition",
-          "machine": "CockpitLifecycle",
-          "from": "initializing",
-          "event": "slots_assigned",
-          "expected": "active"
-        },
-        {
-          "desc": "Should block transition if no slot is configured",
-          "type": "guard_violation",
-          "machine": "CockpitLifecycle",
-          "event": "slots_assigned",
-          "guard": "at_least_one_slot_configured"
-        },
-        {
-          "desc": "Should keep AgentSlot linked to CockpitSession",
-          "type": "relation_integrity",
-          "entity": "AgentSlot",
-          "relation": "belongs_to",
-          "target": "CockpitSession"
+          "desc": "Should update CockpitSession.chairman_brief after Chairman synthesis",
+          "type": "functional"
         }
       ],
       "unit_test": {
-        "file": "XRoadsTests/ConductorTests.swift",
-        "name": "test_conductor_slot_assignment",
-        "description": "Validates Conductor Chairman integration and slot assignment",
+        "file": "XRoadsTests/ChairmanFeedServiceTests.swift",
+        "name": "test_chairman_feed_aggregator",
+        "description": "Validates Chairman synthesis trigger and brief storage",
         "assertions": [
-          "should call cockpit-council with ChairmanInput and receive SlotAssignment",
-          "should create AgentSlot records from SlotAssignment",
-          "should transition session to active after assignment",
-          "should reject if no slots assigned"
+          "should trigger synthesis after 5 new messages",
+          "should trigger synthesis immediately on blocker message",
+          "should publish chairman_brief to message bus",
+          "should update CockpitSession.chairman_brief in SQLite"
         ],
-        "status": "passing"
+        "status": "pending"
       },
-      "technical_notes": "CockpitCouncilClient wraps cockpit-council via Python subprocess or HTTP. SlotAssignment: Codable. Sequential slot startup with 500ms delay between each for cinematic effect.",
-      "completed_at": "2026-03-28T18:10:00Z",
+      "technical_notes": "ChairmanFeedService as Swift actor. Synthesis: call cockpit-council Python with aggregated messages as context. Debounce synthesis calls with 2s minimum interval.",
+      "completed_at": null,
       "blocked_reason": null
     },
     {
       "id": "US-004",
-      "title": "Cockpit Mode UI — activation button and session status display",
-      "description": "As a user, I need a Cockpit Mode button in XRoads that activates the session and shows real-time status of each slot during initialization and runtime.",
+      "title": "Cockpit UI — chat panel per slot + Chairman feed display",
+      "description": "As a user, I need to see the message feed per slot and the Chairman brief panel so I can interact with each agent and understand the project state at a glance.",
       "priority": "high",
-      "status": "complete",
-      "depends_on": [
-        "US-003"
-      ],
-      "touches": [
-        "CockpitSession",
-        "AgentSlot"
-      ],
-      "transition": "CockpitLifecycle.pause",
+      "status": "pending",
+      "depends_on": ["US-003"],
+      "touches": ["AgentMessage", "AgentSlot", "CockpitSession"],
+      "transition": "CockpitLifecycle.resume",
       "acceptance_criteria": [
-        "Cockpit Mode toggle button visible in XRoads toolbar",
-        "Activation triggers sequential slot startup with visual animation per slot",
-        "Each slot card shows: skill name, agent type, status badge, current_task live",
-        "Pause / Resume / Close controls available for the entire session",
-        "CockpitSession pause transitions all slots to paused state"
+        "Each slot card has an expandable chat panel showing its AgentMessage history",
+        "User can type a message to the slot — injected into agent stdin",
+        "Chairman Feed panel (right sidebar or top bar) shows latest chairman_brief",
+        "chairman_brief auto-refreshes when CockpitSession.chairman_brief changes",
+        "Unread messages count badge on each slot card"
       ],
       "tests": [
         {
-          "desc": "Should transition CockpitSession to paused when pause triggered from UI",
-          "type": "state_transition",
-          "machine": "CockpitLifecycle",
-          "from": "active",
-          "event": "pause",
-          "expected": "paused"
-        },
-        {
-          "desc": "Should transition CockpitSession back to active on resume",
-          "type": "state_transition",
-          "machine": "CockpitLifecycle",
-          "from": "paused",
-          "event": "resume",
-          "expected": "active"
+          "desc": "Should display AgentMessages in slot chat panel filtered by AgentSlot",
+          "type": "functional"
         }
       ],
       "unit_test": {
-        "file": "XRoadsTests/CockpitModeViewTests.swift",
-        "name": "test_cockpit_mode_ui_lifecycle",
-        "description": "Validates Cockpit Mode UI state transitions and slot display",
+        "file": "XRoadsTests/CockpitChatPanelTests.swift",
+        "name": "test_cockpit_chat_panel_ui",
+        "description": "Validates chat panel display and user message injection",
         "assertions": [
-          "should show Cockpit button in toolbar",
-          "should animate slot activation sequentially",
-          "should update slot card status in real-time",
-          "should pause all slots on session pause"
+          "should display messages filtered by AgentSlot",
+          "should show unread badge count",
+          "should inject user message to agent stdin",
+          "should refresh chairman_brief on session update"
         ],
-        "status": "passing"
+        "status": "pending"
       },
-      "technical_notes": "CockpitModeView as SwiftUI view. @Observable CockpitViewModel drives state. Animation: withAnimation(.spring) on each slot card appearance.",
-      "completed_at": "2026-03-28T18:15:00Z",
+      "technical_notes": "SlotChatPanel SwiftUI view. @Observable SlotChatViewModel. User message → PTYProcessRunner.sendInput(). Chairman panel driven by @Observable CockpitSessionViewModel.",
+      "completed_at": null,
       "blocked_reason": null
     }
   ],
   "functional_requirements": [
-    {
-      "id": "FR-1",
-      "description": "Une seule CockpitSession active par project_path à tout moment"
-    },
-    {
-      "id": "FR-2",
-      "description": "Les slots s'allument séquentiellement, pas tous simultanément"
-    },
-    {
-      "id": "FR-3",
-      "description": "Le Conductor ne démarre pas si cockpit-council est indisponible"
-    },
-    {
-      "id": "FR-4",
-      "description": "Tous les changements d'état passent par les machines CockpitLifecycle et AgentSlotLifecycle"
-    }
+    { "id": "FR-1", "description": "Messages structurés uniquement — pas de stdout brut dans le bus" },
+    { "id": "FR-2", "description": "Chairman synthesis non-bloquante — agent continue pendant la délibération" },
+    { "id": "FR-3", "description": "User peut interagir avec chaque slot sans interrompre les autres" },
+    { "id": "FR-4", "description": "Messages persistés — feed récupérable après restart" }
   ],
   "technical_considerations": [
-    "GRDB.swift pour SQLite natif macOS",
-    "cockpit-council appelé via subprocess Python ou HTTP local",
-    "Swift actors pour CockpitSessionRepository, ConductorService",
-    "Nexus Loop compatible : prd.json référencé par le loop script"
+    "AsyncStream<AgentMessage> pour le real-time sans polling",
+    "Structured stdout protocol : [XROADS:{...}] prefix convention",
+    "Chairman synthesis via cockpit-council subprocess — async, non-bloquant",
+    "GRDB.swift observation pour les updates SQLite temps réel"
   ],
   "success_metrics": [
-    "CockpitSession persiste et se recharge après restart app",
-    "Chairman délibère et assigne les slots en moins de 10 secondes",
-    "0 transition non modélisée exécutée",
-    "100% des stories avec touches et transition renseignés"
+    "Agent status visible dans le slot en moins de 500ms après émission",
+    "Chairman brief produit en moins de 5 secondes après trigger",
+    "0 message perdu entre publish et subscriber notification",
+    "User message injecté dans agent stdin en moins de 200ms"
   ]
 }

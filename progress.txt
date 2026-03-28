@@ -2713,3 +2713,27 @@ Acceptance Criteria Met:
 
 - Build: swift build PASS
 - State machine compliance: CockpitLifecycle.pause and CockpitLifecycle.resume transitions fully implemented
+
+---
+
+## PRD: Cockpit Mode — Inter-Slot Message Bus + Chairman Feed
+
+### Iteration 1 - US-001 (AgentMessage persistence + MessageBusService)
+- Created AgentMessage model (XRoads/Models/AgentMessage.swift)
+  - AgentMessageType enum: status, question, blocker, completion, chairman_brief
+  - GRDB FetchableRecord + PersistableRecord conformance
+  - belongsTo AgentSlot FK relation (emitted_by)
+- Added v3 migration in CockpitDatabaseManager for agent_message table
+  - FK to agent_slot with CASCADE DELETE
+  - Indexes on fromSlotId, toSlotId, createdAt (per model.json)
+- Added hasMany(AgentMessage) association on AgentSlot
+- Created MessageBusService actor (XRoads/Services/MessageBusService.swift)
+  - publish(message:fromSlot:) — persists to SQLite + notifies subscribers
+  - subscribe(toSession:) — returns AsyncStream<AgentMessage> per session
+  - fetchMessages(sessionId:) — filters through slot→session join
+  - fetchMessages(slotId:) — direct slot filter
+  - Subscription cleanup on AsyncStream termination
+- Tests: 7/7 passing (XRoadsTests/MessageBusServiceTests.swift)
+  - Persistence, pub/sub notification, cascade delete on slot removal,
+    cascade delete on session removal, session filtering, all message types, relation integrity
+- Build: swift build PASS
