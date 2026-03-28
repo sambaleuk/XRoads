@@ -206,6 +206,9 @@ struct MainWindowView: View {
         Button {
             withAnimation(.easeInOut(duration: Theme.Animation.normal)) {
                 appState.showCockpitPanel.toggle()
+                if appState.showCockpitPanel {
+                    appState.bootstrapCockpit()
+                }
             }
         } label: {
             Label(

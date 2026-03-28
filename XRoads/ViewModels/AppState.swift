@@ -81,6 +81,50 @@ final class AppState {
     /// Cockpit view model (created lazily when cockpit mode is first activated)
     var cockpitViewModel: CockpitViewModel?
 
+    // MARK: - Cockpit Bootstrap
+
+    /// Creates and activates the CockpitViewModel with all dependencies.
+    /// Uses DemoCockpitCouncilClient for offline testing (no Python required).
+    func bootstrapCockpit() {
+        guard cockpitViewModel == nil else { return }
+        guard let path = projectPath, !path.isEmpty else {
+            error = .unknown("No project path set — open a git repository first")
+            return
+        }
+
+        Task { @MainActor in
+            do {
+                let dbManager = try CockpitDatabaseManager(path: CockpitDatabaseManager.defaultPath())
+                let dbQueue = await dbManager.dbQueue
+                let repository = await CockpitSessionRepository(databaseManager: dbManager)
+                let gitService = GitService()
+                let contextReader = ProjectContextReader(gitService: gitService, repository: repository)
+                let lifecycleManager = CockpitLifecycleManager(contextReader: contextReader, repository: repository)
+                let councilClient = DemoCockpitCouncilClient()
+                let conductorService = ConductorService(
+                    councilClient: councilClient,
+                    repository: repository,
+                    lifecycleManager: lifecycleManager
+                )
+                let bus = MessageBusService(dbQueue: dbQueue)
+                let gateRepo = ExecutionGateRepository(dbQueue: dbQueue)
+
+                let vm = CockpitViewModel(
+                    lifecycleManager: lifecycleManager,
+                    conductorService: conductorService,
+                    repository: repository,
+                    bus: bus,
+                    gateRepo: gateRepo
+                )
+                cockpitViewModel = vm
+
+                await vm.activate(projectPath: path)
+            } catch {
+                self.error = .unknown("Cockpit bootstrap failed: \(error.localizedDescription)")
+            }
+        }
+    }
+
     // MARK: - Delegating Properties (backward compatibility)
     // These forward to sub-states so existing view code continues to work.
     // Views should migrate to appState.dashboard.*, appState.dispatch.*, appState.orchestration.* over time.
