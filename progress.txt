@@ -2593,3 +2593,27 @@ Acceptance Criteria Met:
 - Learnings:
   - GRDB 7.x partial unique index via `condition:` parameter on create(index:) works well for "one active per project" constraint
   - In-memory DatabaseQueue is ideal for isolated test runs — no cleanup needed
+
+### Modragor Iteration 2 - US-002 (Project context reader for Chairman deliberation)
+- PRD: Cockpit Mode — Conductor + Session Lifecycle
+- Story: US-002 — ProjectContextReader reads git log, PRD, branches, last session and packages as ChairmanInput
+- Created ChairmanInput model (XRoads/Models/ChairmanInput.swift)
+  - ChairmanInput: Codable struct with gitLog, prdSummary, openBranches, lastSession, projectPath, collectedAt
+  - GitLogEntry, PRDSummary, LastSessionInfo supporting structs
+- Created ProjectContextReader actor (XRoads/Services/ProjectContextReader.swift)
+  - hasValidProject(at:) — validates has_valid_project guard (path exists + is git repo)
+  - readContext(projectPath:) — reads all context in parallel (async let)
+  - Reads last 20 commits, open branches, PRD JSON summary, last cockpit session
+- Created CockpitLifecycleManager actor (XRoads/Services/CockpitLifecycleManager.swift)
+  - activate(session:) — CockpitLifecycle idle → initializing transition
+  - Enforces has_valid_project guard, calls read_project_context action
+  - Returns (updated session, ChairmanInput) tuple
+- Tests: 7/7 passing (ProjectContextReaderTests.swift)
+  - Reads git log and packages as ChairmanInput
+  - Transitions idle → initializing on valid project
+  - Rejects on invalid project path (guard violation)
+  - Rejects on non-git directory (guard violation)
+  - Rejects when not in idle state (invalid transition)
+  - Guard validation (true/false) for hasValidProject
+- Build: swift build PASS
+- State machine compliance: CockpitLifecycle.activate transition fully implemented with guard + action

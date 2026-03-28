@@ -24,7 +24,10 @@
       "priority": "critical",
       "status": "complete",
       "depends_on": [],
-      "touches": ["CockpitSession", "AgentSlot"],
+      "touches": [
+        "CockpitSession",
+        "AgentSlot"
+      ],
       "transition": "AgentSlotLifecycle.provision",
       "acceptance_criteria": [
         "CockpitSession table created with all schema attributes",
@@ -68,9 +71,13 @@
       "title": "Project context reader for Chairman deliberation",
       "description": "As the Conductor, I need to read the project context (git log, PRD actif, issues ouvertes, dernière session) and package it for cockpit-council Chairman deliberation.",
       "priority": "critical",
-      "status": "pending",
-      "depends_on": ["US-001"],
-      "touches": ["CockpitSession"],
+      "status": "complete",
+      "depends_on": [
+        "US-001"
+      ],
+      "touches": [
+        "CockpitSession"
+      ],
       "transition": "CockpitLifecycle.activate",
       "acceptance_criteria": [
         "ProjectContextReader reads git log (last 20 commits), active PRD JSON, open branches",
@@ -104,10 +111,10 @@
           "should transition to initializing on valid project",
           "should reject activation on invalid project path"
         ],
-        "status": "pending"
+        "status": "passing"
       },
       "technical_notes": "ProjectContextReader as Swift actor. ChairmanInput: Codable struct with gitLog, prdSummary, openBranches, lastSession.",
-      "completed_at": null,
+      "completed_at": "2026-03-28T18:00:00Z",
       "blocked_reason": null
     },
     {
@@ -116,8 +123,14 @@
       "description": "As the Conductor, I need to send ChairmanInput to cockpit-council, receive the Chairman synthesis, and assign MetierSkill to each AgentSlot based on the decision.",
       "priority": "critical",
       "status": "pending",
-      "depends_on": ["US-002"],
-      "touches": ["CockpitSession", "AgentSlot", "MetierSkill"],
+      "depends_on": [
+        "US-002"
+      ],
+      "touches": [
+        "CockpitSession",
+        "AgentSlot",
+        "MetierSkill"
+      ],
       "transition": "CockpitLifecycle.slots_assigned",
       "acceptance_criteria": [
         "CockpitCouncilClient sends ChairmanInput to cockpit-council Python library",
@@ -172,8 +185,13 @@
       "description": "As a user, I need a Cockpit Mode button in XRoads that activates the session and shows real-time status of each slot during initialization and runtime.",
       "priority": "high",
       "status": "pending",
-      "depends_on": ["US-003"],
-      "touches": ["CockpitSession", "AgentSlot"],
+      "depends_on": [
+        "US-003"
+      ],
+      "touches": [
+        "CockpitSession",
+        "AgentSlot"
+      ],
       "transition": "CockpitLifecycle.pause",
       "acceptance_criteria": [
         "Cockpit Mode toggle button visible in XRoads toolbar",
@@ -218,10 +236,22 @@
     }
   ],
   "functional_requirements": [
-    { "id": "FR-1", "description": "Une seule CockpitSession active par project_path à tout moment" },
-    { "id": "FR-2", "description": "Les slots s'allument séquentiellement, pas tous simultanément" },
-    { "id": "FR-3", "description": "Le Conductor ne démarre pas si cockpit-council est indisponible" },
-    { "id": "FR-4", "description": "Tous les changements d'état passent par les machines CockpitLifecycle et AgentSlotLifecycle" }
+    {
+      "id": "FR-1",
+      "description": "Une seule CockpitSession active par project_path à tout moment"
+    },
+    {
+      "id": "FR-2",
+      "description": "Les slots s'allument séquentiellement, pas tous simultanément"
+    },
+    {
+      "id": "FR-3",
+      "description": "Le Conductor ne démarre pas si cockpit-council est indisponible"
+    },
+    {
+      "id": "FR-4",
+      "description": "Tous les changements d'état passent par les machines CockpitLifecycle et AgentSlotLifecycle"
+    }
   ],
   "technical_considerations": [
     "GRDB.swift pour SQLite natif macOS",
